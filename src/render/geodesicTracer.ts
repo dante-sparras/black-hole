@@ -5,12 +5,15 @@ import {
   Fn,
   If,
   Loop,
+  atan,
   cos,
   cross,
   dot,
   float,
+  floor,
   fract,
   int,
+  log,
   max,
   min,
   pow,
@@ -243,14 +246,86 @@ export function createGeodesicTracer(): GeodesicTracer {
             const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.1))
             // Extra flux weight ∝ ṁ keeps dim disks truly dim (color already from T)
             const iScale = pow(mdot.div(0.1), float(0.35))
+
+            // --- Disk texture: log spirals + multi-scale turbulence ---
+            const phi = atan(hz, hx)
+            const lnR = log(max(rhoSafe.div(M), float(1e-4)))
+            const arms = float(2)
+            const pitch = float(0.55)
+            const spiral = arms.mul(phi.sub(pitch.mul(lnR))).add(0.3)
+            const armWave = float(0.5).add(float(0.5).mul(cos(spiral)))
+            const armsBright = pow(max(armWave, float(1e-4)), float(1.35))
+            const armContrast = float(0.55)
+            const armFac = float(1)
+              .sub(armContrast)
+              .add(armContrast.mul(float(0.35).add(armsBright.mul(0.9))))
+
+            // Hash noise helpers (inline; nested TSL Fn avoided)
+            const nUV = vec2(rhoSafe.div(M).mul(0.35), phi.mul(1.7).add(lnR.mul(0.8)))
+            // octave 1
+            const i1 = vec2(floor(nUV.x), floor(nUV.y))
+            const f1 = vec2(nUV.x.sub(i1.x), nUV.y.sub(i1.y))
+            const u1 = f1.mul(f1).mul(float(3).sub(f1.mul(2)))
+            const h00 = fract(sin(i1.x.mul(127.1).add(i1.y.mul(311.7))).mul(43758.5453))
+            const h10 = fract(
+              sin(i1.x.add(1).mul(127.1).add(i1.y.mul(311.7))).mul(43758.5453),
+            )
+            const h01 = fract(
+              sin(i1.x.mul(127.1).add(i1.y.add(1).mul(311.7))).mul(43758.5453),
+            )
+            const h11 = fract(
+              sin(i1.x.add(1).mul(127.1).add(i1.y.add(1).mul(311.7))).mul(43758.5453),
+            )
+            const n1 = h00
+              .mul(float(1).sub(u1.x))
+              .add(h10.mul(u1.x))
+              .mul(float(1).sub(u1.y))
+              .add(h01.mul(float(1).sub(u1.x)).add(h11.mul(u1.x)).mul(u1.y))
+            // octave 2 (scaled)
+            const nUV2 = nUV.mul(2.1)
+            const i2 = vec2(floor(nUV2.x), floor(nUV2.y))
+            const f2 = vec2(nUV2.x.sub(i2.x), nUV2.y.sub(i2.y))
+            const u2 = f2.mul(f2).mul(float(3).sub(f2.mul(2)))
+            const p00 = fract(sin(i2.x.mul(127.1).add(i2.y.mul(311.7))).mul(43758.5453))
+            const p10 = fract(
+              sin(i2.x.add(1).mul(127.1).add(i2.y.mul(311.7))).mul(43758.5453),
+            )
+            const p01 = fract(
+              sin(i2.x.mul(127.1).add(i2.y.add(1).mul(311.7))).mul(43758.5453),
+            )
+            const p11 = fract(
+              sin(i2.x.add(1).mul(127.1).add(i2.y.add(1).mul(311.7))).mul(43758.5453),
+            )
+            const n2 = p00
+              .mul(float(1).sub(u2.x))
+              .add(p10.mul(u2.x))
+              .mul(float(1).sub(u2.y))
+              .add(p01.mul(float(1).sub(u2.x)).add(p11.mul(u2.x)).mul(u2.y))
+            const turb = n1.mul(0.67).add(n2.mul(0.33))
+            const turbContrast = float(0.4)
+            const turbFac = float(1)
+              .sub(turbContrast)
+              .add(turbContrast.mul(float(0.45).add(turb.mul(0.9))))
+
+            const ripple = float(0.5).add(
+              float(0.5).mul(sin(lnR.mul(4.2).add(phi.mul(0.5)))),
+            )
+            const texFac = max(
+              float(0.28),
+              min(float(1.85), armFac.mul(turbFac).mul(float(0.92).add(ripple.mul(0.16)))),
+            )
+            // Mild T jitter in dense filaments
+            const tJitter = float(0.9).add(turb.mul(0.2))
+
             const emit = vec3(
-              min(float(2.2), float(0.45).add(Tobs.mul(1.15))),
-              min(float(1.6), float(0.15).add(Tobs.mul(0.7))),
-              min(float(1.2), float(0.03).add(Tobs.mul(Tobs).mul(0.25))),
+              min(float(2.2), float(0.45).add(Tobs.mul(tJitter).mul(1.15))),
+              min(float(1.6), float(0.15).add(Tobs.mul(tJitter).mul(0.7))),
+              min(float(1.2), float(0.03).add(Tobs.mul(tJitter).mul(Tobs).mul(0.25))),
             )
               .mul(bounce)
               .mul(beam)
               .mul(iScale)
+              .mul(texFac)
 
             col.addAssign(emit.mul(transm))
             transm.mulAssign(0.4)
