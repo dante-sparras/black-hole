@@ -12,10 +12,10 @@ export type CameraState = {
 }
 
 export const CAMERA_DEFAULTS: CameraState = {
-  distanceM: 28,
-  inclination: 1.15, // ~66° from face-on — classic disk silhouette
+  distanceM: 40,
+  inclination: 1.35, // ~77° from face-on — classic disk + central shadow
   azimuth: 0,
-  fov: 0.62,
+  fov: 0.5,
 }
 
 export const CAMERA_LIMITS = {

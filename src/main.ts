@@ -29,7 +29,10 @@ renderer.setClearColor(0x000000, 1)
 document.body.appendChild(renderer.domElement)
 
 const scene = new THREE.Scene()
-const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+// Fullscreen NDC: camera in front of the plane (z=0). near < 1 < far.
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
+camera.position.set(0, 0, 1)
+camera.lookAt(0, 0, 0)
 
 const tracer = createSchwarzschildTracer()
 scene.add(tracer.mesh)
