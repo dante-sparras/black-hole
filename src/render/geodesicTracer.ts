@@ -326,12 +326,21 @@ export function createGeodesicTracer(): GeodesicTracer {
             )
             const tJitter = float(0.9).add(turb.mul(0.2))
 
-            // Blackbody chromaticity from T_obs (Kelvin via T_ref)
-            // B_λ ∝ λ⁻⁵ / (e^{c₂/(λT)} − 1); sample R/G/B, max-normalize
-            // T_REF=2800: typical NT Tobs~0.5–1.5 → ~1400–4200 K (red→orange→white)
+            // Blackbody chromaticity from T_obs (power-law → Kelvin, then Planck)
+            // T_K = 4500 · (Tobs / 0.75)^1.75  → cool red, hot blue-white
+            // (linear Tobs·const cannot span red→blue: NT only varies ~2–3×)
             const planckC2 = float(1.4387769e7) // nm·K
-            const tRefK = float(2800)
-            const TK = max(float(800), min(float(40000), Tobs.mul(tJitter).mul(tRefK)))
+            const tPivotObs = float(0.75)
+            const tPivotK = float(4500)
+            const tGamma = float(1.75)
+            const tSafe = max(Tobs.mul(tJitter), float(1e-6))
+            const TK = max(
+              float(800),
+              min(
+                float(40000),
+                tPivotK.mul(pow(tSafe.div(tPivotObs), tGamma)),
+              ),
+            )
             const lamR = float(680)
             const lamG = float(550)
             const lamB = float(440)
@@ -345,17 +354,15 @@ export function createGeodesicTracer(): GeodesicTracer {
             const bMax = max(br, max(bg, bb))
             const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-            // Brightness: beaming · ṁ · texture · soft T^2.5 (pivot ~3500 K)
-            const tPivot = float(3500)
-            const tRatio = TK.div(tPivot)
-            const iBB = pow(tRatio, float(2.5))
-            // Cap HDR so bloom doesn't white-out the shadow
+            // Brightness: beaming · ṁ · texture · soft T^2.2 (avoid ACES white-out)
+            const tRatio = TK.div(tPivotK)
+            const iBB = pow(tRatio, float(2.2))
             const emit = chroma
               .mul(bounce)
               .mul(beam)
               .mul(iScale)
               .mul(texFac)
-              .mul(min(iBB.mul(1.4), float(4.0)))
+              .mul(min(iBB.mul(1.2), float(3.5)))
 
             col.addAssign(emit.mul(transm))
             transm.mulAssign(0.4)

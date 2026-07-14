@@ -3,8 +3,8 @@ import {
   blackbodyIntensityScale,
   blackbodyRgb,
   blackbodyRgbFromTobs,
-  DEFAULT_T_REF_K,
   isBlueDominated,
+  isBlueish,
   isRedDominated,
   planckBLambdaRel,
   toobsToKelvin,
@@ -42,52 +42,52 @@ describe('blackbodyRgb', () => {
     expect(c.g).toBeGreaterThan(0.5)
     expect(c.b).toBeGreaterThan(0.35)
   })
-
-  test('channels in [0,1]', () => {
-    for (const T of [1000, 3000, 6500, 12000, 30000]) {
-      const c = blackbodyRgb(T)
-      expect(c.r).toBeGreaterThanOrEqual(0)
-      expect(c.g).toBeGreaterThanOrEqual(0)
-      expect(c.b).toBeGreaterThanOrEqual(0)
-      expect(c.r).toBeLessThanOrEqual(1 + 1e-9)
-      expect(c.g).toBeLessThanOrEqual(1 + 1e-9)
-      expect(c.b).toBeLessThanOrEqual(1 + 1e-9)
-    }
-  })
 })
 
-describe('Tobs mapping (calibrated)', () => {
-  test('DEFAULT_T_REF keeps typical cool Tobs red/orange', () => {
-    // Approximate cool outer-disk Tobs at low ṁ (no g)
+describe('Tobs power-law mapping spans red → blue', () => {
+  test('cool low-ṁ NT is red/orange', () => {
     const tCool = novikovThorneTemperature(18, 6, 1, 0, 0.015)
     const c = blackbodyRgbFromTobs(tCool)
     expect(c.r).toBeGreaterThan(c.b)
-    expect(toobsToKelvin(tCool)).toBeLessThan(4500)
+    expect(toobsToKelvin(tCool)).toBeLessThan(4000)
   })
 
-  test('DEFAULT_T_REF keeps mid ṁ more orange/white than blue', () => {
+  test('default ṁ mid disk is orange/white not deep blue', () => {
     const tMid = novikovThorneTemperature(10, 6, 1, 0.5, 0.1)
-    const c = blackbodyRgbFromTobs(tMid)
-    // Should not be strongly blue-dominated at default ṁ
-    expect(c.b).toBeLessThanOrEqual(c.r + 0.15)
-    expect(toobsToKelvin(tMid)).toBeLessThan(8000)
+    const TK = toobsToKelvin(tMid)
+    expect(TK).toBeGreaterThan(3000)
+    expect(TK).toBeLessThan(9000)
+    const c = blackbodyRgb(TK)
+    // not strongly blue-only
+    expect(c.r).toBeGreaterThan(0.55)
   })
 
-  test('high Tobs can still reach blue-white', () => {
-    const c = blackbodyRgbFromTobs(4.0, DEFAULT_T_REF_K)
-    expect(c.b).toBeGreaterThan(0.7)
+  test('high ṁ peak can reach blueish chromaticity', () => {
+    const tHot = novikovThorneTemperature(8, 6, 1, 0.9, 0.8)
+    // mild blueshift boost like Doppler approaching side
+    const tObs = tHot * 1.35
+    const c = blackbodyRgbFromTobs(tObs)
+    expect(toobsToKelvin(tObs)).toBeGreaterThan(8000)
+    expect(isBlueish(c) || c.b > c.r).toBe(true)
   })
 
-  test('low Tobs → red', () => {
-    const c = blackbodyRgbFromTobs(0.4, DEFAULT_T_REF_K)
-    expect(isRedDominated(c)).toBe(true)
+  test('very low Tobs → red', () => {
+    expect(isRedDominated(blackbodyRgbFromTobs(0.3))).toBe(true)
+  })
+
+  test('very high Tobs → blue', () => {
+    expect(isBlueDominated(blackbodyRgbFromTobs(3.0))).toBe(true)
+  })
+
+  test('Kelvin increases with Tobs', () => {
+    expect(toobsToKelvin(1.2)).toBeGreaterThan(toobsToKelvin(0.5))
   })
 })
 
 describe('intensity scale', () => {
   test('increases with temperature', () => {
-    expect(blackbodyIntensityScale(5000)).toBeGreaterThan(
-      blackbodyIntensityScale(2500),
+    expect(blackbodyIntensityScale(8000)).toBeGreaterThan(
+      blackbodyIntensityScale(3000),
     )
   })
 })

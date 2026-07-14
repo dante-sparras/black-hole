@@ -3,22 +3,26 @@
  * Uses Planck B_λ at three representative wavelengths, then max-normalizes
  * for chromaticity. Intensity is applied separately by the renderer.
  *
- * Dimensionless sim temperature Tobs (order-unity from NT + g) maps via:
- *   T_K = clamp(Tobs · T_REF)
- *
- * T_REF is calibrated so typical disks span red → orange → white → blue-white
- * as ṁ / Tobs rise (not always blue).
+ * Dimensionless sim Tobs (order-unity from NT + g) is mapped with a
+ * power-law stretch so the limited NT dynamic range still spans
+ * red → orange → white → blue-white as ṁ / Doppler rise.
  */
 
 /** Second radiation constant hc/k in nm·K */
 export const PLANCK_C2_NM_K = 1.4387769e7
 
 /**
- * Kelvin per unit dimensionless Tobs.
- * NT Tobs is typically ~0.4–1.5 for ṁ~0.01–0.8; with T_REF=2800:
- *   cool ~1100–2000 K (red/orange), mid ~2500–4000 K, hot+Doppler → white/blue.
+ * Pivot for Tobs → Kelvin power-law:
+ *   T_K = T_PIVOT_K · (Tobs / T_PIVOT_OBS)^GAMMA
+ * Typical mid-disk default-ṁ Tobs ≈ 0.7–0.9 → orange-white.
+ * Gamma > 1 stretches the hot end into blue-white.
  */
-export const DEFAULT_T_REF_K = 2800
+export const T_PIVOT_OBS = 0.75
+export const T_PIVOT_K = 4500
+export const T_OBS_GAMMA = 1.75
+
+/** @deprecated use power-law pivots; kept as approx mid-scale for docs/tests */
+export const DEFAULT_T_REF_K = T_PIVOT_K / T_PIVOT_OBS
 
 /** Representative wavelengths (nm) for a simple RGB sampling of B_λ */
 export const LAMBDA_R_NM = 680
@@ -52,12 +56,21 @@ export function clampColorTemperatureK(tKelvin: number): number {
 }
 
 /**
- * Map dimensionless observed temperature scale → Kelvin.
- * T_K = clamp(Tobs · T_ref)
+ * Map dimensionless observed temperature → Kelvin (power-law stretch).
+ * Cool NT → red/orange; high ṁ + blueshift → white/blue-white.
  */
-export function toobsToKelvin(tObs: number, tRefK = DEFAULT_T_REF_K): number {
-  const t = Math.max(tObs, 0) * Math.max(tRefK, 1)
-  return clampColorTemperatureK(t)
+export function toobsToKelvin(
+  tObs: number,
+  tPivotObs = T_PIVOT_OBS,
+  tPivotK = T_PIVOT_K,
+  gamma = T_OBS_GAMMA,
+): number {
+  const t = Math.max(tObs, 1e-8)
+  const pObs = Math.max(tPivotObs, 1e-8)
+  const pK = Math.max(tPivotK, 1)
+  const g = Math.max(gamma, 0.1)
+  const TK = pK * (t / pObs) ** g
+  return clampColorTemperatureK(TK)
 }
 
 /**
@@ -74,21 +87,19 @@ export function blackbodyRgb(tKelvin: number): Rgb {
 }
 
 /** Convenience: dimensionless Tobs → linear RGB chromaticity. */
-export function blackbodyRgbFromTobs(tObs: number, tRefK = DEFAULT_T_REF_K): Rgb {
-  return blackbodyRgb(toobsToKelvin(tObs, tRefK))
+export function blackbodyRgbFromTobs(tObs: number): Rgb {
+  return blackbodyRgb(toobsToKelvin(tObs))
 }
 
 /**
- * Relative intensity scale. Uses soft power < 4 so cool gas stays visible
- * and hot gas doesn't force ACES into pure white.
- * Pivot ~3500 K ≈ orange-white mid disk.
+ * Relative intensity. Soft power so cool gas stays visible and hot
+ * doesn't force ACES into pure desaturated white (which kills blue).
  */
-export function blackbodyIntensityScale(tKelvin: number, tPivotK = 3500): number {
+export function blackbodyIntensityScale(tKelvin: number, tPivotK = 4500): number {
   const T = clampColorTemperatureK(tKelvin)
   const p = Math.max(tPivotK, 1)
   const x = T / p
-  // ≈ T^{2.5} — between Rayleigh–Jeans and Stefan–Boltzmann for viz balance
-  return Math.pow(x, 2.5)
+  return Math.pow(x, 2.2)
 }
 
 /** True if RGB is red-dominated (cool). */
@@ -96,7 +107,12 @@ export function isRedDominated(rgb: Rgb): boolean {
   return rgb.r >= rgb.g && rgb.r >= rgb.b
 }
 
-/** True if RGB is blue-dominated (hot). */
+/** True if blue is the strongest channel (hot). */
 export function isBlueDominated(rgb: Rgb): boolean {
   return rgb.b > rgb.r && rgb.b >= rgb.g
+}
+
+/** True if clearly blue-white (blue high, not red). */
+export function isBlueish(rgb: Rgb): boolean {
+  return rgb.b > 0.85 && rgb.b > rgb.r
 }
