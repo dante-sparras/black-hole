@@ -83,9 +83,23 @@ describe('diskTemperatureK (physical NT path)', () => {
     expect(observedTemperatureK(10000, 1.5)).toBeCloseTo(15000, 5)
   })
 
-  test('diskPeakTemperatureK increases with spin mildly', () => {
-    expect(diskPeakTemperatureK(0.1, 0.9)).toBeGreaterThan(
-      diskPeakTemperatureK(0.1, 0),
+  test('diskPeakTemperatureK higher at small r_ISCO (high spin)', () => {
+    const schw = diskPeakTemperatureK(0.1, 6, 0)
+    const kerr = diskPeakTemperatureK(0.1, 1.5, 0.998)
+    expect(kerr).toBeGreaterThan(schw * 1.5)
+  })
+
+  test('fixed ṁ: extremal Kerr peak hotter than Schwarzschild', () => {
+    // r_ISCO(a★=0)=6M; near-extremal prograde ~1.2–1.5M
+    const tSchw = diskTemperatureK(novikovThornePeakRadius(6), 6, 0.1, 0, 1)
+    const rIscoK = 1.45
+    const tKerr = diskTemperatureK(
+      novikovThornePeakRadius(rIscoK),
+      rIscoK,
+      0.1,
+      0.998,
+      1,
     )
+    expect(tKerr).toBeGreaterThan(tSchw)
   })
 })

@@ -50,7 +50,7 @@ export const PRESET_DEFAULT: ScenePreset = {
 export const PRESET_INTERSTELLAR: ScenePreset = {
   id: 'interstellar',
   label: 'Interstellar',
-  hint: 'Near-extremal · warm · subtle glow',
+  hint: 'Near-extremal · hotter ISCO · soft glow',
   params: {
     mass: 1,
     spinStar: 0.998,

@@ -250,15 +250,19 @@ export function createGeodesicTracer(): GeodesicTracer {
             const fluxVis = pow(max(fluxRel, float(1e-6)), float(0.5))
 
             // --- Color temperature (Kelvin) — COLOR ONLY ---
-            // T_peak ∝ ṁ^{1/4}; T(r) = T_peak (F/Fmax)^{1/4}; T_obs = g T_rest
-            // IMPORTANT: do NOT use absolute optical B_λ for brightness.
-            // At T ≲ 3000 K, Wien cutoff makes B_optical ≈ 0 → black silhouette bug.
+            // Higher spin → smaller r_ISCO → hotter peak (T ∝ r_in^{-3/4}), not cooler.
+            // T(r) = T_peak (F/Fmax)^{1/4}; mild g on observed color (not full g³ wipe).
+            const rIscoM = max(uRIscoM, float(1.05))
+            const iscoHot = pow(float(6).div(rIscoM), float(0.75))
+            const spinFac = float(1).add(max(aStar, float(0)).mul(0.12))
             const tPeakK = float(9000)
               .mul(pow(max(mdot.div(0.1), float(1e-6)), float(0.25)))
-              .mul(float(1).add(max(aStar, float(0)).mul(0.2)))
+              .mul(iscoHot)
+              .mul(spinFac)
             const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
-            // Keep color T in optical-sensitive range (never Wien-death for chroma)
-            const TK = max(float(1800), min(float(40000), tRestK.mul(freq)))
+            // Soft redshift on color: full g over-redshifts high-spin inner disk
+            const gColor = pow(max(freq, float(0.35)), float(0.45))
+            const TK = max(float(1800), min(float(45000), tRestK.mul(gColor)))
 
             // Max-normalized blackbody chromaticity (always unit peak channel)
             const planckC2 = float(1.4387769e7)

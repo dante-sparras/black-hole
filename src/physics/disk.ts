@@ -82,23 +82,36 @@ export function novikovThornePeakRadius(rIsco: number): number {
 /**
  * Peak effective temperature [K] at the NT flux maximum.
  *
- * Note on realism: true stellar-mass thin disks often peak at ~0.1–1 keV
- * (millions of K), so a pure optical blackbody would be blue-white almost
- * everywhere. For a multi-color disk *in optical-like color space* we set
- * T_peak so the radial profile spans the optical color locus (~few×10³–10⁴ K),
- * with T ∝ ṁ^{1/4} as in thin-disk theory.
+ * Higher spin → smaller r_ISCO → hotter inner disk (thin-disk T ∝ r_in^{-3/4})
+ * and higher radiative efficiency. Fixed ṁ, high a★ should look hotter/bluer,
+ * not cooler.
  *
- * Reference: ṁ = 0.1, a★ = 0 → T_peak = T_PEAK_REF_K.
+ * Reference: ṁ = 0.1, r_ISCO = 6M (Schw), a★ = 0 → T_peak = T_PEAK_REF_K.
  */
 export const T_PEAK_REF_K = 9_000
 export const T_PEAK_MDOT_REF = 0.1
+/** Schwarzschild ISCO in units of M (reference for spin heating). */
+export const R_ISCO_SCHW_OVER_M = 6
 
-export function diskPeakTemperatureK(mdot: number, spinStar = 0): number {
+/**
+ * Peak T [K] from ṁ and r_ISCO/M (and mild residual spin factor).
+ * Dominant effect: iscoHot = (6 / (r_ISCO/M))^{3/4}
+ */
+export function diskPeakTemperatureK(
+  mdot: number,
+  rIscoOverM = R_ISCO_SCHW_OVER_M,
+  spinStar = 0,
+): number {
   const m = Math.max(mdot, 1e-8)
-  const spinFac = 1 + 0.25 * Math.max(0, Math.min(spinStar, 0.998))
+  const rinM = Math.max(rIscoOverM, 1.05)
+  // Thin-disk: smaller ISCO (high prograde spin) → hotter peak
+  const iscoHot = Math.pow(R_ISCO_SCHW_OVER_M / rinM, 0.75)
+  // Small extra efficiency nudge with spin (η rises with a★)
+  const spinFac = 1 + 0.12 * Math.max(0, Math.min(spinStar, 0.998))
   return (
     T_PEAK_REF_K *
     Math.pow(m / T_PEAK_MDOT_REF, 0.25) *
+    iscoHot *
     spinFac
   )
 }
@@ -112,13 +125,15 @@ export function diskTemperatureK(
   rIsco: number,
   mdot: number,
   spinStar = 0,
+  mass = 1,
 ): number {
   const F = novikovThorneFluxFactor(r, rIsco)
   if (F <= 0) return 0
   const rPeak = novikovThornePeakRadius(rIsco)
   const Fmax = novikovThorneFluxFactor(rPeak, rIsco)
   if (!(Fmax > 0)) return 0
-  const Tpeak = diskPeakTemperatureK(mdot, spinStar)
+  const rIscoOverM = rIsco / Math.max(mass, 1e-12)
+  const Tpeak = diskPeakTemperatureK(mdot, rIscoOverM, spinStar)
   return Tpeak * Math.pow(F / Fmax, 0.25)
 }
 
