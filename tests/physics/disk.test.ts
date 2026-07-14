@@ -109,9 +109,9 @@ describe('mdot scales', () => {
     const c = mdotDisplayBrightness(1)
     expect(b).toBeGreaterThan(a)
     expect(c).toBeGreaterThan(b)
-    // linear would be 100× from 0.001→0.1; soft curve much less
-    expect(b / a).toBeLessThan(40)
-    expect(b / a).toBeGreaterThan(2)
+    // Min ṁ still has substantial floor (visible disk)
+    expect(a).toBeGreaterThan(0.35)
+    expect(b / a).toBeLessThan(10)
   })
 })
 

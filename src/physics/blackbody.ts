@@ -1,11 +1,12 @@
 /**
- * Blackbody spectrum → linear RGB for thermal disk emission.
+ * Blackbody spectrum → linear RGB chromaticity for thermal disk color.
  *
- * Physics path (no film palette, no Tobs power-law hacks):
- *   1. Effective temperature T [K] from Novikov–Thorne + ṁ (see disk.ts)
- *   2. Observed T_obs ≈ g · T_rest (gravitational + Doppler)
- *   3. Planck B_λ at three optical wavelengths → chromaticity
- *   4. Intensity handled separately (∝ F · g³), not double-counted here
+ * CRITICAL: Use max-normalized RGB for COLOR only.
+ * Do NOT use absolute optical B_λ as surface brightness at low T —
+ * Wien cutoff makes B_optical ≈ 0 below ~3000 K, which produced the
+ * "matte black disk" bug (opaque + zero emit).
+ *
+ * Brightness must come from NT flux · ṁ display scale · g^n (see tracer).
  */
 
 /** Second radiation constant hc/k in nm·K */

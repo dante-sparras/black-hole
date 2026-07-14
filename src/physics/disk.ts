@@ -90,7 +90,7 @@ export function novikovThornePeakRadius(rIsco: number): number {
  *
  * Reference: ṁ = 0.1, a★ = 0 → T_peak = T_PEAK_REF_K.
  */
-export const T_PEAK_REF_K = 8_500
+export const T_PEAK_REF_K = 9_000
 export const T_PEAK_MDOT_REF = 0.1
 
 export function diskPeakTemperatureK(mdot: number, spinStar = 0): number {
@@ -137,13 +137,13 @@ export function mdotTemperatureScale(mdot: number): number {
 }
 
 /**
- * Display brightness weight for ṁ (not pure linear — keeps cool chromaticity
- * visible under tone-mapping while still dimming at low accretion).
- * Physical bolometric F∝ṁ; this is the renderer’s optical presentation curve.
+ * Display brightness weight for ṁ.
+ * Ensures min-slider disks stay visible (thick thermal surface) while
+ * still brightening toward high ṁ. Not pure F∝ṁ (that + ACES → black).
  */
 export function mdotDisplayBrightness(mdot: number): number {
-  const x = Math.max(mdot / 0.1, 0.008)
-  return Math.pow(x, 0.42)
+  const x = Math.max(mdot / 0.1, 0.01)
+  return 0.4 + 1.2 * Math.pow(x, 0.35)
 }
 
 /** Flux / bolometric intensity scale: F ∝ ṁ. */
