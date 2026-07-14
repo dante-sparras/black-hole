@@ -231,14 +231,14 @@ export function createGeodesicTracer(): GeodesicTracer {
             const mu = dot(tdir, nObs)
             const lambda = rhoSafe.mul(mu)
             const freq = float(1).div(
-              max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.15)),
+              max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.2)),
             )
-            // I ∝ g³ (no hard floor that invents light — soft clamp only for NaN safety)
-            const beam = pow(max(freq, float(0.2)), float(3))
+            // Doppler: g² is enough asymmetry; g³ + low ṁ wiped the disk face to black
+            const beam = pow(max(freq, float(0.35)), float(2.0))
 
-            // --- Novikov–Thorne flux & physical T [K] ---
-            // F̃ = ρ⁻³ (1 − √(r_in/ρ)); F ∝ ṁ F̃
-            // T(r) = T_peak (F̃/F̃_max)^{1/4}, T_peak = 11000 K · (ṁ/0.1)^{1/4} · (1+0.25 a★)
+            // --- Novikov–Thorne flux & T [K] ---
+            // T(r) = T_peak (F̃/F̃_max)^{1/4}
+            // T_peak = 8500 K · (ṁ/0.1)^{1/4} · (1+0.25 a★)
             const gap = max(float(1).sub(sqrt(rin.div(max(rho, rin.mul(1.0001))))), float(0))
             const Ftilde = gap.div(rho.mul(rho).mul(rho).add(1e-12))
             const rPeak = rin.mul(49 / 36)
@@ -247,27 +247,29 @@ export function createGeodesicTracer(): GeodesicTracer {
               float(0),
             )
             const FtildeMax = gapPeak.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
-            const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12))) // 0…~1 near peak
+            // Soft radial profile for optical presentation (raw F falls too hard → black outer disk)
+            const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
+            const fluxVis = pow(max(fluxRel, float(1e-6)), float(0.55))
 
             const tPeakK = float(8500)
               .mul(pow(max(mdot.div(0.1), float(1e-6)), float(0.25)))
               .mul(float(1).add(max(aStar, float(0)).mul(0.25)))
             const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-8)), float(0.25)))
 
-            // Mild density structure (seamless); keeps opacity, doesn't carve black voids
+            // Mild density structure (seamless)
             const invRho = float(1).div(max(rhoSafe, float(1e-5)))
             const cphi = hx.mul(invRho)
             const sphi = hz.mul(invRho)
             const lnR = log(max(rhoSafe.div(M), float(1e-4)))
-            const c2 = cphi.mul(cphi).sub(sphi.mul(sphi))
-            const s2 = cphi.mul(sphi).mul(2)
+            const c2a = cphi.mul(cphi).sub(sphi.mul(sphi))
+            const s2a = cphi.mul(sphi).mul(2)
             const pitch = float(0.55)
             const alpha = pitch.mul(-2).mul(lnR).add(0.3)
             const armWave = float(0.5).add(
-              float(0.5).mul(c2.mul(cos(alpha)).add(s2.mul(sin(alpha)))),
+              float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))),
             )
-            const armsBright = pow(max(armWave, float(1e-4)), float(1.15))
-            const armFac = float(0.72).add(armsBright.mul(0.4))
+            const armsBright = pow(max(armWave, float(1e-4)), float(1.1))
+            const armFac = float(0.78).add(armsBright.mul(0.35))
 
             const nUV = vec2(
               cphi.mul(1.4).add(lnR.mul(0.15)),
@@ -311,13 +313,16 @@ export function createGeodesicTracer(): GeodesicTracer {
               .mul(float(1).sub(u2.y))
               .add(p01.mul(float(1).sub(u2.x)).add(p11.mul(u2.x)).mul(u2.y))
             const turb = n1.mul(0.67).add(n2.mul(0.33))
-            const texFac = max(float(0.65), min(float(1.35), armFac.mul(float(0.85).add(turb.mul(0.3)))))
+            const texFac = max(
+              float(0.72),
+              min(float(1.28), armFac.mul(float(0.88).add(turb.mul(0.25)))),
+            )
 
-            // Color temperature: T_obs = g · T_rest (thermal scaling)
-            const TK = max(float(800), min(float(100000), tRestK.mul(freq)))
+            // T_obs = g · T_rest
+            const TK = max(float(900), min(float(100000), tRestK.mul(freq)))
 
-            // Planck B_λ chromaticity at optical wavelengths
-            const planckC2 = float(1.4387769e7) // nm·K
+            // Unnormalized Planck samples (carry both color AND cool/hot brightness)
+            const planckC2 = float(1.4387769e7)
             const lamR = float(680)
             const lamG = float(550)
             const lamB = float(440)
@@ -327,20 +332,27 @@ export function createGeodesicTracer(): GeodesicTracer {
             const br = float(1).div(pow(lamR, float(5)).mul(max(exp(xR).sub(1), float(1e-20))))
             const bg = float(1).div(pow(lamG, float(5)).mul(max(exp(xG).sub(1), float(1e-20))))
             const bb = float(1).div(pow(lamB, float(5)).mul(max(exp(xB).sub(1), float(1e-20))))
-            const bMax = max(br, max(bg, bb))
-            const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
+            // Normalize to max B_λ of a 6500 K reference (mid-T → O(1))
+            const Tref = float(6500)
+            const xRg = min(planckC2.div(lamR.mul(Tref)), float(80))
+            const xGg = min(planckC2.div(lamG.mul(Tref)), float(80))
+            const xBg = min(planckC2.div(lamB.mul(Tref)), float(80))
+            const br0 = float(1).div(pow(lamR, float(5)).mul(max(exp(xRg).sub(1), float(1e-20))))
+            const bg0 = float(1).div(pow(lamG, float(5)).mul(max(exp(xGg).sub(1), float(1e-20))))
+            const bb0 = float(1).div(pow(lamB, float(5)).mul(max(exp(xBg).sub(1), float(1e-20))))
+            const refMax = max(br0, max(bg0, bb0))
+            const spec = vec3(br, bg, bb).div(max(refMax, float(1e-30)))
 
-            // Intensity: I ∝ F̃ · g³ · texture.
-            // ṁ: physical F∝ṁ, but pure linear ṁ at 10⁻³ makes HDR/ACES crush
-            // cool reds into black-brown. Use mild √-like scale so color stays
-            // readable while still dimming at low accretion.
-            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.8))
-            const mdotBright = pow(max(mdot.div(0.1), float(0.008)), float(0.42))
-            const iFlux = fluxRel.mul(mdotBright).mul(3.8)
-            const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
+            // Optically thick face: always emit thermal spectrum (never matte black cardboard)
+            // ṁ soft display curve; fluxVis keeps outer disk faintly lit
+            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.65))
+            const mdotBright = pow(max(mdot.div(0.1), float(0.02)), float(0.38))
+            const iFlux = max(fluxVis, float(0.12)).mul(mdotBright).mul(2.6)
+            const emit = spec.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
 
             col.addAssign(emit.mul(transm))
-            transm.mulAssign(0.42)
+            // Less aggressive occlusion so dim disks don't become pure silhouette
+            transm.mulAssign(0.55)
           })
         },
       )
