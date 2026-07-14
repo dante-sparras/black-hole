@@ -26,6 +26,7 @@ No-hair parameter core (mass \(M\), spin \(a_\star\), charge \(Q\)) + Schwarzsch
 - Geometric units: `G = c = 1`. Schwarzschild horizon \(r_s = 2M\), photon sphere \(r_{ph} = 3M\), \(b_c = 3\sqrt{3}\,M\).
 - Prefer real physics root-causes over visual workarounds once GR starts.
 - Pure-black voids for captured rays (no fake fill).
+- TSL geodesic materials may need `// @ts-nocheck` (TS 7 + three/tsl type graphs can non-terminate).
 
 ## No-hair parameters (core)
 
