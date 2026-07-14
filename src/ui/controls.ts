@@ -4,7 +4,6 @@ import {
   mdotTemperatureScale,
   sliderFromMdot as sliderFromMdotRange,
 } from '../physics/disk'
-import { shadowDiagnostics } from '../physics/diagnostics'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import {
   CAMERA_LIMITS,
@@ -24,11 +23,8 @@ import {
 } from '../state/look'
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
 import { ALL_PRESETS, applyPreset } from '../state/presets'
-
-function fmt(n: number, digits = 3): string {
-  if (!Number.isFinite(n)) return '—'
-  return n.toFixed(digits)
-}
+import { fmt, fmtMdot } from './format'
+import { renderDerivedHud } from './hud'
 
 /** Log-space slider (0…1000) ↔ ṁ ∈ [MDOT_MIN, MDOT_MAX]. */
 export function mdotFromSlider(t: number): number {
@@ -37,12 +33,6 @@ export function mdotFromSlider(t: number): number {
 
 export function sliderFromMdot(mdot: number): number {
   return sliderFromMdotRange(mdot, MDOT_MIN, MDOT_MAX)
-}
-
-function fmtMdot(m: number): string {
-  if (m >= 0.1) return fmt(m, 2)
-  if (m >= 0.01) return fmt(m, 3)
-  return m.toExponential(1)
 }
 
 export type ControlsApi = {
@@ -235,24 +225,7 @@ export function mountControls(
 
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
     if (!derivedRoot) return
-    const diag = shadowDiagnostics(p, d)
-    const tScale = mdotTemperatureScale(p.mdot)
-    derivedRoot.innerHTML = `
-      <div class="diag-title">Radii</div>
-      <div><dt>family</dt><dd>${d.family}</dd></div>
-      <div><dt>r₊</dt><dd>${fmt(d.rPlus)} <span class="dim">(${fmt(diag.rPlusOverM, 2)} M)</span></dd></div>
-      <div><dt>r₋</dt><dd>${fmt(d.rMinus)}</dd></div>
-      <div><dt>r_ph</dt><dd>${fmt(d.rPhotonSphere)} <span class="dim">(${fmt(diag.rPhotonOverM, 2)} M)</span></dd></div>
-      <div><dt>r_ISCO</dt><dd>${fmt(d.rIsco)} <span class="dim">(${fmt(diag.rIscoOverM, 2)} M)</span></dd></div>
-      <div class="diag-title">Disk (not hair)</div>
-      <div><dt>ṁ</dt><dd>${fmtMdot(p.mdot)} ṁ_Edd</dd></div>
-      <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
-      <div class="diag-title">Shadow / critical curve</div>
-      <div><dt>b_c⁺</dt><dd>${fmt(diag.bCritPro)} <span class="dim">(${fmt(diag.bCritProOverM, 2)} M)</span></dd></div>
-      <div><dt>b_c⁻</dt><dd>${fmt(diag.bCritRet)} <span class="dim">(${fmt(diag.bCritRetOverM, 2)} M)</span></dd></div>
-      <div><dt>⌀_shad</dt><dd>${fmt(diag.shadowDiameter)} <span class="dim">(~${fmt(diag.shadowDiameter / Math.max(p.mass, 1e-12), 2)} M)</span></dd></div>
-      <div><dt>Δ_ext</dt><dd>${fmt(d.extremalityDelta)}</dd></div>
-    `
+    renderDerivedHud(derivedRoot, p, d)
   }
 
   massInput?.addEventListener('input', () => {

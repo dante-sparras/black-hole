@@ -44,13 +44,17 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 ## Physics layout
 
 ```
-src/physics/
-  geodesic/schwarzschildNull.ts
-  geodesic/kerrNull.ts          CPU Kerr approx (a=0 ≡ Schw)
-src/render/geodesicTracer.ts    WebGPU/TSL Kerr/Schw GRRT
+src/physics/     # pure TS — metricFamily, disk, diagnostics, geodesic/
+src/state/       # params, camera, look, presets
+src/app/         # sceneBridge (stores → GPU)
+src/render/      # geodesicTracer (WebGPU/TSL) + bloom
+src/ui/          # controls, hud, format, orbit
+src/main.ts      # WebGPU boot only
 ```
 
 **Camera:** distance in units of \(M\); spin ‖ +Y; disk in XZ (\(y=0\)).
+
+**Emission:** `DISK_EMISSION` in `physics/disk.ts` — shared with GPU tracer.
 
 ## Code hygiene
 

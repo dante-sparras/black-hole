@@ -2,23 +2,21 @@ import './style.css'
 
 import * as THREE from 'three/webgpu'
 
+import { createSceneBridge } from './app/sceneBridge'
 import { createBloomPipeline } from './render/bloomPipeline'
 import { createGeodesicTracer } from './render/geodesicTracer'
-import { toUniforms } from './render/uniforms'
-import { getCamera, subscribeCamera } from './state/camera'
-import { getLook, subscribeLook } from './state/look'
-import { getDerived, getParams, subscribe } from './state/params'
+import { getLook } from './state/look'
 import { mountControls } from './ui/controls'
 import { mountOrbitControls } from './ui/orbit'
 
-// Geometric units G = c = 1. No-hair: M, a★, Q. View: Kerr/Schwarzschild GRRT.
+// Geometric units G = c = 1. No-hair: M, a★, Q + disk ṁ (not hair).
 
 const errorEl = document.querySelector<HTMLElement>('#error')
 const statsEl = document.querySelector<HTMLElement>('#stats')
 const controlsEl = document.querySelector<HTMLElement>('#controls')
 const derivedEl = document.querySelector<HTMLElement>('#derived')
 
-function showError(message: string) {
+function showError(message: string): void {
   if (!errorEl) return
   errorEl.textContent = message
   errorEl.classList.add('visible')
@@ -38,10 +36,12 @@ camera.lookAt(0, 0, 0)
 const tracer = createGeodesicTracer()
 scene.add(tracer.mesh)
 
-/** Post stack created after WebGPU init. */
+const bridge = createSceneBridge(tracer)
+bridge.connect()
+
 let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
 
-function onResize() {
+function onResize(): void {
   renderer.setSize(window.innerWidth, window.innerHeight)
   bloomPipeline?.setSize(window.innerWidth, window.innerHeight)
 }
@@ -50,73 +50,13 @@ window.addEventListener('resize', onResize)
 if (controlsEl) {
   mountControls(controlsEl, derivedEl)
 }
-
 mountOrbitControls(renderer.domElement)
-
-let spacetime = toUniforms(getParams(), getDerived())
-
-function applyPhysics(): void {
-  const p = getParams()
-  const d = getDerived()
-  spacetime = toUniforms(p, d)
-  tracer.setSpacetime({
-    mass: p.mass,
-    spinStar: p.spinStar,
-    charge: p.charge,
-    mdot: p.mdot,
-    rIscoOverM: d.rIsco / Math.max(p.mass, 1e-12),
-  })
-}
-
-function applyCamera(): void {
-  tracer.setCamera(getCamera())
-}
-
-function applyLook(): void {
-  if (bloomPipeline) bloomPipeline.applyLook(getLook())
-}
-
-subscribe(() => {
-  applyPhysics()
-})
-subscribeCamera(() => {
-  applyCamera()
-})
-subscribeLook(() => {
-  applyLook()
-})
-applyPhysics()
-applyCamera()
 
 let frames = 0
 let fpsAccum = 0
 let last = performance.now()
 
-function formatStats(fps: number): string {
-  const d = getDerived()
-  const c = getCamera()
-  const look = getLook()
-  const m = spacetime.mass.toFixed(2)
-  const a = spacetime.spinStar.toFixed(3)
-  const q = spacetime.charge.toFixed(3)
-  const md = spacetime.mdot >= 0.01 ? spacetime.mdot.toFixed(2) : spacetime.mdot.toExponential(1)
-  const rp = Number.isFinite(spacetime.rPlus) ? spacetime.rPlus.toFixed(3) : '—'
-  const dist = c.distanceM.toFixed(1)
-  const hasA = Math.abs(spacetime.spinStar) >= 1e-6
-  const hasQ = Math.abs(spacetime.charge) >= 1e-6
-  const mode =
-    !hasA && !hasQ
-      ? 'schw-RT'
-      : hasA && !hasQ
-        ? 'kerr-RT'
-        : !hasA && hasQ
-          ? 'rn-RT'
-          : 'kn-RT'
-  const bloomTag = look.bloomEnabled ? `bloom=${look.bloomStrength.toFixed(2)}` : 'bloom=off'
-  return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${bloomTag} · r₊=${rp} · D=${dist}M`
-}
-
-async function boot() {
+async function boot(): Promise<void> {
   try {
     await renderer.init()
   } catch (err) {
@@ -127,7 +67,8 @@ async function boot() {
   }
 
   bloomPipeline = createBloomPipeline(renderer, scene, camera, getLook())
-  applyLook()
+  bridge.setBloomPipeline(bloomPipeline)
+  bridge.applyLook()
 
   renderer.setAnimationLoop(() => {
     const now = performance.now()
@@ -146,7 +87,7 @@ async function boot() {
       const fps = Math.round(frames / fpsAccum)
       frames = 0
       fpsAccum = 0
-      if (statsEl) statsEl.textContent = formatStats(fps)
+      if (statsEl) statsEl.textContent = bridge.formatStats(fps)
     }
   })
 }

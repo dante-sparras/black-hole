@@ -1,20 +1,22 @@
 import { knGeometry } from './kn'
 import { kerrGeometry } from './kerr'
+import { metricFamilyFromParams } from './metricFamily'
 import { schwarzschildGeometry } from './schwarzschild'
 import type { BlackHoleParams, DerivedGeometry } from './types'
 
-const EPS = 1e-12
-
-/** Derive analytic geometry from no-hair parameters. */
+/**
+ * Derive analytic geometry from no-hair parameters.
+ * Routing mirrors metricFamilyFromParams (schw → kerr → rn/kn).
+ */
 export function deriveGeometry(params: BlackHoleParams): DerivedGeometry {
-  const a = Math.abs(params.spinStar)
-  const q = Math.abs(params.charge)
-
-  if (q < EPS && a < EPS) {
-    return schwarzschildGeometry(params.mass)
+  const family = metricFamilyFromParams(params)
+  switch (family) {
+    case 'schwarzschild':
+      return schwarzschildGeometry(params.mass)
+    case 'kerr':
+      return kerrGeometry(params)
+    case 'reissner-nordstrom':
+    case 'kerr-newman':
+      return knGeometry(params)
   }
-  if (q < EPS) {
-    return kerrGeometry(params)
-  }
-  return knGeometry(params)
 }

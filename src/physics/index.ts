@@ -1,6 +1,7 @@
 export * from './constants'
 export * from './types'
 export * from './validate'
+export * from './metricFamily'
 export * from './schwarzschild'
 export * from './kerr'
 export * from './kn'

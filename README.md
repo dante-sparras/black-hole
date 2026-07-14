@@ -24,6 +24,27 @@ bun test
 bun run build
 ```
 
+## Architecture
+
+```
+src/
+  physics/          # pure TS math (bun test) — no Three.js
+    metricFamily.ts # schw/kerr/rn/kn routing + RT mode tags
+    disk.ts         # ISCO, NT, DISK_EMISSION (CPU↔GPU lockstep)
+    geodesic/       # CPU null integrators
+  state/            # params, camera, look, presets (stores)
+  app/
+    sceneBridge.ts  # stores → tracer/bloom wiring + stats
+  render/           # WebGPU/TSL geodesicTracer + bloom
+  ui/               # controls, hud, format, orbit
+  main.ts           # WebGPU boot only
+```
+
+**Data flow:** UI/orbit → state stores → `sceneBridge` → GPU uniforms → TSL ray marcher → bloom → canvas.
+
+Disk emission constants (`DISK_EMISSION`) live in `physics/disk.ts` and are
+imported by the GPU tracer so color/brightness cannot drift.
+
 ## Status
 
 | Feature | State |
@@ -37,20 +58,7 @@ bun run build
 | Seamless disk texture | ✅ |
 | Unreal bloom + ACES (subtle) | ✅ |
 | Scene presets (shared camera) | ✅ |
-| Full Boyer–Lindquist geodesics | ⏳ research-grade later |
-
-## Architecture
-
-```
-src/physics/     # pure TS — tested with bun test (no Three.js)
-src/state/       # params, camera, look, presets
-src/render/      # WebGPU/TSL geodesicTracer + bloom
-src/ui/          # sliders + orbit
-src/main.ts      # boot + wire
-```
-
-Disk emission constants (`DISK_EMISSION`) live in `src/physics/disk.ts` and are
-shared with the GPU tracer so color/brightness math cannot drift.
+| Full Boyer–Lindquist geodesics | ⏳ later |
 
 ## License
 
