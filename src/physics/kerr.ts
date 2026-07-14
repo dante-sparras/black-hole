@@ -92,6 +92,7 @@ export function kerrGeometry(params: BlackHoleParams): DerivedGeometry {
   const rMinus = hasHorizon ? M - sqrtDisc : Number.NaN
   const { prograde } = photonSphereRadii(M, params.spinStar)
   const { prograde: bPro } = criticalImpacts(M, params.spinStar)
+  const { prograde: rIsco } = iscoRadii(M, params.spinStar)
 
   const family: MetricFamily =
     Math.abs(params.spinStar) < 1e-12 ? 'schwarzschild' : 'kerr'
@@ -109,6 +110,7 @@ export function kerrGeometry(params: BlackHoleParams): DerivedGeometry {
     rErgoEquator,
     rPhotonSphere: prograde,
     criticalImpact: bPro,
+    rIsco,
     hasHorizon,
     extremalityDelta: disc,
   }

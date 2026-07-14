@@ -5,7 +5,6 @@ import {
   Fn,
   If,
   Loop,
-  abs,
   cos,
   cross,
   dot,
@@ -31,6 +30,7 @@ export type GeodesicTracer = {
   setMass: (mass: number) => void
   setSpinStar: (spinStar: number) => void
   setCharge: (charge: number) => void
+  setRIscoM: (rIscoOverM: number) => void
   setCameraDistanceM: (distanceM: number) => void
   setInclination: (radians: number) => void
   setAzimuth: (radians: number) => void
@@ -40,17 +40,19 @@ export type GeodesicTracer = {
 /**
  * Einstein–Maxwell null geodesic ray marcher (WebGPU / TSL).
  * Families: Schwarzschild / Kerr / RN / Kerr–Newman from (M, a★, Q).
+ * Disk: Novikov–Thorne T(r) with family ISCO from CPU uniform.
  * Spin ‖ +Y; disk in XZ (y = 0).
  */
 export function createGeodesicTracer(): GeodesicTracer {
   const uMass = uniform(1)
   const uSpinStar = uniform(0)
   const uCharge = uniform(0)
+  const uRIscoM = uniform(6) // r_isco / M from CPU diskIsco
   const uCamDistM = uniform(30)
   const uInclination = uniform(1.25)
   const uAzimuth = uniform(0)
   const uFov = uniform(0.65)
-  const uRoutM = uniform(18)
+  const uRoutM = uniform(22)
   const STEPS = 900
 
   const colorNode = Fn(() => {
@@ -65,23 +67,8 @@ export function createGeodesicTracer(): GeodesicTracer {
     const rPlus = M.add(sqrt(disc))
     const rCapture = rPlus.mul(1.02)
 
-    // Prograde Kerr ISCO (Bardeen); for pure RN use ~6M pulled in slightly by Q
-    const a2 = aStar.mul(aStar)
-    const oneMa2 = max(float(1).sub(a2), float(1e-6))
-    const cbrt1m = pow(oneMa2, float(1 / 3))
-    const cbrt1p = pow(max(float(1).add(aStar), float(1e-6)), float(1 / 3))
-    const cbrt1n = pow(max(float(1).sub(aStar), float(1e-6)), float(1 / 3))
-    const Z1 = float(1).add(cbrt1m.mul(cbrt1p.add(cbrt1n)))
-    const Z2 = sqrt(a2.mul(3).add(Z1.mul(Z1)))
-    const sgn = aStar.lessThan(0).select(float(-1), float(1))
-    const iscoRoot = sqrt(
-      max(float(3).sub(Z1).mul(float(3).add(Z1).add(Z2.mul(2))), float(0)),
-    )
-    const iscoKerr = M.mul(float(3).add(Z2).sub(sgn.mul(iscoRoot)))
-    const qhat = Q.div(max(M, float(1e-6)))
-    const iscoRn = M.mul(6).mul(float(1).sub(qhat.mul(qhat).mul(0.2)))
-    const isco = abs(aStar).lessThan(1e-6).select(iscoRn, iscoKerr)
-    const rin = max(isco, rPlus.mul(1.15))
+    // Family ISCO from CPU (units of M → geometric)
+    const rin = max(uRIscoM.mul(M), rPlus.mul(1.05))
     const rout = uRoutM.mul(M)
     const camD = uCamDistM.mul(M)
 
@@ -221,37 +208,37 @@ export function createGeodesicTracer(): GeodesicTracer {
             const g = max(g2, float(1e-4)).sqrt()
 
             // Kerr/Kepler orbital speed about +Y (prograde)
-            // Ω = √M / (ρ^{3/2} + a√M), β ≈ |Ω| ρ
             const sqrtM = sqrt(max(M, float(1e-8)))
             const r32 = pow(max(rho, float(1e-5)), float(1.5))
             const Omega = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
             const beta = min(Omega.mul(rho), float(0.92))
 
-            // ê_φ = (−z, 0, x)/ρ
             const tdir = vec3(hz.mul(-1), float(0), hx).normalize()
-            // Photon toward observer = −rayDir (backward RT)
             const nObs = vel.normalize().mul(-1)
             const mu = dot(tdir, nObs)
 
-            // Special-rel Doppler: D = 1 / (γ (1 − β μ))
             const gamma = float(1).div(sqrt(max(float(1).sub(beta.mul(beta)), float(1e-4))))
             const D = float(1).div(
               max(gamma.mul(float(1).sub(beta.mul(mu))), float(0.08)),
             )
-            // Frequency factor & bolometric beaming I ∝ D³
             const freq = g.mul(D)
             const beam = D.mul(D).mul(D)
 
-            // Rest temperature (hot near ISCO); observed T ∝ freq
-            const tempRest = float(2.8).div(max(x.sub(rin.div(M)).add(0.8), float(0.25)))
+            // Novikov–Thorne: F̃ ∝ ρ⁻³ (1 − √(r_in/ρ)), T ∝ F̃^{1/4}
+            const gap = max(float(1).sub(sqrt(rin.div(max(rho, rin.mul(1.0001))))), float(0))
+            const flux = gap.div(rho.mul(rho).mul(rho).add(1e-12))
+            const Fm = flux.mul(M).mul(M).mul(M).mul(8000)
+            const Tnt = pow(max(Fm, float(1e-12)), float(0.25))
+            const eff = float(1).add(max(aStar, float(0)).mul(0.35))
+            const tempRest = Tnt.mul(eff).mul(2.2)
             const Tobs = tempRest.mul(freq)
-            // Blackbody-ish RGB from observed temperature
-            const fall = float(1.15).div(x.mul(0.09).add(0.45))
-            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.15))
+
+            const fall = float(1)
+            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.1))
             const emit = vec3(
-              min(float(2.2), float(0.55).add(Tobs.mul(1.1))),
-              min(float(1.6), float(0.18).add(Tobs.mul(0.65))),
-              min(float(1.2), float(0.04).add(Tobs.mul(Tobs).mul(0.22))),
+              min(float(2.2), float(0.45).add(Tobs.mul(1.15))),
+              min(float(1.6), float(0.15).add(Tobs.mul(0.7))),
+              min(float(1.2), float(0.03).add(Tobs.mul(Tobs).mul(0.25))),
             )
               .mul(fall)
               .mul(bounce)
@@ -308,6 +295,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setCharge: (q) => {
       uCharge.value = q
+    },
+    setRIscoM: (r) => {
+      uRIscoM.value = r
     },
     setCameraDistanceM: (d) => {
       uCamDistM.value = d

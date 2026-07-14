@@ -8,6 +8,7 @@ export type SpacetimeUniforms = {
   charge: number
   rPlus: number
   rMinus: number
+  rIsco: number
 }
 
 export function toUniforms(p: BlackHoleParams, d: DerivedGeometry): SpacetimeUniforms {
@@ -18,5 +19,6 @@ export function toUniforms(p: BlackHoleParams, d: DerivedGeometry): SpacetimeUni
     charge: p.charge,
     rPlus: d.rPlus,
     rMinus: d.rMinus,
+    rIsco: d.rIsco,
   }
 }

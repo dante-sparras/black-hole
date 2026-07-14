@@ -14,6 +14,7 @@ export function schwarzschildGeometry(mass: number): DerivedGeometry {
     rErgoEquator: 2 * M,
     rPhotonSphere: 3 * M,
     criticalImpact: 3 * Math.sqrt(3) * M,
+    rIsco: 6 * M,
     hasHorizon: true,
     extremalityDelta: M * M,
   }

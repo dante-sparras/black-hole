@@ -55,6 +55,8 @@ function applyPhysics(): void {
   tracer.setMass(p.mass)
   tracer.setSpinStar(p.spinStar)
   tracer.setCharge(p.charge)
+  const d = getDerived()
+  tracer.setRIscoM(d.rIsco / Math.max(p.mass, 1e-12))
 }
 
 function applyCamera(): void {

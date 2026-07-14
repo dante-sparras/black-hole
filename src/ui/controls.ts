@@ -116,6 +116,7 @@ export function mountControls(
       <div><dt>r₊</dt><dd>${fmt(d.rPlus)}</dd></div>
       <div><dt>r₋</dt><dd>${fmt(d.rMinus)}</dd></div>
       <div><dt>r_ph</dt><dd>${fmt(d.rPhotonSphere)}</dd></div>
+      <div><dt>r_ISCO</dt><dd>${fmt(d.rIsco)}</dd></div>
       <div><dt>Δ_ext</dt><dd>${fmt(d.extremalityDelta)}</dd></div>
     `
   }

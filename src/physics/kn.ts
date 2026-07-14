@@ -1,6 +1,7 @@
-import { photonSphereRadii } from './kerr'
+import { iscoRadii, photonSphereRadii } from './kerr'
 import type { BlackHoleParams, DerivedGeometry, MetricFamily } from './types'
 import { spinLength } from './types'
+import { rnIsco } from './disk'
 
 /**
  * Outer RN photon-sphere radius (a = 0):
@@ -11,7 +12,6 @@ export function rnPhotonSphere(mass: number, charge: number): number {
   const Q = charge
   const disc = 9 * M * M - 8 * Q * Q
   if (disc < 0) {
-    // No circular photon orbit (near-extremal RN) — fall back near 2M
     return 2 * M
   }
   return 0.5 * (3 * M + Math.sqrt(disc))
@@ -48,9 +48,20 @@ export function knGeometry(params: BlackHoleParams): DerivedGeometry {
   const { prograde } = photonSphereRadii(M, params.spinStar)
   const rPhotonSphere = spinning ? prograde : rnPhotonSphere(M, Q)
 
-  // Critical impact rough: Schw scale, shrink slightly with |Q|/M
   const qhat = Math.min(Math.abs(Q) / Math.max(M, 1e-12), 0.99)
   const criticalImpact = 3 * Math.sqrt(3) * M * (1 - 0.2 * qhat * qhat)
+
+  // ISCO: RN closed form, or Kerr prograde with mild charge pull-in
+  let rIsco: number
+  if (!spinning) {
+    rIsco = rnIsco(M, Q)
+  } else {
+    const { prograde: rK } = iscoRadii(M, params.spinStar)
+    rIsco = rK * (1 - 0.12 * qhat * qhat)
+  }
+  if (Number.isFinite(rPlus)) {
+    rIsco = Math.max(rIsco, rPlus * 1.05)
+  }
 
   return {
     mass: M,
@@ -60,9 +71,10 @@ export function knGeometry(params: BlackHoleParams): DerivedGeometry {
     family,
     rPlus,
     rMinus,
-    rErgoEquator: 2 * M, // equatorial ergosphere unchanged at leading order for display
+    rErgoEquator: 2 * M,
     rPhotonSphere,
     criticalImpact,
+    rIsco,
     hasHorizon,
     extremalityDelta: disc,
   }

@@ -42,6 +42,8 @@ export type DerivedGeometry = {
    * the Kerr ray-tracer supplies pro/retro b_c.
    */
   readonly criticalImpact: number
+  /** Prograde thin-disk ISCO (inner edge) */
+  readonly rIsco: number
   /** true if M² ≥ a² + Q² */
   readonly hasHorizon: boolean
   /** M² − a² − Q² */

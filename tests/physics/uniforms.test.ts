@@ -14,5 +14,6 @@ describe('toUniforms', () => {
     expect(u.charge).toBe(p.charge)
     expect(u.rPlus).toBe(d.rPlus)
     expect(u.rMinus).toBe(d.rMinus)
+    expect(u.rIsco).toBe(d.rIsco)
   })
 })
