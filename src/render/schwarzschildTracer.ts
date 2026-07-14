@@ -5,6 +5,7 @@ import {
   Fn,
   If,
   Loop,
+  abs,
   cos,
   cross,
   dot,
@@ -35,33 +36,36 @@ export type SchwarzschildTracer = {
 /**
  * Full-screen Schwarzschild null-geodesic ray marcher (WebGPU / TSL).
  *
- * Ray NDC comes from the fullscreen quad's local XY (PlaneGeometry 2×2 → [-1,1]),
- * not screenUV — avoids ortho/viewport mismatches that offset the shadow.
+ * - Rays from fullscreen-quad local XY as NDC (center → BH)
+ * - Finite-thickness equatorial disk (miss-resistant)
+ * - Adaptive steps near the photon sphere
+ * - Pure-black horizon capture
  */
 export function createSchwarzschildTracer(): SchwarzschildTracer {
   const uMass = uniform(1)
-  const uCamDistM = uniform(40)
-  const uInclination = uniform(1.35) // ~77° from face-on
+  const uCamDistM = uniform(28)
+  const uInclination = uniform(1.2) // ~69°
   const uAzimuth = uniform(0)
-  const uFov = uniform(0.5)
+  const uFov = uniform(0.7)
   const uDiskInnerM = uniform(6)
-  const uDiskOuterM = uniform(18)
-  const uMaxSteps = uniform(int(400))
-  const uStepBase = uniform(0.05)
+  const uDiskOuterM = uniform(20)
+  const uDiskHalfHM = uniform(0.22) // half-thickness in units of M
+  const uMaxSteps = uniform(int(520))
+  const uStepBase = uniform(0.045)
 
   const colorNode = Fn(() => {
     const mass = uMass
     const rs = mass.mul(2)
-    const captureR = rs.mul(1.01)
+    const captureR = rs.mul(1.005)
     const camDist = uCamDistM.mul(mass)
     const diskInner = uDiskInnerM.mul(mass)
     const diskOuter = uDiskOuterM.mul(mass)
+    const diskHalfH = uDiskHalfHM.mul(mass)
 
-    // Fullscreen quad local XY is NDC [-1,1]. Center pixel → BH.
     const aspect = screenSize.x.div(max(screenSize.y, float(1)))
-    const uv = vec2(positionLocal.x.mul(aspect), positionLocal.y)
+    // PlaneGeometry(2,2) local XY = NDC. Flip Y so +inclination reads "disk up" naturally.
+    const uv = vec2(positionLocal.x.mul(aspect), positionLocal.y.negate())
 
-    // Spherical camera about origin: θ from +z, φ around z. Disk = xy plane.
     const th = uInclination
     const ph = uAzimuth
     const sth = sin(th)
@@ -75,13 +79,13 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
       cth.mul(camDist),
     )
 
-    // Look at origin
     const forward = camPos.negate().normalize()
-    // Build ONB with world up = +z (disk normal)
     const worldUp = vec3(0, 0, 1)
     const rightRaw = cross(forward, worldUp)
     const rightLen = rightRaw.length()
-    const right = rightLen.lessThan(1e-4).select(vec3(1, 0, 0), rightRaw.div(max(rightLen, float(1e-6))))
+    const right = rightLen
+      .lessThan(1e-4)
+      .select(vec3(1, 0, 0), rightRaw.div(max(rightLen, float(1e-6))))
     const up = cross(right, forward).normalize()
 
     const rd = forward
@@ -93,10 +97,10 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
     const vel = rd.toVar()
     const col = vec3(0, 0, 0).toVar()
     const transm = float(1).toVar()
-    const prevZ = float(0).toVar()
     const done = float(0).toVar()
     const escaped = float(0).toVar()
-    const diskHits = float(0).toVar()
+    // Track optical depth through disk to avoid infinite glow while allowing multi-orbit
+    const diskTau = float(0).toVar()
 
     Loop({ start: int(0), end: uMaxSteps, type: 'int', condition: '<' }, () => {
       If(done.greaterThan(0.5), () => {
@@ -105,28 +109,62 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
 
       const r = pos.length()
 
-      // Event horizon capture → pure black contribution (no fill)
       If(r.lessThanEqual(captureR), () => {
         done.assign(1)
         Break()
       })
 
-      // Escaped to infinity
-      If(r.greaterThan(camDist.mul(5)).and(dot(pos, vel).greaterThan(0)), () => {
+      If(r.greaterThan(camDist.mul(6)).and(dot(pos, vel).greaterThan(0)), () => {
         escaped.assign(1)
         done.assign(1)
         Break()
       })
 
-      // Smaller steps near the hole (photon sphere ~3M)
-      const h = uStepBase
-        .mul(mass)
-        .mul(min(float(1.2), max(float(0.04), r.div(mass.mul(10)))))
+      // Adaptive step: fine near hole and near the equatorial plane
+      const nearHole = min(float(1.2), max(float(0.035), r.div(mass.mul(9))))
+      const nearPlane = min(float(1), max(float(0.08), abs(pos.z).div(mass.mul(1.2))))
+      const h = uStepBase.mul(mass).mul(nearHole).mul(nearPlane)
 
-      prevZ.assign(pos.z)
-      const prevPos = vec3(pos.x, pos.y, pos.z).toVar()
+      // --- Finite-thickness disk sample (before step) ---
+      const rho = pos.x.mul(pos.x).add(pos.y.mul(pos.y)).sqrt()
+      const inDisk = abs(pos.z)
+        .lessThanEqual(diskHalfH)
+        .and(rho.greaterThanEqual(diskInner))
+        .and(rho.lessThanEqual(diskOuter))
+        .and(transm.greaterThan(0.02))
+        .and(diskTau.lessThan(4))
 
-      // RK2 Heun: a = −1.5 rs |L|² x / r⁵  (null geodesic spatial form)
+      If(inDisk, () => {
+        const g = max(float(1).sub(rs.div(max(rho, float(1e-5)))), float(1e-4)).sqrt()
+        const x = rho.div(mass)
+        // Temperature-ish: hot near ISCO
+        const hot = float(2.4).div(max(x.sub(5.0), float(0.35)))
+        const fall = float(1).div(x.mul(0.12).add(0.45))
+        // Vertical gaussian so midplane is brightest
+        const vert = max(
+          float(1).sub(abs(pos.z).div(max(diskHalfH, float(1e-5))).mul(abs(pos.z).div(max(diskHalfH, float(1e-5))))),
+          float(0),
+        )
+        // Path length through this step (approx)
+        const ds = h.mul(0.85)
+        const kappa = float(1.8).div(mass) // opacity scale
+        const dTau = kappa.mul(ds).mul(vert.add(0.15))
+        const emit = vec3(
+          hot.mul(2.1).mul(g),
+          hot.mul(0.65).mul(g).mul(g),
+          hot.mul(0.18).mul(g).mul(g),
+        )
+          .mul(fall)
+          .mul(vert.add(0.2))
+
+        // Emission * transmittance * (1 - e^{-dτ}) ≈ emit * transm * dτ for small dτ
+        const weight = transm.mul(min(dTau, float(0.85)))
+        col.addAssign(emit.mul(weight))
+        transm.mulAssign(max(float(1).sub(dTau.mul(0.55)), float(0.15)))
+        diskTau.addAssign(dTau)
+      })
+
+      // RK2 Heun null geodesic step: a = −1.5 rs |L|² x / r⁵
       const L1 = cross(pos, vel)
       const L2sq1 = dot(L1, L1)
       const rSafe = max(r, float(1e-5))
@@ -143,55 +181,21 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
 
       pos.addAssign(vel.add(velMid).mul(h.mul(0.5)))
       vel.addAssign(a1.add(a2).mul(h.mul(0.5)))
-
-      // Thin equatorial disk z=0 (optically thin, multi-orbit = photon-ring path)
-      If(prevZ.mul(pos.z).lessThan(0).and(transm.greaterThan(0.015)), () => {
-        const denom = prevZ.sub(pos.z)
-        const tHit = prevZ.div(denom)
-        const hx = prevPos.x.add(pos.x.sub(prevPos.x).mul(tHit))
-        const hy = prevPos.y.add(pos.y.sub(prevPos.y).mul(tHit))
-        const hitR = hx.mul(hx).add(hy.mul(hy)).sqrt()
-
-        If(hitR.greaterThanEqual(diskInner).and(hitR.lessThanEqual(diskOuter)), () => {
-          diskHits.addAssign(1)
-          const g = max(float(1).sub(rs.div(max(hitR, float(1e-5)))), float(1e-4)).sqrt()
-          const x = hitR.div(mass)
-          // Peak near ISCO, fall with r; slight ring structure
-          const radial = float(1).div(x.mul(0.18).add(0.55))
-          const ring = float(0.65).add(
-            float(0.35).mul(sin(x.mul(2.2)).mul(0.5).add(0.5)),
-          )
-          // Secondary images (photon ring) stay brighter longer
-          const orbitBoost = float(1).add(max(diskHits.sub(1), float(0)).mul(0.85))
-          const hot = float(1.6).div(max(x.sub(5.0), float(0.45)))
-          const emit = vec3(
-            hot.mul(1.9).mul(g),
-            hot.mul(0.55).mul(g).mul(g),
-            hot.mul(0.16).mul(g).mul(g),
-          )
-            .mul(radial)
-            .mul(ring)
-            .mul(orbitBoost)
-
-          col.addAssign(emit.mul(transm))
-          // Optically thin: later orbits still contribute
-          transm.mulAssign(0.42)
-        })
-      })
     })
 
-    // Escaped rays: very dark sky + faint procedural stars (not shadow fill)
+    // Escaped: dim sky + sparse stars
     If(escaped.greaterThan(0.5), () => {
-      const sky = vec3(0.004, 0.005, 0.01)
-      // Cheap star field from ray direction
+      const sky = vec3(0.006, 0.007, 0.014)
       const s = vel.normalize()
-      const starHash = fract(sin(s.x.mul(127.1).add(s.y.mul(311.7)).add(s.z.mul(74.7))).mul(43758.55))
-      const star = starHash.greaterThan(0.997).select(float(0.55), float(0))
-      col.addAssign(sky.add(vec3(star, star, star.mul(0.9))).mul(transm))
+      const starHash = fract(
+        sin(s.x.mul(127.1).add(s.y.mul(311.7)).add(s.z.mul(74.7))).mul(43758.55),
+      )
+      const star = starHash.greaterThan(0.9965).select(float(0.7), float(0))
+      col.addAssign(sky.add(vec3(star, star, star.mul(0.85))).mul(transm))
     })
 
-    // Soft tonemap — keep pure black for captured (col≈0, transm irrelevant)
-    const mapped = col.div(col.add(1.1))
+    // Captured rays keep col≈0 → pure black after tonemap
+    const mapped = col.div(col.add(0.9))
     return vec4(mapped, 1)
   })()
 
@@ -201,7 +205,6 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
   material.depthTest = false
   material.side = THREE.DoubleSide
 
-  // Fullscreen NDC quad. Paired with OrthographicCamera at z=1 looking at origin.
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
   mesh.frustumCulled = false
   mesh.position.set(0, 0, 0)
