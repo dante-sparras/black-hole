@@ -8,6 +8,7 @@ import {
   cos,
   cross,
   dot,
+  exp,
   float,
   floor,
   fract,
@@ -325,15 +326,35 @@ export function createGeodesicTracer(): GeodesicTracer {
             )
             const tJitter = float(0.9).add(turb.mul(0.2))
 
-            const emit = vec3(
-              min(float(2.2), float(0.45).add(Tobs.mul(tJitter).mul(1.15))),
-              min(float(1.6), float(0.15).add(Tobs.mul(tJitter).mul(0.7))),
-              min(float(1.2), float(0.03).add(Tobs.mul(tJitter).mul(Tobs).mul(0.25))),
-            )
+            // Blackbody chromaticity from T_obs (Kelvin via T_ref)
+            // B_λ ∝ λ⁻⁵ / (e^{c₂/(λT)} − 1); sample R/G/B, max-normalize
+            const planckC2 = float(1.4387769e7) // nm·K
+            const tRefK = float(12000)
+            const TK = max(float(800), min(float(40000), Tobs.mul(tJitter).mul(tRefK)))
+            const lamR = float(680)
+            const lamG = float(550)
+            const lamB = float(440)
+            // Planck relative B_λ
+            const xR = min(planckC2.div(lamR.mul(TK)), float(80))
+            const xG = min(planckC2.div(lamG.mul(TK)), float(80))
+            const xB = min(planckC2.div(lamB.mul(TK)), float(80))
+            const br = float(1).div(pow(lamR, float(5)).mul(max(exp(xR).sub(1), float(1e-20))))
+            const bg = float(1).div(pow(lamG, float(5)).mul(max(exp(xG).sub(1), float(1e-20))))
+            const bb = float(1).div(pow(lamB, float(5)).mul(max(exp(xB).sub(1), float(1e-20))))
+            const bMax = max(br, max(bg, bb))
+            const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
+
+            // Brightness: beaming · ṁ · texture · soft T⁴ (relative to 8 kK)
+            const tPivot = float(8000)
+            const tRatio = TK.div(tPivot)
+            const iBB = pow(tRatio, float(4))
+            // Cap HDR so bloom doesn't white-out the shadow
+            const emit = chroma
               .mul(bounce)
               .mul(beam)
               .mul(iScale)
               .mul(texFac)
+              .mul(min(iBB.mul(1.8), float(6.0)))
 
             col.addAssign(emit.mul(transm))
             transm.mulAssign(0.4)

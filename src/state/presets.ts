@@ -71,7 +71,7 @@ export const PRESET_INTERSTELLAR: ScenePreset = {
 export const PRESET_HOT: ScenePreset = {
   id: 'hot',
   label: 'Hot',
-  hint: 'High ṁ · brighter disk · still readable shadow',
+  hint: 'High ṁ · hotter BB → blue-white',
   params: {
     mass: 1,
     spinStar: 0.9,
