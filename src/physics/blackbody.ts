@@ -3,14 +3,22 @@
  * Uses Planck B_λ at three representative wavelengths, then max-normalizes
  * for chromaticity. Intensity is applied separately by the renderer.
  *
- * Temperature in Kelvin. Geometric-sim Tobs is mapped via T_K = Tobs · T_REF.
+ * Dimensionless sim temperature Tobs (order-unity from NT + g) maps via:
+ *   T_K = clamp(Tobs · T_REF)
+ *
+ * T_REF is calibrated so typical disks span red → orange → white → blue-white
+ * as ṁ / Tobs rise (not always blue).
  */
 
 /** Second radiation constant hc/k in nm·K */
 export const PLANCK_C2_NM_K = 1.4387769e7
 
-/** Default: dimensionless Tobs ≈ 1 → 12 000 K (blue-white AGN-ish) */
-export const DEFAULT_T_REF_K = 12_000
+/**
+ * Kelvin per unit dimensionless Tobs.
+ * NT Tobs is typically ~0.4–1.5 for ṁ~0.01–0.8; with T_REF=2800:
+ *   cool ~1100–2000 K (red/orange), mid ~2500–4000 K, hot+Doppler → white/blue.
+ */
+export const DEFAULT_T_REF_K = 2800
 
 /** Representative wavelengths (nm) for a simple RGB sampling of B_λ */
 export const LAMBDA_R_NM = 680
@@ -26,13 +34,11 @@ export type Rgb = { r: number; g: number; b: number }
 export function planckBLambdaRel(lambdaNm: number, tKelvin: number): number {
   if (!(lambdaNm > 0) || !(tKelvin > 0)) return 0
   const x = PLANCK_C2_NM_K / (lambdaNm * tKelvin)
-  // underflow / overflow guards
   if (x > 80) return 0
   if (x < 1e-6) {
-    // Rayleigh–Jeans: B ∝ T / λ⁴  (relative; drop constants)
     return tKelvin / (lambdaNm * lambdaNm * lambdaNm * lambdaNm)
   }
-  const denom = Math.expm1(x) // e^x - 1
+  const denom = Math.expm1(x)
   if (!(denom > 0)) return 0
   const l2 = lambdaNm * lambdaNm
   const l5 = l2 * l2 * lambdaNm
@@ -56,7 +62,7 @@ export function toobsToKelvin(tObs: number, tRefK = DEFAULT_T_REF_K): number {
 
 /**
  * Linear RGB chromaticity of a blackbody (max channel = 1).
- * Cool → red; ~6500–8000 K → white; hot → blue-white.
+ * Cool → red; ~5500–7000 K → white; hot → blue-white.
  */
 export function blackbodyRgb(tKelvin: number): Rgb {
   const T = clampColorTemperatureK(tKelvin)
@@ -73,12 +79,24 @@ export function blackbodyRgbFromTobs(tObs: number, tRefK = DEFAULT_T_REF_K): Rgb
 }
 
 /**
- * Bolometric-style intensity scale ∝ T⁴ (Stefan–Boltzmann), relative.
- * Used so hotter gas is brighter as well as bluer.
+ * Relative intensity scale. Uses soft power < 4 so cool gas stays visible
+ * and hot gas doesn't force ACES into pure white.
+ * Pivot ~3500 K ≈ orange-white mid disk.
  */
-export function blackbodyIntensityScale(tKelvin: number, tPivotK = 8000): number {
+export function blackbodyIntensityScale(tKelvin: number, tPivotK = 3500): number {
   const T = clampColorTemperatureK(tKelvin)
   const p = Math.max(tPivotK, 1)
   const x = T / p
-  return x * x * x * x
+  // ≈ T^{2.5} — between Rayleigh–Jeans and Stefan–Boltzmann for viz balance
+  return Math.pow(x, 2.5)
+}
+
+/** True if RGB is red-dominated (cool). */
+export function isRedDominated(rgb: Rgb): boolean {
+  return rgb.r >= rgb.g && rgb.r >= rgb.b
+}
+
+/** True if RGB is blue-dominated (hot). */
+export function isBlueDominated(rgb: Rgb): boolean {
+  return rgb.b > rgb.r && rgb.b >= rgb.g
 }

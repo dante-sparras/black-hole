@@ -240,7 +240,7 @@ export function createGeodesicTracer(): GeodesicTracer {
             const Fm = flux.mul(M).mul(M).mul(M).mul(8000)
             const Tnt = pow(max(Fm, float(1e-12)), float(0.25))
             const eff = float(1).add(max(aStar, float(0)).mul(0.35))
-            const tempRest = Tnt.mul(eff).mul(2.2)
+            const tempRest = Tnt.mul(eff)
             const Tobs = tempRest.mul(freq)
 
             const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.1))
@@ -328,8 +328,9 @@ export function createGeodesicTracer(): GeodesicTracer {
 
             // Blackbody chromaticity from T_obs (Kelvin via T_ref)
             // B_λ ∝ λ⁻⁵ / (e^{c₂/(λT)} − 1); sample R/G/B, max-normalize
+            // T_REF=2800: typical NT Tobs~0.5–1.5 → ~1400–4200 K (red→orange→white)
             const planckC2 = float(1.4387769e7) // nm·K
-            const tRefK = float(12000)
+            const tRefK = float(2800)
             const TK = max(float(800), min(float(40000), Tobs.mul(tJitter).mul(tRefK)))
             const lamR = float(680)
             const lamG = float(550)
@@ -344,17 +345,17 @@ export function createGeodesicTracer(): GeodesicTracer {
             const bMax = max(br, max(bg, bb))
             const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-            // Brightness: beaming · ṁ · texture · soft T⁴ (relative to 8 kK)
-            const tPivot = float(8000)
+            // Brightness: beaming · ṁ · texture · soft T^2.5 (pivot ~3500 K)
+            const tPivot = float(3500)
             const tRatio = TK.div(tPivot)
-            const iBB = pow(tRatio, float(4))
+            const iBB = pow(tRatio, float(2.5))
             // Cap HDR so bloom doesn't white-out the shadow
             const emit = chroma
               .mul(bounce)
               .mul(beam)
               .mul(iScale)
               .mul(texFac)
-              .mul(min(iBB.mul(1.8), float(6.0)))
+              .mul(min(iBB.mul(1.4), float(4.0)))
 
             col.addAssign(emit.mul(transm))
             transm.mulAssign(0.4)
