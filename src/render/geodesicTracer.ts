@@ -249,7 +249,7 @@ export function createGeodesicTracer(): GeodesicTracer {
             const FtildeMax = gapPeak.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
             const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12))) // 0…~1 near peak
 
-            const tPeakK = float(11000)
+            const tPeakK = float(8500)
               .mul(pow(max(mdot.div(0.1), float(1e-6)), float(0.25)))
               .mul(float(1).add(max(aStar, float(0)).mul(0.25)))
             const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-8)), float(0.25)))
@@ -330,10 +330,13 @@ export function createGeodesicTracer(): GeodesicTracer {
             const bMax = max(br, max(bg, bb))
             const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-            // Intensity: bolometric ∝ F · g³ · texture (ṁ already inside F via fluxRel·mdot path)
-            // fluxRel is F̃/F̃_max; absolute F ∝ ṁ so multiply mdot once:
+            // Intensity: I ∝ F̃ · g³ · texture.
+            // ṁ: physical F∝ṁ, but pure linear ṁ at 10⁻³ makes HDR/ACES crush
+            // cool reds into black-brown. Use mild √-like scale so color stays
+            // readable while still dimming at low accretion.
             const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.8))
-            const iFlux = fluxRel.mul(mdot.div(0.1)).mul(2.2)
+            const mdotBright = pow(max(mdot.div(0.1), float(0.008)), float(0.42))
+            const iFlux = fluxRel.mul(mdotBright).mul(3.8)
             const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
 
             col.addAssign(emit.mul(transm))

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   diskIsco,
+  mdotDisplayBrightness,
   mdotFluxScale,
   mdotFromSlider,
   mdotTemperatureScale,
@@ -87,7 +88,6 @@ describe('Novikov–Thorne flux / temperature', () => {
   test('T scales as ṁ^{1/4}', () => {
     const t01 = novikovThorneTemperature(12, 6, 1, 0, 0.1)
     const t1 = novikovThorneTemperature(12, 6, 1, 0, 1.0)
-    // (1/0.1)^{1/4} = 10^{0.25} ≈ 1.778
     expect(t1 / t01).toBeCloseTo(Math.pow(10, 0.25), 3)
   })
 })
@@ -101,6 +101,17 @@ describe('mdot scales', () => {
 
   test('flux scale is ṁ', () => {
     expect(mdotFluxScale(0.25)).toBe(0.25)
+  })
+
+  test('mdotDisplayBrightness rises softer than linear', () => {
+    const a = mdotDisplayBrightness(0.001)
+    const b = mdotDisplayBrightness(0.1)
+    const c = mdotDisplayBrightness(1)
+    expect(b).toBeGreaterThan(a)
+    expect(c).toBeGreaterThan(b)
+    // linear would be 100× from 0.001→0.1; soft curve much less
+    expect(b / a).toBeLessThan(40)
+    expect(b / a).toBeGreaterThan(2)
   })
 })
 
