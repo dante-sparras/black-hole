@@ -2,13 +2,11 @@
  * Application bridge: pure stores → render tracer / bloom.
  * Keeps main.ts as a thin WebGPU boot entry.
  */
+import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
 import type { GeodesicTracer } from '../render/geodesicTracer'
 import { toUniforms, type SpacetimeUniforms } from '../render/uniforms'
-import { getCamera, subscribeCamera } from '../state/camera'
-import { getLook, subscribeLook } from '../state/look'
-import { getDerived, getParams, subscribe } from '../state/params'
-import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
+import { getScene, subscribeScene } from '../state/scene'
 
 export type BloomPipeline = ReturnType<typeof createBloomPipeline>
 
@@ -16,7 +14,7 @@ export type SceneBridge = {
   applyPhysics: () => void
   applyCamera: () => void
   applyLook: () => void
-  /** Subscribe stores → tracer; returns unsubscribe all. */
+  /** Subscribe scene facade → tracer; returns unsubscribe. */
   connect: () => () => void
   getSpacetime: () => SpacetimeUniforms
   formatStats: (fps: number) => string
@@ -24,12 +22,12 @@ export type SceneBridge = {
 }
 
 export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
-  let spacetime = toUniforms(getParams(), getDerived())
+  const initial = getScene()
+  let spacetime = toUniforms(initial.params, initial.derived)
   let bloom: BloomPipeline | null = null
 
   function applyPhysics(): void {
-    const p = getParams()
-    const d = getDerived()
+    const { params: p, derived: d } = getScene()
     spacetime = toUniforms(p, d)
     tracer.setSpacetime({
       mass: p.mass,
@@ -41,42 +39,28 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   }
 
   function applyCamera(): void {
-    tracer.setCamera(getCamera())
+    tracer.setCamera(getScene().camera)
   }
 
   function applyLook(): void {
-    if (bloom) bloom.applyLook(getLook())
+    if (bloom) bloom.applyLook(getScene().look)
   }
 
   function connect(): () => void {
-    const unsubP = subscribe(() => {
+    return subscribeScene(() => {
       applyPhysics()
-    })
-    const unsubC = subscribeCamera(() => {
       applyCamera()
-    })
-    const unsubL = subscribeLook(() => {
       applyLook()
     })
-    applyPhysics()
-    applyCamera()
-    return () => {
-      unsubP()
-      unsubC()
-      unsubL()
-    }
   }
 
   function formatStats(fps: number): string {
-    const d = getDerived()
-    const c = getCamera()
-    const look = getLook()
-    const p = spacetime
+    const { params: p, derived: d, camera: c, look } = getScene()
     const m = p.mass.toFixed(2)
     const a = p.spinStar.toFixed(3)
     const q = p.charge.toFixed(3)
     const md = p.mdot >= 0.01 ? p.mdot.toFixed(2) : p.mdot.toExponential(1)
-    const rp = Number.isFinite(p.rPlus) ? p.rPlus.toFixed(3) : '—'
+    const rp = Number.isFinite(d.rPlus) ? d.rPlus.toFixed(3) : '—'
     const dist = c.distanceM.toFixed(1)
     const mode = realtimeModeTag(p)
     const bloomTag = look.bloomEnabled

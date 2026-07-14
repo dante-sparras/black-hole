@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "bunx --bun tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "bun test tests"
+    "test": "bun test tests",
+    "test:ref": "bun run scripts/cpu-ref-render.ts",
+    "test:all": "bun test tests && bun run scripts/cpu-ref-render.ts"
   },
   "devDependencies": {
     "@types/three": "^0.185.1",

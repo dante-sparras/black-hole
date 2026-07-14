@@ -1,28 +1,14 @@
 /** Observer camera (not black-hole hair). Distances in units of M. */
+import {
+  OBSERVER_DEFAULTS,
+  OBSERVER_LIMITS,
+  type ObserverCamera,
+} from '../physics/observer'
 
-export type CameraState = {
-  /** Distance from BH center, in units of M */
-  distanceM: number
-  /** Polar angle from +z (spin axis), radians. 0 = face-on, π/2 = edge-on */
-  inclination: number
-  /** Azimuth around z, radians */
-  azimuth: number
-  /** Half-screen FOV scale (shader ray offset strength) */
-  fov: number
-}
+export type CameraState = ObserverCamera
 
-export const CAMERA_DEFAULTS: CameraState = {
-  distanceM: 60,
-  inclination: 1.25, // ~72° from face-on (disk horizontal)
-  azimuth: 0,
-  fov: 0.90,
-}
-
-export const CAMERA_LIMITS = {
-  distanceM: { min: 8, max: 120 },
-  inclination: { min: 0.05, max: Math.PI - 0.05 },
-  fov: { min: 0.2, max: 1.4 },
-} as const
+export const CAMERA_DEFAULTS: CameraState = { ...OBSERVER_DEFAULTS }
+export const CAMERA_LIMITS = OBSERVER_LIMITS
 
 type Listener = (cam: CameraState) => void
 
@@ -46,7 +32,6 @@ export function setCamera(partial: Partial<CameraState>): CameraState {
     CAMERA_LIMITS.inclination.min,
     CAMERA_LIMITS.inclination.max,
   )
-  // azimuth free-wrap
   next.azimuth = wrapAngle(next.azimuth)
   next.fov = clamp(next.fov, CAMERA_LIMITS.fov.min, CAMERA_LIMITS.fov.max)
 

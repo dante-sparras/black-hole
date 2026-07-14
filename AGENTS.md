@@ -44,17 +44,21 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 ## Physics layout
 
 ```
-src/physics/     # pure TS — metricFamily, disk, diagnostics, geodesic/
-src/state/       # params, camera, look, presets
-src/app/         # sceneBridge (stores → GPU)
+src/physics/     # pure TS — metricFamily, observer, disk, geodesic/{rtConstants,cpuRef,kerrNull}
+src/state/       # params, camera, look, presets, scene facade
+src/app/         # sceneBridge (scene → GPU)
 src/render/      # geodesicTracer (WebGPU/TSL) + bloom
 src/ui/          # controls, hud, format, orbit
 src/main.ts      # WebGPU boot only
 ```
 
-**Camera:** distance in units of \(M\); spin ‖ +Y; disk in XZ (\(y=0\)).
+**Camera:** distance in units of \(M\); spin ‖ +Y; disk in XZ (\(y=0\)). Defaults: `OBSERVER_DEFAULTS`.
 
 **Emission:** `DISK_EMISSION` in `physics/disk.ts` — shared with GPU tracer.
+
+**Integration:** `RT` in `physics/geodesic/rtConstants.ts` — step floor ≥0.2M, used by GPU + CPU ref.
+
+**CPU ref:** `bun run test:ref` / `renderCpuRef()` — topology twin of the GPU path.
 
 ## Code hygiene
 

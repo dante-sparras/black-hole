@@ -39,7 +39,8 @@ import {
   T_PEAK_MDOT_REF,
   T_PEAK_REF_K,
 } from '../physics/disk'
-import { CAMERA_DEFAULTS } from '../state/camera'
+import { RT } from '../physics/geodesic/rtConstants'
+import { OBSERVER_DEFAULTS } from '../physics/observer'
 
 export type SpacetimeTraceParams = {
   mass: number
@@ -88,12 +89,12 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uCharge = uniform(0)
   const uMdot = uniform(DEFAULT_MDOT)
   const uRIscoM = uniform(R_ISCO_SCHW_OVER_M)
-  const uCamDistM = uniform(CAMERA_DEFAULTS.distanceM)
-  const uInclination = uniform(CAMERA_DEFAULTS.inclination)
-  const uAzimuth = uniform(CAMERA_DEFAULTS.azimuth)
-  const uFov = uniform(CAMERA_DEFAULTS.fov)
-  const uRoutM = uniform(22)
-  const STEPS = 900
+  const uCamDistM = uniform(OBSERVER_DEFAULTS.distanceM)
+  const uInclination = uniform(OBSERVER_DEFAULTS.inclination)
+  const uAzimuth = uniform(OBSERVER_DEFAULTS.azimuth)
+  const uFov = uniform(OBSERVER_DEFAULTS.fov)
+  const uRoutM = uniform(RT.diskOuterM)
+  const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
     const M = uMass
@@ -106,10 +107,10 @@ export function createGeodesicTracer(): GeodesicTracer {
     // r₊ = M + √(M² − a² − Q²)
     const disc = max(M.mul(M).sub(a.mul(a)).sub(Q.mul(Q)), float(0))
     const rPlus = M.add(sqrt(disc))
-    const rCapture = rPlus.mul(1.02)
+    const rCapture = rPlus.mul(RT.captureMargin)
 
     // Family ISCO from CPU (units of M → geometric)
-    const rin = max(uRIscoM.mul(M), rPlus.mul(1.05))
+    const rin = max(uRIscoM.mul(M), rPlus.mul(RT.iscoHorizonMargin))
     const rout = uRoutM.mul(M)
     const camD = uCamDistM.mul(M)
 
@@ -164,14 +165,14 @@ export function createGeodesicTracer(): GeodesicTracer {
         Break()
       })
 
-      If(r.greaterThan(camD.mul(3)).and(dot(pos, vel).greaterThan(0)), () => {
+      If(r.greaterThan(camD.mul(RT.escapeCamFactor)).and(dot(pos, vel).greaterThan(0)), () => {
         escaped.assign(1)
         done.assign(1)
         Break()
       })
 
-      const adapt = min(float(1.5), max(float(0.2), r.div(M.mul(12))))
-      const ds = float(0.1).mul(M).mul(adapt)
+      const adapt = min(float(RT.adaptMax), max(float(RT.adaptFloor), r.div(M.mul(RT.adaptScale))))
+      const ds = float(RT.baseStepM).mul(M).mul(adapt)
 
       prevY.assign(pos.y)
       const p0x = pos.x.toVar()
@@ -365,10 +366,10 @@ export function createGeodesicTracer(): GeodesicTracer {
       )
     })
 
-    If(done.lessThan(0.5).and(minR.lessThan(M.mul(3.2))), () => {
+    If(done.lessThan(0.5).and(minR.lessThan(M.mul(RT.stalledCaptureM))), () => {
       captured.assign(1)
     })
-    If(done.lessThan(0.5).and(minR.greaterThanEqual(M.mul(3.2))), () => {
+    If(done.lessThan(0.5).and(minR.greaterThanEqual(M.mul(RT.stalledCaptureM))), () => {
       escaped.assign(1)
     })
 

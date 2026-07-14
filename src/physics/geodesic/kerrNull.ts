@@ -1,3 +1,5 @@
+import { knHorizon } from '../kn'
+import { RT, rtStepSize } from './rtConstants'
 import {
   add,
   clone,
@@ -9,7 +11,6 @@ import {
   type Vec3,
 } from './vec3'
 import { schwarzschildNullAccel } from './schwarzschildNull'
-import { knHorizon } from '../kn'
 
 /**
  * Real-time Einstein–Maxwell null geodesics (Cartesian approx).
@@ -202,12 +203,12 @@ export function traceKnNull(options: KnTraceOptions): KnTraceResult {
   const Q = options.charge ?? 0
   const rPlus = knHorizon(M, a, Q)
   const captureR =
-    (Number.isFinite(rPlus) ? rPlus : 2 * M) * (options.captureMargin ?? 1.02)
+    (Number.isFinite(rPlus) ? rPlus : 2 * M) *
+    (options.captureMargin ?? RT.captureMargin)
   const maxSteps = options.maxSteps ?? 5000
-  const h0 = options.stepSize ?? 0.1 * M
   const escapeR = options.escapeRadius ?? 250 * M
   const diskInner = options.diskInner ?? 6 * M
-  const diskOuter = options.diskOuter ?? 30 * M
+  const diskOuter = options.diskOuter ?? RT.diskOuterM * M
   const axis = options.diskAxis ?? 'y'
 
   let pos = clone(options.origin)
@@ -231,7 +232,9 @@ export function traceKnNull(options: KnTraceOptions): KnTraceResult {
       return { fate: 'escaped', minR, finalR: r, steps: i, diskHits, impact }
     }
 
-    const h = h0 * Math.min(1.5, Math.max(0.2, r / (12 * M)))
+    const h = options.stepSize
+      ? options.stepSize * Math.min(RT.adaptMax, Math.max(RT.adaptFloor, r / (RT.adaptScale * M)))
+      : rtStepSize(r, M)
     prevPos = clone(pos)
     prevAxis = axis === 'y' ? pos.y : pos.z
 
@@ -252,7 +255,7 @@ export function traceKnNull(options: KnTraceOptions): KnTraceResult {
     }
   }
 
-  if (minR < 3.2 * M) {
+  if (minR < RT.stalledCaptureM * M) {
     return {
       fate: 'captured',
       minR,
