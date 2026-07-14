@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { getCamera } from '../../src/state/camera'
-import { getLook } from '../../src/state/look'
+import { CAMERA_DEFAULTS, getCamera } from '../../src/state/camera'
+import { getLook, LOOK_DEFAULTS } from '../../src/state/look'
 import { getParams } from '../../src/state/params'
 import {
   ALL_PRESETS,
@@ -30,14 +30,15 @@ describe('presets', () => {
     expect(getParams().charge).toBe(0)
     expect(getLook().bloomEnabled).toBe(true)
     expect(getLook().exposure).toBeLessThan(1.05)
-    expect(getCamera().distanceM).toBeGreaterThan(10)
+    expect(getLook().bloomStrength).toBeLessThan(0.5)
   })
 
-  test('apply hot raises ṁ and exposure', () => {
+  test('apply hot raises ṁ without nuking the shadow with bloom', () => {
     applyPreset(PRESET_HOT)
     expect(getParams().mdot).toBeGreaterThan(0.3)
-    expect(getLook().exposure).toBeGreaterThan(1.1)
-    expect(getLook().bloomStrength).toBeGreaterThan(1)
+    expect(getLook().exposure).toBeGreaterThanOrEqual(0.95)
+    expect(getLook().bloomStrength).toBeLessThan(0.5)
+    expect(getLook().bloomThreshold).toBeGreaterThanOrEqual(0.7)
   })
 
   test('apply schwarzschild zeros spin and charge', () => {
@@ -55,6 +56,31 @@ describe('presets', () => {
     expect(() => applyPreset('nope-does-not-exist')).toThrow()
   })
 
+  test('every preset uses shared camera defaults', () => {
+    for (const p of ALL_PRESETS) {
+      applyPreset(p)
+      const cam = getCamera()
+      expect(cam.distanceM).toBe(CAMERA_DEFAULTS.distanceM)
+      expect(cam.inclination).toBe(CAMERA_DEFAULTS.inclination)
+      expect(cam.azimuth).toBe(CAMERA_DEFAULTS.azimuth)
+      expect(cam.fov).toBe(CAMERA_DEFAULTS.fov)
+    }
+  })
+
+  test('every preset keeps bloom subtle (shadow readable)', () => {
+    for (const p of ALL_PRESETS) {
+      applyPreset(p)
+      const look = getLook()
+      expect(look.bloomStrength).toBeLessThanOrEqual(0.45)
+      expect(look.bloomThreshold).toBeGreaterThanOrEqual(0.5)
+    }
+  })
+
+  test('defaults stay subtle', () => {
+    expect(LOOK_DEFAULTS.bloomStrength).toBeLessThanOrEqual(0.35)
+    expect(LOOK_DEFAULTS.bloomThreshold).toBeGreaterThanOrEqual(0.6)
+  })
+
   test('every preset applies without throw and stays physical', () => {
     for (const p of ALL_PRESETS) {
       applyPreset(p)
@@ -63,7 +89,6 @@ describe('presets', () => {
       expect(phys.spinStar).toBeGreaterThanOrEqual(0)
       expect(phys.spinStar).toBeLessThanOrEqual(0.998)
       expect(phys.mdot).toBeGreaterThan(0)
-      // Extremality M² ≥ a² + Q²
       const a = phys.spinStar * phys.mass
       expect(phys.mass * phys.mass).toBeGreaterThanOrEqual(
         a * a + phys.charge * phys.charge - 1e-9,

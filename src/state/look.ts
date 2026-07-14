@@ -1,6 +1,7 @@
 /**
  * Look / post-process settings (not black-hole hair).
  * Bloom is Unreal-style luminance threshold + multi-mip blur.
+ * Defaults stay subtle so the shadow stays readable.
  */
 
 export type LookState = {
@@ -16,12 +17,13 @@ export type LookState = {
   exposure: number
 }
 
+/** Subtle film glow — disk edges, not a white-out of the hole. */
 export const LOOK_DEFAULTS: LookState = {
   bloomEnabled: true,
-  bloomStrength: 0.75,
-  bloomRadius: 0.55,
-  bloomThreshold: 0.45,
-  exposure: 1.0,
+  bloomStrength: 0.28,
+  bloomRadius: 0.4,
+  bloomThreshold: 0.7,
+  exposure: 0.95,
 }
 
 export const LOOK_LIMITS = {
