@@ -230,32 +230,35 @@ export function createGeodesicTracer(): GeodesicTracer {
             const nObs = vel.normalize().mul(-1)
             const mu = dot(tdir, nObs)
             const lambda = rhoSafe.mul(mu)
-            const freq = float(1).div(max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.12)))
-            // Bolometric I ∝ g³, floored so receding side stays visible (not black holes)
-            const beam = max(freq.mul(freq).mul(freq), float(0.18))
+            const freq = float(1).div(
+              max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.15)),
+            )
+            // I ∝ g³ (no hard floor that invents light — soft clamp only for NaN safety)
+            const beam = pow(max(freq, float(0.2)), float(3))
 
-            // Novikov–Thorne: F̃ ∝ ρ⁻³ (1 − √(r_in/ρ)); F ∝ ṁ F̃; T ∝ (ṁ F̃)^{1/4}
+            // --- Novikov–Thorne flux & physical T [K] ---
+            // F̃ = ρ⁻³ (1 − √(r_in/ρ)); F ∝ ṁ F̃
+            // T(r) = T_peak (F̃/F̃_max)^{1/4}, T_peak = 11000 K · (ṁ/0.1)^{1/4} · (1+0.25 a★)
             const gap = max(float(1).sub(sqrt(rin.div(max(rho, rin.mul(1.0001))))), float(0))
-            const flux = gap.div(rho.mul(rho).mul(rho).add(1e-12)).mul(mdot)
-            const Fm = flux.mul(M).mul(M).mul(M).mul(8000)
-            const Tnt = pow(max(Fm, float(1e-12)), float(0.25))
-            const eff = float(1).add(max(aStar, float(0)).mul(0.35))
-            const tempRest = Tnt.mul(eff)
-            const Tobs = tempRest.mul(freq)
+            const Ftilde = gap.div(rho.mul(rho).mul(rho).add(1e-12))
+            const rPeak = rin.mul(49 / 36)
+            const gapPeak = max(
+              float(1).sub(sqrt(rin.div(max(rPeak, rin.mul(1.0001))))),
+              float(0),
+            )
+            const FtildeMax = gapPeak.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
+            const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12))) // 0…~1 near peak
 
-            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.1))
-            // Mild ṁ brightness (floor keeps Cool preset solid, not transparent)
-            const iScale = max(pow(mdot.div(0.1), float(0.28)), float(0.4))
+            const tPeakK = float(11000)
+              .mul(pow(max(mdot.div(0.1), float(1e-6)), float(0.25)))
+              .mul(float(1).add(max(aStar, float(0)).mul(0.25)))
+            const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-8)), float(0.25)))
 
-            // --- Disk texture: seamless log spirals + turbulence (no raw φ) ---
-            // Use (cosφ,sinφ) via hx/ρ, hz/ρ so atan2 branch cut cannot seam.
+            // Mild density structure (seamless); keeps opacity, doesn't carve black voids
             const invRho = float(1).div(max(rhoSafe, float(1e-5)))
             const cphi = hx.mul(invRho)
             const sphi = hz.mul(invRho)
             const lnR = log(max(rhoSafe.div(M), float(1e-4)))
-
-            // m=2 spiral: cos(2φ − 2·pitch·lnR + phase)
-            // cos(2φ)=c²−s², sin(2φ)=2cs
             const c2 = cphi.mul(cphi).sub(sphi.mul(sphi))
             const s2 = cphi.mul(sphi).mul(2)
             const pitch = float(0.55)
@@ -263,14 +266,9 @@ export function createGeodesicTracer(): GeodesicTracer {
             const armWave = float(0.5).add(
               float(0.5).mul(c2.mul(cos(alpha)).add(s2.mul(sin(alpha)))),
             )
-            const armsBright = pow(max(armWave, float(1e-4)), float(1.2))
-            const armContrast = float(0.4)
-            const armFac = float(1)
-              .sub(armContrast)
-              .add(armContrast.mul(float(0.5).add(armsBright.mul(0.7))))
+            const armsBright = pow(max(armWave, float(1e-4)), float(1.15))
+            const armFac = float(0.72).add(armsBright.mul(0.4))
 
-            // Seamless noise domain: (cosφ, sinφ) scaled + lnR as 3rd via offset mix
-            // Project to 2D for cheap value noise: (cφ, sφ) * scale + lnR drift on both axes equally
             const nUV = vec2(
               cphi.mul(1.4).add(lnR.mul(0.15)),
               sphi.mul(1.4).add(lnR.mul(0.11)),
@@ -313,39 +311,16 @@ export function createGeodesicTracer(): GeodesicTracer {
               .mul(float(1).sub(u2.y))
               .add(p01.mul(float(1).sub(u2.x)).add(p11.mul(u2.x)).mul(u2.y))
             const turb = n1.mul(0.67).add(n2.mul(0.33))
-            const turbContrast = float(0.28)
-            const turbFac = float(1)
-              .sub(turbContrast)
-              .add(turbContrast.mul(float(0.55).add(turb.mul(0.7))))
+            const texFac = max(float(0.65), min(float(1.35), armFac.mul(float(0.85).add(turb.mul(0.3)))))
 
-            // Radial-only ripple (no φ) — seamless
-            const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.2))))
-            // Floor texture so troughs stay opaque red, not transparent black
-            const texFac = max(
-              float(0.55),
-              min(float(1.55), armFac.mul(turbFac).mul(float(0.94).add(ripple.mul(0.12)))),
-            )
-            const tJitter = float(0.92).add(turb.mul(0.16))
+            // Color temperature: T_obs = g · T_rest (thermal scaling)
+            const TK = max(float(800), min(float(100000), tRestK.mul(freq)))
 
-            // Blackbody chromaticity from T_obs (power-law → Kelvin, then Planck)
-            // T_K = 4500 · (Tobs / 0.75)^1.75  → cool red, hot blue-white
-            // (linear Tobs·const cannot span red→blue: NT only varies ~2–3×)
+            // Planck B_λ chromaticity at optical wavelengths
             const planckC2 = float(1.4387769e7) // nm·K
-            const tPivotObs = float(0.75)
-            const tPivotK = float(4500)
-            const tGamma = float(1.75)
-            const tSafe = max(Tobs.mul(tJitter), float(1e-6))
-            const TK = max(
-              float(800),
-              min(
-                float(40000),
-                tPivotK.mul(pow(tSafe.div(tPivotObs), tGamma)),
-              ),
-            )
             const lamR = float(680)
             const lamG = float(550)
             const lamB = float(440)
-            // Planck relative B_λ
             const xR = min(planckC2.div(lamR.mul(TK)), float(80))
             const xG = min(planckC2.div(lamG.mul(TK)), float(80))
             const xB = min(planckC2.div(lamB.mul(TK)), float(80))
@@ -355,23 +330,14 @@ export function createGeodesicTracer(): GeodesicTracer {
             const bMax = max(br, max(bg, bb))
             const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-            // Brightness: beaming · ṁ · texture · soft T^2.2; floor keeps Cool solid
-            const tRatio = TK.div(tPivotK)
-            const iBB = max(pow(tRatio, float(2.2)), float(0.22))
-            const emit = chroma
-              .mul(bounce)
-              .mul(beam)
-              .mul(iScale)
-              .mul(texFac)
-              .mul(min(iBB.mul(1.15), float(3.2)))
-              // Absolute floor so disk never punches black holes in the silhouette
-              .mul(1)
-            // Ensure minimum luminance in chroma direction
-            const emitFloor = chroma.mul(0.12)
-            const emitLit = max(emit, emitFloor)
+            // Intensity: bolometric ∝ F · g³ · texture (ṁ already inside F via fluxRel·mdot path)
+            // fluxRel is F̃/F̃_max; absolute F ∝ ṁ so multiply mdot once:
+            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.8))
+            const iFlux = fluxRel.mul(mdot.div(0.1)).mul(2.2)
+            const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
 
-            col.addAssign(emitLit.mul(transm))
-            transm.mulAssign(0.45)
+            col.addAssign(emit.mul(transm))
+            transm.mulAssign(0.42)
           })
         },
       )

@@ -71,20 +71,20 @@ export const PRESET_INTERSTELLAR: ScenePreset = {
 export const PRESET_HOT: ScenePreset = {
   id: 'hot',
   label: 'Hot',
-  hint: 'High ṁ · hotter BB → blue-white',
+  hint: 'High ṁ · hotter multi-color BB',
   params: {
     mass: 1,
     spinStar: 0.9,
     charge: 0,
-    mdot: 0.8,
+    mdot: 0.6,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
-    bloomStrength: 0.38,
-    bloomRadius: 0.38,
-    bloomThreshold: 0.85,
-    exposure: 1.05,
+    bloomStrength: 0.32,
+    bloomRadius: 0.4,
+    bloomThreshold: 0.75,
+    exposure: 1.0,
   },
 }
 
@@ -92,20 +92,20 @@ export const PRESET_HOT: ScenePreset = {
 export const PRESET_COOL: ScenePreset = {
   id: 'cool',
   label: 'Cool',
-  hint: 'Low ṁ · red/orange · solid disk',
+  hint: 'Low ṁ · cooler multi-color BB',
   params: {
     mass: 1,
-    spinStar: 0.5,
+    spinStar: 0.4,
     charge: 0,
-    mdot: 0.035,
+    mdot: 0.04,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
-    bloomStrength: 0.2,
-    bloomRadius: 0.48,
-    bloomThreshold: 0.55,
-    exposure: 0.95,
+    bloomStrength: 0.22,
+    bloomRadius: 0.45,
+    bloomThreshold: 0.6,
+    exposure: 1.0,
   },
 }
 
