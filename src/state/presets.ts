@@ -1,6 +1,14 @@
 /**
  * Named scene presets: physics + look (not black-hole hair).
  * All presets share CAMERA_DEFAULTS — framing is independent of look mode.
+ *
+ * Design rules (audited):
+ * - Temperature ladder at fixed display physics:
+ *     Cool < Schwarzschild ≲ RN < Default < Interstellar < Extremal < Hot
+ * - Higher spin → smaller r_ISCO → hotter (not cooler).
+ * - Higher ṁ → hotter (T ∝ ṁ^{1/4}).
+ * - Bloom stays subtle so the shadow stays readable.
+ * - Every preset sets full {mass, spinStar, charge, mdot} (no stale merges).
  */
 import type { BlackHoleParams } from '../physics/types'
 import {
@@ -16,7 +24,8 @@ export type ScenePreset = {
   label: string
   /** Short HUD hint */
   hint: string
-  params: Partial<BlackHoleParams>
+  /** Full physics snapshot (all no-hair + ṁ) */
+  params: Pick<BlackHoleParams, 'mass' | 'spinStar' | 'charge' | 'mdot'>
   /** Always CAMERA_DEFAULTS — kept for type/API completeness */
   camera: Partial<CameraState>
   look: Partial<LookState>
@@ -31,11 +40,11 @@ const LOOK_SOFT: LookState = {
   exposure: 0.95,
 }
 
-/** Default / reset baseline. */
+/** Default / reset baseline — moderate Kerr + default ṁ. */
 export const PRESET_DEFAULT: ScenePreset = {
   id: 'default',
   label: 'Default',
-  hint: 'Unit mass · moderate ṁ · subtle bloom',
+  hint: 'a★=0.7 · ṁ=0.1 · balanced Kerr',
   params: {
     mass: 1,
     spinStar: 0.7,
@@ -46,70 +55,81 @@ export const PRESET_DEFAULT: ScenePreset = {
   look: { ...LOOK_DEFAULTS },
 }
 
-/** Cinematic warm disk, high spin — glow stays mild so the hole reads. */
+/**
+ * Near-extremal Kerr showcase (Interstellar-class spin).
+ * Hot from small ISCO; ṁ moderate so Hot/Extremal still rank hotter.
+ */
 export const PRESET_INTERSTELLAR: ScenePreset = {
   id: 'interstellar',
   label: 'Interstellar',
-  hint: 'Near-extremal · hotter ISCO · soft glow',
+  hint: 'a★≈0.998 · hot ISCO · soft glow',
   params: {
     mass: 1,
     spinStar: 0.998,
     charge: 0,
-    mdot: 0.08,
+    mdot: 0.1,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
-    bloomStrength: 0.32,
-    bloomRadius: 0.45,
-    bloomThreshold: 0.65,
-    exposure: 0.9,
+    bloomStrength: 0.3,
+    bloomRadius: 0.42,
+    bloomThreshold: 0.68,
+    exposure: 0.95,
   },
 }
 
-/** Hot disk via ṁ / exposure — not by blowing out bloom. */
+/**
+ * Hottest preset: high ṁ dominates color temperature.
+ * Spin high enough for asymmetry, not max (that’s Extremal).
+ */
 export const PRESET_HOT: ScenePreset = {
   id: 'hot',
   label: 'Hot',
-  hint: 'High ṁ · hotter multi-color BB',
+  hint: 'ṁ=1.5 · hottest multi-color BB',
   params: {
     mass: 1,
-    spinStar: 0.9,
+    spinStar: 0.92,
     charge: 0,
-    mdot: 0.6,
+    mdot: 1.5,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
-    bloomStrength: 0.32,
-    bloomRadius: 0.4,
-    bloomThreshold: 0.75,
-    exposure: 1.0,
+    bloomStrength: 0.3,
+    bloomRadius: 0.38,
+    // Higher threshold — only the brightest core blooms (shadow stays black)
+    bloomThreshold: 0.78,
+    exposure: 0.92,
   },
 }
 
-/** Dim cool disk, low accretion. */
+/**
+ * Coolest preset: low ṁ + modest spin.
+ * Must stay below Schwarzschild in peak T (do not raise a★ without lowering ṁ).
+ */
 export const PRESET_COOL: ScenePreset = {
   id: 'cool',
   label: 'Cool',
-  hint: 'Low ṁ · cooler multi-color BB',
+  hint: 'ṁ=0.02 · coolest multi-color BB',
   params: {
     mass: 1,
-    spinStar: 0.4,
+    spinStar: 0.25,
     charge: 0,
-    mdot: 0.04,
+    mdot: 0.02,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
-    bloomStrength: 0.22,
-    bloomRadius: 0.45,
-    bloomThreshold: 0.6,
-    exposure: 1.0,
+    bloomStrength: 0.2,
+    bloomRadius: 0.42,
+    // Higher threshold + less strength — dim red disk, not muddy bloom soup
+    bloomThreshold: 0.72,
+    exposure: 1.05,
   },
 }
 
-/** Schwarzschild classic silhouette. */
+/** Schwarzschild classic silhouette (no spin, no charge). */
 export const PRESET_SCHWARZSCHILD: ScenePreset = {
   id: 'schwarzschild',
   label: 'Schwarzschild',
@@ -118,36 +138,43 @@ export const PRESET_SCHWARZSCHILD: ScenePreset = {
     mass: 1,
     spinStar: 0,
     charge: 0,
-    mdot: 0.12,
+    mdot: 0.1,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: { ...LOOK_SOFT },
 }
 
-/** Max spin Doppler asymmetry. */
+/**
+ * Max-spin Doppler asymmetry; slightly higher ṁ than Interstellar.
+ * Still cooler peak than Hot (Hot wins via ṁ).
+ */
 export const PRESET_EXTREMAL: ScenePreset = {
   id: 'extremal',
   label: 'Extremal Kerr',
-  hint: 'a★≈0.998 · Doppler asymmetry',
+  hint: 'a★≈0.998 · max Doppler · hot',
   params: {
     mass: 1,
     spinStar: 0.998,
     charge: 0,
-    mdot: 0.15,
+    mdot: 0.18,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
     bloomStrength: 0.3,
-    exposure: 0.98,
+    bloomThreshold: 0.72,
+    exposure: 0.95,
   },
 }
 
-/** Reissner–Nordström charged (no spin). */
+/**
+ * Reissner–Nordström charged (no spin).
+ * Slightly smaller r_ISCO than Schw → mildly hotter than Schw at same ṁ.
+ */
 export const PRESET_RN: ScenePreset = {
   id: 'rn',
   label: 'RN charged',
-  hint: 'High Q · a★=0 · RN family',
+  hint: 'Q=0.85 · a★=0 · RN family',
   params: {
     mass: 1,
     spinStar: 0,
@@ -173,16 +200,28 @@ export function getPresetById(id: string): ScenePreset | undefined {
 }
 
 /**
- * Apply physics + look; camera always resets to shared CAMERA_DEFAULTS.
+ * Apply full physics snapshot + look; camera always resets to shared CAMERA_DEFAULTS.
  */
 export function applyPreset(preset: ScenePreset | string): ScenePreset {
   const p = typeof preset === 'string' ? getPresetById(preset) : preset
   if (!p) {
     throw new Error(`Unknown preset: ${String(preset)}`)
   }
-  setParams(p.params)
+  // Full snapshot — avoid partial merge leaving stale charge/spin/mdot
+  setParams({
+    mass: p.params.mass,
+    spinStar: p.params.spinStar,
+    charge: p.params.charge,
+    mdot: p.params.mdot,
+  })
   setCamera({ ...CAMERA_DEFAULTS })
-  setLook(p.look)
+  setLook({
+    bloomEnabled: p.look.bloomEnabled ?? LOOK_DEFAULTS.bloomEnabled,
+    bloomStrength: p.look.bloomStrength ?? LOOK_DEFAULTS.bloomStrength,
+    bloomRadius: p.look.bloomRadius ?? LOOK_DEFAULTS.bloomRadius,
+    bloomThreshold: p.look.bloomThreshold ?? LOOK_DEFAULTS.bloomThreshold,
+    exposure: p.look.exposure ?? LOOK_DEFAULTS.exposure,
+  })
   return p
 }
 
