@@ -2,9 +2,11 @@ import './style.css'
 
 import * as THREE from 'three/webgpu'
 
+import { createBloomPipeline } from './render/bloomPipeline'
 import { createGeodesicTracer } from './render/geodesicTracer'
 import { toUniforms } from './render/uniforms'
 import { getCamera, subscribeCamera } from './state/camera'
+import { getLook, subscribeLook } from './state/look'
 import { getDerived, getParams, subscribe } from './state/params'
 import { mountControls } from './ui/controls'
 import { mountOrbitControls } from './ui/orbit'
@@ -36,8 +38,12 @@ camera.lookAt(0, 0, 0)
 const tracer = createGeodesicTracer()
 scene.add(tracer.mesh)
 
+/** Post stack created after WebGPU init. */
+let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
+
 function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight)
+  bloomPipeline?.setSize(window.innerWidth, window.innerHeight)
 }
 window.addEventListener('resize', onResize)
 
@@ -68,11 +74,18 @@ function applyCamera(): void {
   tracer.setFov(c.fov)
 }
 
+function applyLook(): void {
+  if (bloomPipeline) bloomPipeline.applyLook(getLook())
+}
+
 subscribe(() => {
   applyPhysics()
 })
 subscribeCamera(() => {
   applyCamera()
+})
+subscribeLook(() => {
+  applyLook()
 })
 applyPhysics()
 applyCamera()
@@ -84,6 +97,7 @@ let last = performance.now()
 function formatStats(fps: number): string {
   const d = getDerived()
   const c = getCamera()
+  const look = getLook()
   const m = spacetime.mass.toFixed(2)
   const a = spacetime.spinStar.toFixed(3)
   const q = spacetime.charge.toFixed(3)
@@ -100,7 +114,8 @@ function formatStats(fps: number): string {
         : !hasA && hasQ
           ? 'rn-RT'
           : 'kn-RT'
-  return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r₊=${rp} · D=${dist}M`
+  const bloomTag = look.bloomEnabled ? `bloom=${look.bloomStrength.toFixed(2)}` : 'bloom=off'
+  return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${bloomTag} · r₊=${rp} · D=${dist}M`
 }
 
 async function boot() {
@@ -113,12 +128,19 @@ async function boot() {
     return
   }
 
+  bloomPipeline = createBloomPipeline(renderer, scene, camera, getLook())
+  applyLook()
+
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min((now - last) / 1000, 1 / 20)
     last = now
 
-    renderer.render(scene, camera)
+    if (bloomPipeline) {
+      bloomPipeline.render()
+    } else {
+      renderer.render(scene, camera)
+    }
 
     frames++
     fpsAccum += dt

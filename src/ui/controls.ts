@@ -15,6 +15,13 @@ import {
   subscribeCamera,
   type CameraState,
 } from '../state/camera'
+import {
+  getLook,
+  LOOK_LIMITS,
+  setLook,
+  subscribeLook,
+  type LookState,
+} from '../state/look'
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
 
 function fmt(n: number, digits = 3): string {
@@ -97,6 +104,34 @@ export function mountControls(
       <span class="ctrl-val" data-val="fov"></span>
     </label>
     <p class="ctrl-hint">Drag canvas to orbit · scroll/pinch to zoom</p>
+
+    <div class="ctrl-section">Look</div>
+    <label class="ctrl">
+      <span class="ctrl-name">Bloom</span>
+      <input type="checkbox" id="l-bloom-on" />
+      <span class="ctrl-val" data-val="bloomOn"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Strength</span>
+      <input type="range" id="l-bloom-str" min="${LOOK_LIMITS.bloomStrength.min}" max="${LOOK_LIMITS.bloomStrength.max}" step="0.01" />
+      <span class="ctrl-val" data-val="bloomStr"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Radius</span>
+      <input type="range" id="l-bloom-rad" min="${LOOK_LIMITS.bloomRadius.min}" max="${LOOK_LIMITS.bloomRadius.max}" step="0.01" />
+      <span class="ctrl-val" data-val="bloomRad"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Threshold</span>
+      <input type="range" id="l-bloom-thr" min="${LOOK_LIMITS.bloomThreshold.min}" max="${LOOK_LIMITS.bloomThreshold.max}" step="0.01" />
+      <span class="ctrl-val" data-val="bloomThr"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Exposure</span>
+      <input type="range" id="l-exposure" min="${LOOK_LIMITS.exposure.min}" max="${LOOK_LIMITS.exposure.max}" step="0.01" />
+      <span class="ctrl-val" data-val="exposure"></span>
+    </label>
+    <p class="ctrl-hint">Unreal bloom on HDR · ACES tone map · not hair</p>
   `
 
   const massInput = root.querySelector<HTMLInputElement>('#p-mass')
@@ -116,6 +151,17 @@ export function mountControls(
   const incVal = root.querySelector<HTMLElement>('[data-val="inc"]')
   const azVal = root.querySelector<HTMLElement>('[data-val="az"]')
   const fovVal = root.querySelector<HTMLElement>('[data-val="fov"]')
+
+  const bloomOnInput = root.querySelector<HTMLInputElement>('#l-bloom-on')
+  const bloomStrInput = root.querySelector<HTMLInputElement>('#l-bloom-str')
+  const bloomRadInput = root.querySelector<HTMLInputElement>('#l-bloom-rad')
+  const bloomThrInput = root.querySelector<HTMLInputElement>('#l-bloom-thr')
+  const exposureInput = root.querySelector<HTMLInputElement>('#l-exposure')
+  const bloomOnVal = root.querySelector<HTMLElement>('[data-val="bloomOn"]')
+  const bloomStrVal = root.querySelector<HTMLElement>('[data-val="bloomStr"]')
+  const bloomRadVal = root.querySelector<HTMLElement>('[data-val="bloomRad"]')
+  const bloomThrVal = root.querySelector<HTMLElement>('[data-val="bloomThr"]')
+  const exposureVal = root.querySelector<HTMLElement>('[data-val="exposure"]')
 
   function syncPhysicsInputs(p: BlackHoleParams): void {
     if (massInput) massInput.value = String(p.mass)
@@ -140,6 +186,19 @@ export function mountControls(
     if (incVal) incVal.textContent = fmt(radToDeg(c.inclination), 1)
     if (azVal) azVal.textContent = fmt(radToDeg(c.azimuth), 1)
     if (fovVal) fovVal.textContent = fmt(c.fov, 2)
+  }
+
+  function syncLookInputs(l: LookState): void {
+    if (bloomOnInput) bloomOnInput.checked = l.bloomEnabled
+    if (bloomStrInput) bloomStrInput.value = String(l.bloomStrength)
+    if (bloomRadInput) bloomRadInput.value = String(l.bloomRadius)
+    if (bloomThrInput) bloomThrInput.value = String(l.bloomThreshold)
+    if (exposureInput) exposureInput.value = String(l.exposure)
+    if (bloomOnVal) bloomOnVal.textContent = l.bloomEnabled ? 'on' : 'off'
+    if (bloomStrVal) bloomStrVal.textContent = fmt(l.bloomStrength, 2)
+    if (bloomRadVal) bloomRadVal.textContent = fmt(l.bloomRadius, 2)
+    if (bloomThrVal) bloomThrVal.textContent = fmt(l.bloomThreshold, 2)
+    if (exposureVal) exposureVal.textContent = fmt(l.exposure, 2)
   }
 
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
@@ -190,6 +249,22 @@ export function mountControls(
     setCamera({ fov: Number(fovInput.value) })
   })
 
+  bloomOnInput?.addEventListener('change', () => {
+    setLook({ bloomEnabled: Boolean(bloomOnInput.checked) })
+  })
+  bloomStrInput?.addEventListener('input', () => {
+    setLook({ bloomStrength: Number(bloomStrInput.value) })
+  })
+  bloomRadInput?.addEventListener('input', () => {
+    setLook({ bloomRadius: Number(bloomRadInput.value) })
+  })
+  bloomThrInput?.addEventListener('input', () => {
+    setLook({ bloomThreshold: Number(bloomThrInput.value) })
+  })
+  exposureInput?.addEventListener('input', () => {
+    setLook({ exposure: Number(exposureInput.value) })
+  })
+
   subscribe((p, d) => {
     syncPhysicsInputs(p)
     syncDerived(d, p)
@@ -197,6 +272,10 @@ export function mountControls(
 
   subscribeCamera((c) => {
     syncCameraInputs(c)
+  })
+
+  subscribeLook((l) => {
+    syncLookInputs(l)
   })
 
   massInput?.addEventListener('input', () => {
@@ -207,6 +286,7 @@ export function mountControls(
 
   syncPhysicsInputs(getParams())
   syncCameraInputs(getCamera())
+  syncLookInputs(getLook())
   syncDerived(getDerived(), getParams())
 
   return {

@@ -117,6 +117,12 @@ canvas {
   accent-color: #7aa2ff;
 }
 
+.ctrl input[type='checkbox'] {
+  width: auto;
+  justify-self: start;
+  accent-color: #7aa2ff;
+}
+
 .advanced {
   color: #8a9099;
   font-size: 11px;

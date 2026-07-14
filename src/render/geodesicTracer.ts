@@ -280,7 +280,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       col.assign(vec3(0, 0, 0))
     })
 
-    return vec4(col.div(col.add(1)), 1)
+    return vec4(col, 1)
   })()
 
   const material = new THREE.MeshBasicNodeMaterial()
