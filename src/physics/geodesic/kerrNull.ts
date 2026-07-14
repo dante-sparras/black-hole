@@ -9,38 +9,41 @@ import {
   type Vec3,
 } from './vec3'
 import { schwarzschildNullAccel } from './schwarzschildNull'
-import { kerrHorizon } from '../kerr'
+import { knHorizon } from '../kn'
 
 /**
- * Real-time Kerr null geodesics in Cartesian form (spin ‖ +Y).
+ * Real-time Einstein–Maxwell null geodesics (Cartesian approx).
  *
- * When a = 0, reduces exactly to the Schwarzschild pseudo-Newtonian force
- * used in schwarzschildNullAccel.
+ * Families (a = Kerr length, Q = charge):
+ *   a=0, Q=0 → Schwarzschild
+ *   a≠0, Q=0 → Kerr
+ *   a=0, Q≠0 → Reissner–Nordström
+ *   a≠0, Q≠0 → Kerr–Newman
  *
- * Nonzero spin adds Lense–Thirring frame-dragging:
- *   Ω(r) = 2 a M / (r³ + a² r) along ŷ
- *   a_LT = 2 Ω × v
- * plus a co/counter-rotation coupling that shifts the effective capture
- * (prograde rays less tightly bound, retrograde more).
+ * Radial force from Binet (RN):
+ *   d²u/dφ² + u = 3 M u² − 2 Q² u³
+ * → a = L² (−3M/r⁵ + 2 Q²/r⁶) x̂
+ *   = −1.5 r_s L² x / r⁵ + 2 Q² L² x / r⁶   (r_s = 2M)
  *
- * This is the standard class of real-time Kerr approximations (not full
- * Boyer–Lindquist Christoffels) — accurate enough for silhouette + drag
- * asymmetry; a=0 matches our tested Schwarzschild integrator.
+ * Spin: Lense–Thirring + spin–orbit (same as kerrNull).
  */
 
-export function kerrNullAccel(
+export function knNullAccel(
   pos: Vec3,
   vel: Vec3,
   mass: number,
   spinLengthA: number,
+  charge: number,
 ): Vec3 {
   const a = spinLengthA
-  if (Math.abs(a) < 1e-14) {
-    return schwarzschildNullAccel(pos, vel, 2 * mass)
-  }
-
+  const Q = charge
   const r = length3(pos)
   if (r < 1e-10) return { x: 0, y: 0, z: 0 }
+
+  // Pure Schwarzschild fast path
+  if (Math.abs(a) < 1e-14 && Math.abs(Q) < 1e-14) {
+    return schwarzschildNullAccel(pos, vel, 2 * mass)
+  }
 
   const rs = 2 * mass
   const L = cross(pos, vel)
@@ -48,36 +51,50 @@ export function kerrNullAccel(
   const r2 = r * r
   const r3 = r2 * r
   const r5 = r2 * r3
+  const r6 = r5 * r
 
-  // Base Schwarzschild-like radial force
+  // RN/Schw radial strength: −1.5 rs L²/r⁵ + 2 Q² L²/r⁶
   let strength = (-1.5 * rs * L2) / r5
+  if (Math.abs(Q) > 1e-14) {
+    strength += (2 * Q * Q * L2) / r6
+  }
 
-  // Spin–orbit coupling: Ly > 0 with a > 0 is prograde (weaker effective pull
-  // near the hole → smaller shadow on that side).
-  const Ly = L.y
-  const coup = (a * Ly) / (r3 + a * a * r + 1e-12)
-  // Mild modulation so a=0.998 is dramatic but stable
-  strength *= 1 - 1.35 * coup
+  // Spin–orbit modulation (Kerr / KN)
+  if (Math.abs(a) > 1e-14) {
+    const Ly = L.y
+    const coup = (a * Ly) / (r3 + a * a * r + 1e-12)
+    strength *= 1 - 1.35 * coup
+  }
 
-  const schw: Vec3 = {
+  const radial: Vec3 = {
     x: strength * pos.x,
     y: strength * pos.y,
     z: strength * pos.z,
   }
 
-  // Lense–Thirring: Ω = 2 a M / (r³ + a² r) along +Y
+  if (Math.abs(a) < 1e-14) return radial
+
+  // Lense–Thirring Ω = 2 a M / (r³ + a² r)
   const Omega = (2 * a * mass) / (r3 + a * a * r + 1e-12)
-  // 2 Ω × v with Ω = (0, Ω, 0) → (2 Ω vz, 0, −2 Ω vx)
   const lt: Vec3 = {
     x: 2 * Omega * vel.z,
     y: 0,
     z: -2 * Omega * vel.x,
   }
-
-  return add(schw, lt)
+  return add(radial, lt)
 }
 
-/** Rotate velocity about +Y by dφ (frame-drag twist of the ray). */
+/** @deprecated alias — use knNullAccel */
+export function kerrNullAccel(
+  pos: Vec3,
+  vel: Vec3,
+  mass: number,
+  spinLengthA: number,
+  charge = 0,
+): Vec3 {
+  return knNullAccel(pos, vel, mass, spinLengthA, charge)
+}
+
 export function frameDragRotateVel(
   vel: Vec3,
   pos: Vec3,
@@ -99,53 +116,65 @@ export function frameDragRotateVel(
   }
 }
 
-export function rk4StepKerr(
+export function rk4StepKn(
   pos: Vec3,
   vel: Vec3,
   mass: number,
   spinLengthA: number,
+  charge: number,
   h: number,
 ): { pos: Vec3; vel: Vec3 } {
-  const a1 = kerrNullAccel(pos, vel, mass, spinLengthA)
+  const a1 = knNullAccel(pos, vel, mass, spinLengthA, charge)
 
   const p2 = add(pos, scale(vel, h * 0.5))
   const v2 = add(vel, scale(a1, h * 0.5))
-  const a2 = kerrNullAccel(p2, v2, mass, spinLengthA)
+  const a2 = knNullAccel(p2, v2, mass, spinLengthA, charge)
 
   const p3 = add(pos, scale(v2, h * 0.5))
   const v3 = add(vel, scale(a2, h * 0.5))
-  const a3 = kerrNullAccel(p3, v3, mass, spinLengthA)
+  const a3 = knNullAccel(p3, v3, mass, spinLengthA, charge)
 
   const p4 = add(pos, scale(v3, h))
   const v4 = add(vel, scale(a3, h))
-  const a4 = kerrNullAccel(p4, v4, mass, spinLengthA)
+  const a4 = knNullAccel(p4, v4, mass, spinLengthA, charge)
 
   const dPos = scale(add(add(vel, scale(add(v2, v3), 2)), v4), h / 6)
   const dVel = scale(add(add(a1, scale(add(a2, a3), 2)), a4), h / 6)
 
   let newPos = add(pos, dPos)
   let newVel = add(vel, dVel)
-  // Continuous frame-drag twist (helps shadow asymmetry)
   newVel = frameDragRotateVel(newVel, newPos, mass, spinLengthA, h)
-
   return { pos: newPos, vel: newVel }
 }
 
-export type KerrTraceFate = 'captured' | 'escaped' | 'max_steps'
+export function rk4StepKerr(
+  pos: Vec3,
+  vel: Vec3,
+  mass: number,
+  spinLengthA: number,
+  h: number,
+  charge = 0,
+): { pos: Vec3; vel: Vec3 } {
+  return rk4StepKn(pos, vel, mass, spinLengthA, charge, h)
+}
 
-export type KerrTraceResult = {
-  fate: KerrTraceFate
+export type KnTraceFate = 'captured' | 'escaped' | 'max_steps'
+export type KerrTraceFate = KnTraceFate
+
+export type KnTraceResult = {
+  fate: KnTraceFate
   minR: number
   finalR: number
   steps: number
   diskHits: number
   impact: number
 }
+export type KerrTraceResult = KnTraceResult
 
-export type KerrTraceOptions = {
+export type KnTraceOptions = {
   mass: number
-  /** Kerr length a = a★ M */
   spinLength: number
+  charge?: number
   origin: Vec3
   direction: Vec3
   maxSteps?: number
@@ -154,9 +183,9 @@ export type KerrTraceOptions = {
   captureMargin?: number
   diskInner?: number
   diskOuter?: number
-  /** Disk normal: 'y' (XZ plane, default) or 'z' (XY plane) */
   diskAxis?: 'y' | 'z'
 }
+export type KerrTraceOptions = KnTraceOptions
 
 export function impactParameter(pos: Vec3, vel: Vec3): number {
   const v = normalize(vel)
@@ -164,13 +193,14 @@ export function impactParameter(pos: Vec3, vel: Vec3): number {
 }
 
 /**
- * Integrate a backward null geodesic in (approximate) Kerr spacetime.
+ * Integrate a backward null geodesic in RN / Kerr / KN / Schw.
  * Disk: y=0 (XZ) by default — spin ‖ +Y.
  */
-export function traceKerrNull(options: KerrTraceOptions): KerrTraceResult {
+export function traceKnNull(options: KnTraceOptions): KnTraceResult {
   const M = options.mass
   const a = options.spinLength
-  const rPlus = kerrHorizon(M, a)
+  const Q = options.charge ?? 0
+  const rPlus = knHorizon(M, a, Q)
   const captureR =
     (Number.isFinite(rPlus) ? rPlus : 2 * M) * (options.captureMargin ?? 1.02)
   const maxSteps = options.maxSteps ?? 5000
@@ -201,12 +231,11 @@ export function traceKerrNull(options: KerrTraceOptions): KerrTraceResult {
       return { fate: 'escaped', minR, finalR: r, steps: i, diskHits, impact }
     }
 
-    // Floor adapt so photon-sphere skims still progress
     const h = h0 * Math.min(1.5, Math.max(0.2, r / (12 * M)))
     prevPos = clone(pos)
     prevAxis = axis === 'y' ? pos.y : pos.z
 
-    const next = rk4StepKerr(pos, vel, M, a, h)
+    const next = rk4StepKn(pos, vel, M, a, Q, h)
     pos = next.pos
     vel = next.vel
 
@@ -223,7 +252,6 @@ export function traceKerrNull(options: KerrTraceOptions): KerrTraceResult {
     }
   }
 
-  // Unfinished near-photon-sphere skims ≈ capture
   if (minR < 3.2 * M) {
     return {
       fate: 'captured',
@@ -243,4 +271,9 @@ export function traceKerrNull(options: KerrTraceOptions): KerrTraceResult {
     diskHits,
     impact,
   }
+}
+
+/** @deprecated alias */
+export function traceKerrNull(options: KnTraceOptions): KnTraceResult {
+  return traceKnNull(options)
 }

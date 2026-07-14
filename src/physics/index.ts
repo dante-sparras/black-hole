@@ -7,10 +7,16 @@ export * from './kn'
 export * from './derive'
 export * from './geodesic/schwarzschildNull'
 export {
+  knNullAccel,
   kerrNullAccel,
   frameDragRotateVel,
+  rk4StepKn,
   rk4StepKerr,
+  traceKnNull,
   traceKerrNull,
+  type KnTraceFate,
+  type KnTraceResult,
+  type KnTraceOptions,
   type KerrTraceFate,
   type KerrTraceResult,
   type KerrTraceOptions,

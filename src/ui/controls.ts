@@ -42,14 +42,12 @@ export function mountControls(
       <input type="range" id="p-spin" min="0" max="${MAX_SPIN_STAR}" step="0.001" />
       <span class="ctrl-val" data-val="spin"></span>
     </label>
-    <details class="advanced">
-      <summary>Advanced — charge Q</summary>
-      <label class="ctrl">
-        <span class="ctrl-name">Charge Q</span>
-        <input type="range" id="p-charge" min="0" max="0.9" step="0.01" />
-        <span class="ctrl-val" data-val="charge"></span>
-      </label>
-    </details>
+    <label class="ctrl">
+      <span class="ctrl-name">Charge Q</span>
+      <input type="range" id="p-charge" min="0" max="0.95" step="0.01" />
+      <span class="ctrl-val" data-val="charge"></span>
+    </label>
+    <p class="ctrl-hint">Families: Schw · Kerr · RN · KN (extremality clamps Q)</p>
 
     <div class="ctrl-section">Camera</div>
     <label class="ctrl">

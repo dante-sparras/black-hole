@@ -54,6 +54,7 @@ function applyPhysics(): void {
   spacetime = toUniforms(p, getDerived())
   tracer.setMass(p.mass)
   tracer.setSpinStar(p.spinStar)
+  tracer.setCharge(p.charge)
 }
 
 function applyCamera(): void {
@@ -85,12 +86,16 @@ function formatStats(fps: number): string {
   const q = spacetime.charge.toFixed(3)
   const rp = Number.isFinite(spacetime.rPlus) ? spacetime.rPlus.toFixed(3) : '—'
   const dist = c.distanceM.toFixed(1)
+  const hasA = Math.abs(spacetime.spinStar) >= 1e-6
+  const hasQ = Math.abs(spacetime.charge) >= 1e-6
   const mode =
-    Math.abs(spacetime.spinStar) < 1e-6
+    !hasA && !hasQ
       ? 'schw-RT'
-      : Math.abs(spacetime.charge) > 1e-6
-        ? 'KN-approx'
-        : 'kerr-RT'
+      : hasA && !hasQ
+        ? 'kerr-RT'
+        : !hasA && hasQ
+          ? 'rn-RT'
+          : 'kn-RT'
   return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} · r₊=${rp} · D=${dist}M`
 }
 

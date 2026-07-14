@@ -5,6 +5,7 @@ import {
   Fn,
   If,
   Loop,
+  abs,
   cos,
   cross,
   dot,
@@ -29,6 +30,7 @@ export type GeodesicTracer = {
   mesh: THREE.Mesh
   setMass: (mass: number) => void
   setSpinStar: (spinStar: number) => void
+  setCharge: (charge: number) => void
   setCameraDistanceM: (distanceM: number) => void
   setInclination: (radians: number) => void
   setAzimuth: (radians: number) => void
@@ -36,12 +38,14 @@ export type GeodesicTracer = {
 }
 
 /**
- * Kerr / Schwarzschild null geodesic ray marcher (WebGPU / TSL).
- * Spin ‖ +Y; disk in XZ (y = 0). a★ = 0 → Schwarzschild.
+ * Einstein–Maxwell null geodesic ray marcher (WebGPU / TSL).
+ * Families: Schwarzschild / Kerr / RN / Kerr–Newman from (M, a★, Q).
+ * Spin ‖ +Y; disk in XZ (y = 0).
  */
 export function createGeodesicTracer(): GeodesicTracer {
   const uMass = uniform(1)
   const uSpinStar = uniform(0)
+  const uCharge = uniform(0)
   const uCamDistM = uniform(30)
   const uInclination = uniform(1.25)
   const uAzimuth = uniform(0)
@@ -53,13 +57,15 @@ export function createGeodesicTracer(): GeodesicTracer {
     const M = uMass
     const aStar = uSpinStar
     const a = aStar.mul(M)
+    const Q = uCharge
     const rs = M.mul(2)
 
-    const disc = max(M.mul(M).sub(a.mul(a)), float(0))
+    // r₊ = M + √(M² − a² − Q²)
+    const disc = max(M.mul(M).sub(a.mul(a)).sub(Q.mul(Q)), float(0))
     const rPlus = M.add(sqrt(disc))
     const rCapture = rPlus.mul(1.02)
 
-    // Prograde ISCO (Bardeen)
+    // Prograde Kerr ISCO (Bardeen); for pure RN use ~6M pulled in slightly by Q
     const a2 = aStar.mul(aStar)
     const oneMa2 = max(float(1).sub(a2), float(1e-6))
     const cbrt1m = pow(oneMa2, float(1 / 3))
@@ -71,10 +77,11 @@ export function createGeodesicTracer(): GeodesicTracer {
     const iscoRoot = sqrt(
       max(float(3).sub(Z1).mul(float(3).add(Z1).add(Z2.mul(2))), float(0)),
     )
-    const rin = max(
-      M.mul(float(3).add(Z2).sub(sgn.mul(iscoRoot))),
-      rPlus.mul(1.15),
-    )
+    const iscoKerr = M.mul(float(3).add(Z2).sub(sgn.mul(iscoRoot)))
+    const qhat = Q.div(max(M, float(1e-6)))
+    const iscoRn = M.mul(6).mul(float(1).sub(qhat.mul(qhat).mul(0.2)))
+    const isco = abs(aStar).lessThan(1e-6).select(iscoRn, iscoKerr)
+    const rin = max(isco, rPlus.mul(1.15))
     const rout = uRoutM.mul(M)
     const camD = uCamDistM.mul(M)
 
@@ -142,17 +149,20 @@ export function createGeodesicTracer(): GeodesicTracer {
       const p0x = pos.x.toVar()
       const p0z = pos.z.toVar()
 
-      // --- a1 = kerrAccel(pos, vel) ---
+      // --- a1 = knAccel(pos, vel): Schw/RN radial + Kerr LT ---
       const r1 = max(r, float(1e-6))
       const L1 = cross(pos, vel)
       const L12 = dot(L1, L1)
       const r13 = r1.mul(r1).mul(r1)
       const r15 = r13.mul(r1).mul(r1)
+      const r16 = r15.mul(r1)
       const coup1 = a.mul(L1.y).div(r13.add(a.mul(a).mul(r1)).add(1e-12))
+      // Binet RN: strength = −1.5 rs L²/r⁵ + 2 Q² L²/r⁶
       const str1 = float(-1.5)
         .mul(rs)
         .mul(L12)
         .div(r15)
+        .add(Q.mul(Q).mul(2).mul(L12).div(r16))
         .mul(float(1).sub(coup1.mul(1.35)))
       const Om1 = a.mul(M).mul(2).div(r13.add(a.mul(a).mul(r1)).add(1e-12))
       const a1 = pos.mul(str1).add(vec3(Om1.mul(2).mul(vel.z), float(0), Om1.mul(-2).mul(vel.x)))
@@ -160,17 +170,19 @@ export function createGeodesicTracer(): GeodesicTracer {
       const pm = pos.add(vel.mul(ds.mul(0.5)))
       const vm = vel.add(a1.mul(ds.mul(0.5)))
 
-      // --- a2 = kerrAccel(pm, vm) ---
+      // --- a2 = knAccel(pm, vm) ---
       const r2 = max(pm.length(), float(1e-6))
       const L2 = cross(pm, vm)
       const L22 = dot(L2, L2)
       const r23 = r2.mul(r2).mul(r2)
       const r25 = r23.mul(r2).mul(r2)
+      const r26 = r25.mul(r2)
       const coup2 = a.mul(L2.y).div(r23.add(a.mul(a).mul(r2)).add(1e-12))
       const str2 = float(-1.5)
         .mul(rs)
         .mul(L22)
         .div(r25)
+        .add(Q.mul(Q).mul(2).mul(L22).div(r26))
         .mul(float(1).sub(coup2.mul(1.35)))
       const Om2 = a.mul(M).mul(2).div(r23.add(a.mul(a).mul(r2)).add(1e-12))
       const a2 = pm.mul(str2).add(vec3(Om2.mul(2).mul(vm.z), float(0), Om2.mul(-2).mul(vm.x)))
@@ -201,8 +213,12 @@ export function createGeodesicTracer(): GeodesicTracer {
             hits.addAssign(1)
             const x = rho.div(M)
 
-            // Static gravitational redshift g = √(1 − rs/ρ)
-            const g = max(float(1).sub(rs.div(max(rho, float(1e-5)))), float(1e-4)).sqrt()
+            // Static RN/Schw redshift g = √(1 − 2M/ρ + Q²/ρ²)
+            const rhoSafe = max(rho, float(1e-5))
+            const g2 = float(1)
+              .sub(rs.div(rhoSafe))
+              .add(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
+            const g = max(g2, float(1e-4)).sqrt()
 
             // Kerr/Kepler orbital speed about +Y (prograde)
             // Ω = √M / (ρ^{3/2} + a√M), β ≈ |Ω| ρ
@@ -289,6 +305,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setSpinStar: (s) => {
       uSpinStar.value = s
+    },
+    setCharge: (q) => {
+      uCharge.value = q
     },
     setCameraDistanceM: (d) => {
       uCamDistM.value = d

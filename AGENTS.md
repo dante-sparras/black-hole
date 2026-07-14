@@ -8,7 +8,7 @@
 
 ## Status
 
-No-hair parameter core (mass \(M\), spin \(a_\star\), charge \(Q\)) + Kerr/Schwarzschild null geodesic ray marcher (WebGPU/TSL) with thin equatorial disk, frame-dragging, Doppler beaming, spin-dependent ISCO. Charge still reserved (RN/KN metrics derived; rays ignore \(Q\) until KN phase).
+No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Reissner–Nordström**, **Kerr–Newman** from \((M, a_\star, Q)\). Real-time Cartesian null geodesics (Binet RN term + Kerr frame-drag), Doppler beaming, orbit camera.
 
 ## Commands
 

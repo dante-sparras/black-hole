@@ -62,12 +62,17 @@ export function specialRelDoppler(beta: number, mu: number): number {
 }
 
 /**
- * Static gravitational redshift factor g = √(1 − r_s/r), r_s = 2M.
- * Frequency at infinity: ν_∞ = g · ν_emit (for a static emitter).
+ * Static gravitational redshift for RN: g = √(1 − 2M/r + Q²/r²).
+ * Q=0 → Schwarzschild √(1 − 2M/r).
  */
-export function gravitationalRedshift(mass: number, r: number): number {
+export function gravitationalRedshift(
+  mass: number,
+  r: number,
+  charge = 0,
+): number {
   const rs = 2 * mass
-  const x = 1 - rs / Math.max(r, rs * 1.001)
+  const rr = Math.max(r, rs * 1.001)
+  const x = 1 - rs / rr + (charge * charge) / (rr * rr)
   return Math.sqrt(Math.max(x, 1e-8))
 }
 
