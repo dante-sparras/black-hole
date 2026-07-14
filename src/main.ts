@@ -2,14 +2,14 @@ import './style.css'
 
 import * as THREE from 'three/webgpu'
 
-import { createSchwarzschildTracer } from './render/schwarzschildTracer'
+import { createGeodesicTracer } from './render/geodesicTracer'
 import { toUniforms } from './render/uniforms'
 import { getCamera, subscribeCamera } from './state/camera'
 import { getDerived, getParams, subscribe } from './state/params'
 import { mountControls } from './ui/controls'
 import { mountOrbitControls } from './ui/orbit'
 
-// Geometric units G = c = 1. Core: M, a★, Q. View: Schwarzschild GRRT + orbit camera.
+// Geometric units G = c = 1. No-hair: M, a★, Q. View: Kerr/Schwarzschild GRRT.
 
 const errorEl = document.querySelector<HTMLElement>('#error')
 const statsEl = document.querySelector<HTMLElement>('#stats')
@@ -29,12 +29,11 @@ renderer.setClearColor(0x000000, 1)
 document.body.appendChild(renderer.domElement)
 
 const scene = new THREE.Scene()
-// Fullscreen NDC: camera in front of the plane (z=0). near < 1 < far.
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
 camera.position.set(0, 0, 1)
 camera.lookAt(0, 0, 0)
 
-const tracer = createSchwarzschildTracer()
+const tracer = createGeodesicTracer()
 scene.add(tracer.mesh)
 
 function onResize() {
@@ -46,7 +45,6 @@ if (controlsEl) {
   mountControls(controlsEl, derivedEl)
 }
 
-// Orbit: drag = azimuth/inclination, wheel/pinch = distance
 mountOrbitControls(renderer.domElement)
 
 let spacetime = toUniforms(getParams(), getDerived())
@@ -55,6 +53,7 @@ function applyPhysics(): void {
   const p = getParams()
   spacetime = toUniforms(p, getDerived())
   tracer.setMass(p.mass)
+  tracer.setSpinStar(p.spinStar)
 }
 
 function applyCamera(): void {
@@ -86,7 +85,12 @@ function formatStats(fps: number): string {
   const q = spacetime.charge.toFixed(3)
   const rp = Number.isFinite(spacetime.rPlus) ? spacetime.rPlus.toFixed(3) : '—'
   const dist = c.distanceM.toFixed(1)
-  const mode = spacetime.spinStar === 0 && spacetime.charge === 0 ? 'schw-RT' : 'schw-RT*'
+  const mode =
+    Math.abs(spacetime.spinStar) < 1e-6
+      ? 'schw-RT'
+      : Math.abs(spacetime.charge) > 1e-6
+        ? 'KN-approx'
+        : 'kerr-RT'
   return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} · r₊=${rp} · D=${dist}M`
 }
 

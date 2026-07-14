@@ -8,7 +8,7 @@
 
 ## Status
 
-No-hair parameter core (mass \(M\), spin \(a_\star\), charge \(Q\)) + Schwarzschild null geodesic ray marcher (WebGPU/TSL) with thin equatorial disk. Kerr geodesics not yet; spin/charge sliders reserve state for later.
+No-hair parameter core (mass \(M\), spin \(a_\star\), charge \(Q\)) + Kerr/Schwarzschild null geodesic ray marcher (WebGPU/TSL) with thin equatorial disk, frame-dragging, Doppler beaming, spin-dependent ISCO. Charge still reserved (RN/KN metrics derived; rays ignore \(Q\) until KN phase).
 
 ## Commands
 
@@ -23,46 +23,36 @@ No-hair parameter core (mass \(M\), spin \(a_\star\), charge \(Q\)) + Schwarzsch
 ## Preferences
 
 - Write Test-Driven Code — add unit tests for new features and bug fixes. Use `bun test` to run them.
-- Geometric units: `G = c = 1`. Schwarzschild horizon \(r_s = 2M\), photon sphere \(r_{ph} = 3M\), \(b_c = 3\sqrt{3}\,M\).
+- Geometric units: \(G = c = 1\). Schwarzschild: \(r_s = 2M\), \(r_{ph} = 3M\), \(b_c = 3\sqrt{3}\,M\). Kerr: \(r_+=M+\sqrt{M^2-a^2}\); prograde ISCO/photon sphere shrink with \(a_\star\).
 - Prefer real physics root-causes over visual workarounds once GR starts.
 - Pure-black voids for captured rays (no fake fill).
 - TSL geodesic materials may need `// @ts-nocheck` (TS 7 + three/tsl type graphs can non-terminate).
 
 ## No-hair parameters (core)
 
-Stationary Einstein–Maxwell black holes are characterized by three classical parameters only:
-
 | Param | Code | Range (UI) | Notes |
 | ----- | ---- | ---------- | ----- |
 | Mass \(M\) | `mass` | \(0.1\)–\(10\) (default \(1\)) | Primary scale |
-| Dimensionless spin \(a_\star = J/M^2\) | `spinStar` | \(0\)–\(0.998\) | Kerr length \(a = a_\star M\) |
-| Charge \(Q\) | `charge` | \(0\)–… (default \(0\), Advanced) | Astrophysically usually ~0 |
+| Dimensionless spin \(a_\star = J/M^2\) | `spinStar` | \(0\)–\(0.998\) | Kerr length \(a = a_\star M\) — **affects rays** |
+| Charge \(Q\) | `charge` | default \(0\), Advanced | Derived only for now |
 
-**Extremality:** enforce \(M^2 \ge a^2 + Q^2\). `normalizeParams` clamps \(|a_\star| \le 0.998\) and reduces \(|Q|\) first so spin stays the visual lever.
+**Extremality:** \(M^2 \ge a^2 + Q^2\). Prefer reducing \(Q\) so spin stays the visual lever.
 
-**Not hair (scene/observer — later):** inclination, camera distance, disk temperature, jets, resolution.
-
-**Camera convention (planned):** distance in units of \(M\) so changing mass does not reframe the hole.
+**Not hair:** camera distance/angles, disk temperature, jets, resolution.
 
 ## Physics layout
 
 ```
-src/physics/     pure TS (no Three.js) — unit-tested
-  constants.ts / types.ts / validate.ts / derive.ts
-  schwarzschild.ts / kerr.ts / kn.ts
-  geodesic/schwarzschildNull.ts  CPU RK4 null geodesics + disk hits
-src/state/params.ts   reactive store
-src/ui/controls.ts    sliders
-src/render/uniforms.ts
-src/render/schwarzschildTracer.ts  WebGPU/TSL full-screen GRRT
+src/physics/
+  geodesic/schwarzschildNull.ts
+  geodesic/kerrNull.ts          CPU Kerr approx (a=0 ≡ Schw)
+src/render/geodesicTracer.ts    WebGPU/TSL Kerr/Schw GRRT
 ```
 
-**Camera:** distance fixed in units of \(M\) (default ~32\(M\)); changing \(M\) rescales spacetime and camera together (image framing stable).
-
-Metric family routing: Schwarzschild → Kerr → Reissner–Nordström / Kerr–Newman from \((a_\star, Q)\).
+**Camera:** distance in units of \(M\); spin ‖ +Y; disk in XZ (\(y=0\)).
 
 ## Code hygiene
 
-- **Delete, don’t deprecate** — remove dead code; no `@deprecated` stubs or legacy re-export barrels.
-- **No `any`** — use `unknown` or proper types instead.
-- **No `console.log`** — use `debug()` or `logger.info()` instead.
+- **Delete, don’t deprecate** — remove dead code; no legacy re-export barrels.
+- **No `any`** — use `unknown` or proper types.
+- **No `console.log`** — use structured logging if needed.
