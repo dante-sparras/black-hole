@@ -14,10 +14,10 @@ import {
   int,
   max,
   min,
-  positionLocal,
   screenSize,
   sin,
   uniform,
+  uv,
   vec2,
   vec3,
   vec4,
@@ -34,168 +34,168 @@ export type SchwarzschildTracer = {
 }
 
 /**
- * Full-screen Schwarzschild null-geodesic ray marcher (WebGPU / TSL).
+ * Schwarzschild GRRT (validated against CPU reference).
  *
- * - Rays from fullscreen-quad local XY as NDC (center → BH)
- * - Finite-thickness equatorial disk (miss-resistant)
- * - Adaptive steps near the photon sphere
- * - Pure-black horizon capture
+ * Critical: step size must NOT shrink below ~0.2M or rays stall on the
+ * photon sphere and never capture/escape — that produced the solid blob /
+ * empty-frame failures.
+ *
+ * Disk in XZ (y = 0). Camera on sphere; face-on = +Y.
  */
 export function createSchwarzschildTracer(): SchwarzschildTracer {
   const uMass = uniform(1)
-  const uCamDistM = uniform(28)
-  const uInclination = uniform(1.2) // ~69°
+  const uCamDistM = uniform(30)
+  const uInclination = uniform(1.25)
   const uAzimuth = uniform(0)
-  const uFov = uniform(0.7)
-  const uDiskInnerM = uniform(6)
-  const uDiskOuterM = uniform(20)
-  const uDiskHalfHM = uniform(0.22) // half-thickness in units of M
-  const uMaxSteps = uniform(int(520))
-  const uStepBase = uniform(0.045)
+  const uFov = uniform(0.65)
+  const uRinM = uniform(6)
+  const uRoutM = uniform(18)
+  // Fixed iteration count — dynamic uniform ends are flaky on some drivers
+  const STEPS = 900
 
   const colorNode = Fn(() => {
-    const mass = uMass
-    const rs = mass.mul(2)
-    const captureR = rs.mul(1.005)
-    const camDist = uCamDistM.mul(mass)
-    const diskInner = uDiskInnerM.mul(mass)
-    const diskOuter = uDiskOuterM.mul(mass)
-    const diskHalfH = uDiskHalfHM.mul(mass)
+    const M = uMass
+    const rs = M.mul(2)
+    const rCapture = rs.mul(1.01)
+    const camD = uCamDistM.mul(M)
+    const rin = uRinM.mul(M)
+    const rout = uRoutM.mul(M)
 
+    const tex = uv()
     const aspect = screenSize.x.div(max(screenSize.y, float(1)))
-    // PlaneGeometry(2,2) local XY = NDC. Flip Y so +inclination reads "disk up" naturally.
-    const uv = vec2(positionLocal.x.mul(aspect), positionLocal.y.negate())
+    const ndc = vec2(tex.x.mul(2).sub(1).mul(aspect), tex.y.mul(2).sub(1))
 
+    // Face-on = +Y pole; θ from +Y toward equator
     const th = uInclination
     const ph = uAzimuth
-    const sth = sin(th)
-    const cth = cos(th)
-    const sph = sin(ph)
-    const cph = cos(ph)
-
     const camPos = vec3(
-      sth.mul(cph).mul(camDist),
-      sth.mul(sph).mul(camDist),
-      cth.mul(camDist),
+      sin(th).mul(cos(ph)).mul(camD),
+      cos(th).mul(camD),
+      sin(th).mul(sin(ph)).mul(camD),
     )
 
     const forward = camPos.negate().normalize()
-    const worldUp = vec3(0, 0, 1)
+    const worldUp = vec3(0, 1, 0)
     const rightRaw = cross(forward, worldUp)
-    const rightLen = rightRaw.length()
-    const right = rightLen
-      .lessThan(1e-4)
-      .select(vec3(1, 0, 0), rightRaw.div(max(rightLen, float(1e-6))))
+    const right = rightRaw.length().lessThan(1e-4).select(vec3(1, 0, 0), rightRaw.normalize())
     const up = cross(right, forward).normalize()
 
-    const rd = forward
-      .add(right.mul(uv.x.mul(uFov)))
-      .add(up.mul(uv.y.mul(uFov)))
+    const dir0 = forward
+      .add(right.mul(ndc.x.mul(uFov)))
+      .add(up.mul(ndc.y.mul(uFov)))
       .normalize()
 
     const pos = camPos.toVar()
-    const vel = rd.toVar()
+    const vel = dir0.toVar()
     const col = vec3(0, 0, 0).toVar()
     const transm = float(1).toVar()
+    const prevY = camPos.y.toVar()
     const done = float(0).toVar()
     const escaped = float(0).toVar()
-    // Track optical depth through disk to avoid infinite glow while allowing multi-orbit
-    const diskTau = float(0).toVar()
+    const captured = float(0).toVar()
+    const minR = camD.toVar()
+    const hits = float(0).toVar()
 
-    Loop({ start: int(0), end: uMaxSteps, type: 'int', condition: '<' }, () => {
+    Loop({ start: int(0), end: int(STEPS), type: 'int', condition: '<' }, () => {
       If(done.greaterThan(0.5), () => {
         Break()
       })
 
       const r = pos.length()
+      minR.assign(min(minR, r))
 
-      If(r.lessThanEqual(captureR), () => {
+      If(r.lessThanEqual(rCapture), () => {
+        captured.assign(1)
         done.assign(1)
         Break()
       })
 
-      If(r.greaterThan(camDist.mul(6)).and(dot(pos, vel).greaterThan(0)), () => {
+      // Escape once clearly outbound and far
+      If(r.greaterThan(camD.mul(3)).and(dot(pos, vel).greaterThan(0)), () => {
         escaped.assign(1)
         done.assign(1)
         Break()
       })
 
-      // Adaptive step: fine near hole and near the equatorial plane
-      const nearHole = min(float(1.2), max(float(0.035), r.div(mass.mul(9))))
-      const nearPlane = min(float(1), max(float(0.08), abs(pos.z).div(mass.mul(1.2))))
-      const h = uStepBase.mul(mass).mul(nearHole).mul(nearPlane)
+      // Adaptive step — floor at 0.2 so photon-sphere skims still progress
+      const adapt = min(float(1.5), max(float(0.2), r.div(M.mul(12))))
+      const ds = float(0.1).mul(M).mul(adapt)
 
-      // --- Finite-thickness disk sample (before step) ---
-      const rho = pos.x.mul(pos.x).add(pos.y.mul(pos.y)).sqrt()
-      const inDisk = abs(pos.z)
-        .lessThanEqual(diskHalfH)
-        .and(rho.greaterThanEqual(diskInner))
-        .and(rho.lessThanEqual(diskOuter))
-        .and(transm.greaterThan(0.02))
-        .and(diskTau.lessThan(4))
+      prevY.assign(pos.y)
+      const p0x = pos.x.toVar()
+      const p0y = pos.y.toVar()
+      const p0z = pos.z.toVar()
 
-      If(inDisk, () => {
-        const g = max(float(1).sub(rs.div(max(rho, float(1e-5)))), float(1e-4)).sqrt()
-        const x = rho.div(mass)
-        // Temperature-ish: hot near ISCO
-        const hot = float(2.4).div(max(x.sub(5.0), float(0.35)))
-        const fall = float(1).div(x.mul(0.12).add(0.45))
-        // Vertical gaussian so midplane is brightest
-        const vert = max(
-          float(1).sub(abs(pos.z).div(max(diskHalfH, float(1e-5))).mul(abs(pos.z).div(max(diskHalfH, float(1e-5))))),
-          float(0),
-        )
-        // Path length through this step (approx)
-        const ds = h.mul(0.85)
-        const kappa = float(1.8).div(mass) // opacity scale
-        const dTau = kappa.mul(ds).mul(vert.add(0.15))
-        const emit = vec3(
-          hot.mul(2.1).mul(g),
-          hot.mul(0.65).mul(g).mul(g),
-          hot.mul(0.18).mul(g).mul(g),
-        )
-          .mul(fall)
-          .mul(vert.add(0.2))
+      // RK2 Heun
+      const h1 = cross(pos, vel)
+      const h1sq = dot(h1, h1)
+      const r1 = max(r, float(1e-6))
+      const r15 = r1.mul(r1).mul(r1).mul(r1).mul(r1)
+      const a1 = pos.mul(float(-1.5).mul(rs).mul(h1sq).div(r15))
 
-        // Emission * transmittance * (1 - e^{-dτ}) ≈ emit * transm * dτ for small dτ
-        const weight = transm.mul(min(dTau, float(0.85)))
-        col.addAssign(emit.mul(weight))
-        transm.mulAssign(max(float(1).sub(dTau.mul(0.55)), float(0.15)))
-        diskTau.addAssign(dTau)
+      const pm = pos.add(vel.mul(ds.mul(0.5)))
+      const vm = vel.add(a1.mul(ds.mul(0.5)))
+      const rm = max(pm.length(), float(1e-6))
+      const rm5 = rm.mul(rm).mul(rm).mul(rm).mul(rm)
+      const h2 = cross(pm, vm)
+      const h2sq = dot(h2, h2)
+      const a2 = pm.mul(float(-1.5).mul(rs).mul(h2sq).div(rm5))
+
+      pos.addAssign(vel.add(vm).mul(ds.mul(0.5)))
+      vel.addAssign(a1.add(a2).mul(ds.mul(0.5)))
+
+      // Disk: y = 0 plane crossing
+      If(prevY.mul(pos.y).lessThan(0).and(transm.greaterThan(0.02)).and(hits.lessThan(8)), () => {
+        const t = prevY.div(prevY.sub(pos.y))
+        const hx = p0x.add(pos.x.sub(p0x).mul(t))
+        const hz = p0z.add(pos.z.sub(p0z).mul(t))
+        const rho = hx.mul(hx).add(hz.mul(hz)).sqrt()
+
+        If(rho.greaterThanEqual(rin).and(rho.lessThanEqual(rout)), () => {
+          hits.addAssign(1)
+          const x = rho.div(M)
+          const g = max(float(1).sub(rs.div(max(rho, float(1e-5)))), float(1e-4)).sqrt()
+          const temp = float(3.5).div(max(x.sub(5.0), float(0.28)))
+          const fall = float(1.2).div(x.mul(0.09).add(0.45))
+          const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.25))
+          const emit = vec3(
+            temp.mul(2.0).mul(g),
+            temp.mul(0.6).mul(g).mul(g),
+            temp.mul(0.16).mul(g).mul(g),
+          )
+            .mul(fall)
+            .mul(bounce)
+
+          col.addAssign(emit.mul(transm))
+          transm.mulAssign(0.42)
+        })
       })
-
-      // RK2 Heun null geodesic step: a = −1.5 rs |L|² x / r⁵
-      const L1 = cross(pos, vel)
-      const L2sq1 = dot(L1, L1)
-      const rSafe = max(r, float(1e-5))
-      const r5 = rSafe.mul(rSafe).mul(rSafe).mul(rSafe).mul(rSafe)
-      const a1 = pos.mul(float(-1.5).mul(rs).mul(L2sq1).div(r5))
-
-      const posMid = pos.add(vel.mul(h.mul(0.5)))
-      const velMid = vel.add(a1.mul(h.mul(0.5)))
-      const rMid = max(posMid.length(), float(1e-5))
-      const r5m = rMid.mul(rMid).mul(rMid).mul(rMid).mul(rMid)
-      const L2 = cross(posMid, velMid)
-      const L2sq2 = dot(L2, L2)
-      const a2 = posMid.mul(float(-1.5).mul(rs).mul(L2sq2).div(r5m))
-
-      pos.addAssign(vel.add(velMid).mul(h.mul(0.5)))
-      vel.addAssign(a1.add(a2).mul(h.mul(0.5)))
     })
 
-    // Escaped: dim sky + sparse stars
+    // Unfinished photon-sphere skims ≈ capture
+    If(done.lessThan(0.5).and(minR.lessThan(M.mul(3.2))), () => {
+      captured.assign(1)
+    })
+    If(done.lessThan(0.5).and(minR.greaterThanEqual(M.mul(3.2))), () => {
+      escaped.assign(1)
+    })
+
+    // Captured → pure black (keep any prior disk light that hit before plunge)
+    // Escaped sky
     If(escaped.greaterThan(0.5), () => {
-      const sky = vec3(0.006, 0.007, 0.014)
-      const s = vel.normalize()
-      const starHash = fract(
-        sin(s.x.mul(127.1).add(s.y.mul(311.7)).add(s.z.mul(74.7))).mul(43758.55),
-      )
-      const star = starHash.greaterThan(0.9965).select(float(0.7), float(0))
-      col.addAssign(sky.add(vec3(star, star, star.mul(0.85))).mul(transm))
+      const d = vel.normalize()
+      const sky = vec3(0.012, 0.014, 0.025)
+      const h = fract(sin(d.x.mul(12.9898).add(d.y.mul(78.233)).add(d.z.mul(37.719))).mul(43758.5453))
+      const star = h.greaterThan(0.9968).select(float(0.9), float(0))
+      col.addAssign(sky.add(vec3(star, star, star.mul(0.9))).mul(transm))
     })
 
-    // Captured rays keep col≈0 → pure black after tonemap
-    const mapped = col.div(col.add(0.9))
+    // If captured with no disk hits, force pure black
+    If(captured.greaterThan(0.5).and(hits.lessThan(0.5)), () => {
+      col.assign(vec3(0, 0, 0))
+    })
+
+    const mapped = col.div(col.add(1))
     return vec4(mapped, 1)
   })()
 
@@ -207,25 +207,24 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
 
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
   mesh.frustumCulled = false
-  mesh.position.set(0, 0, 0)
 
   return {
     material,
     mesh,
-    setMass: (mass: number) => {
-      uMass.value = mass
+    setMass: (m) => {
+      uMass.value = m
     },
-    setCameraDistanceM: (distanceM: number) => {
-      uCamDistM.value = distanceM
+    setCameraDistanceM: (d) => {
+      uCamDistM.value = d
     },
-    setInclination: (radians: number) => {
-      uInclination.value = radians
+    setInclination: (r) => {
+      uInclination.value = r
     },
-    setAzimuth: (radians: number) => {
-      uAzimuth.value = radians
+    setAzimuth: (r) => {
+      uAzimuth.value = r
     },
-    setFov: (fov: number) => {
-      uFov.value = fov
+    setFov: (f) => {
+      uFov.value = f
     },
   }
 }
