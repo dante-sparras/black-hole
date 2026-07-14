@@ -12,7 +12,6 @@ import {
   int,
   max,
   min,
-  mix,
   screenSize,
   screenUV,
   sin,
@@ -28,6 +27,8 @@ export type SchwarzschildTracer = {
   setMass: (mass: number) => void
   setCameraDistanceM: (distanceM: number) => void
   setInclination: (radians: number) => void
+  setAzimuth: (radians: number) => void
+  setFov: (fov: number) => void
 }
 
 /**
@@ -36,13 +37,15 @@ export type SchwarzschildTracer = {
  */
 export function createSchwarzschildTracer(): SchwarzschildTracer {
   const uMass = uniform(1)
-  const uCamDistM = uniform(32)
-  const uInclination = uniform(1.25) // ~72° from face-on
-  const uFov = uniform(0.55)
+  const uCamDistM = uniform(28)
+  const uInclination = uniform(1.15)
+  const uAzimuth = uniform(0)
+  const uFov = uniform(0.62)
+  // Disk in units of M (scaled by mass in shader)
   const uDiskInnerM = uniform(6)
-  const uDiskOuterM = uniform(28)
-  const uMaxSteps = uniform(int(320))
-  const uStepBase = uniform(0.07)
+  const uDiskOuterM = uniform(16)
+  const uMaxSteps = uniform(int(360))
+  const uStepBase = uniform(0.06)
 
   const colorNode = Fn(() => {
     const mass = uMass
@@ -52,13 +55,23 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
     const diskInner = uDiskInnerM.mul(mass)
     const diskOuter = uDiskOuterM.mul(mass)
 
+    // screenUV: (0,0) bottom-left in three.js viewport space for WebGPU
     const ndc = screenUV.mul(2).sub(1)
     const aspect = screenSize.x.div(screenSize.y)
     const uv = vec2(ndc.x.mul(aspect), ndc.y)
 
-    // Camera on a sphere; disk = xy plane (z = spin / polar axis).
-    const inc = uInclination
-    const camPos = vec3(sin(inc).mul(camDist), float(0), cos(inc).mul(camDist))
+    // Spherical camera: θ = inclination from +z, φ = azimuth
+    const th = uInclination
+    const ph = uAzimuth
+    const sth = sin(th)
+    const cth = cos(th)
+    const sph = sin(ph)
+    const cph = cos(ph)
+    const camPos = vec3(
+      sth.mul(cph).mul(camDist),
+      sth.mul(sph).mul(camDist),
+      cth.mul(camDist),
+    )
     const forward = camPos.negate().normalize()
     const worldUp = vec3(0, 0, 1)
     const rightRaw = cross(forward, worldUp)
@@ -94,7 +107,8 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
         Break()
       })
 
-      If(r.greaterThan(camDist.mul(3.5)).and(dot(pos, vel).greaterThan(0)), () => {
+      // Escape once far and outgoing
+      If(r.greaterThan(camDist.mul(4)).and(dot(pos, vel).greaterThan(0)), () => {
         escaped.assign(1)
         done.assign(1)
         Break()
@@ -107,7 +121,7 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
       prevZ.assign(pos.z)
       const prevPos = vec3(pos).toVar()
 
-      // RK2 (Heun) for null geodesic: a = −1.5 rs |L|² x / r⁵
+      // RK2 (Heun): a = −1.5 rs |L|² x / r⁵
       const L1 = cross(pos, vel)
       const L2sq1 = dot(L1, L1)
       const rSafe = max(r, float(1e-5))
@@ -125,7 +139,7 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
       pos.addAssign(vel.add(velMid).mul(h.mul(0.5)))
       vel.addAssign(a1.add(a2).mul(h.mul(0.5)))
 
-      // Disk plane z = 0
+      // Equatorial disk z = 0
       If(prevZ.mul(pos.z).lessThan(0).and(transm.greaterThan(0.02)), () => {
         const denom = prevZ.sub(pos.z)
         const tHit = prevZ.div(denom)
@@ -136,25 +150,29 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
         If(hitR.greaterThanEqual(diskInner).and(hitR.lessThanEqual(diskOuter)), () => {
           const g = max(float(1).sub(rs.div(max(hitR, float(1e-5)))), float(0)).sqrt()
           const x = hitR.div(mass)
-          const temp = float(1).div(max(x.sub(5.5), float(0.35)))
+          // Brighter ring near ISCO, falloff outward
+          const fall = float(1).div(x.mul(0.22).add(0.4))
+          const hot = float(1).div(max(x.sub(5.2), float(0.4)))
           const emit = vec3(
-            temp.mul(1.8).mul(g),
-            temp.mul(0.55).mul(g).mul(g),
-            temp.mul(0.18).mul(g).mul(g),
-          ).mul(float(0.85).div(x.mul(0.15).add(0.55)))
+            hot.mul(2.2).mul(g),
+            hot.mul(0.7).mul(g).mul(g),
+            hot.mul(0.22).mul(g).mul(g),
+          ).mul(fall)
 
           col.addAssign(emit.mul(transm))
-          transm.mulAssign(0.55)
+          transm.mulAssign(0.48)
         })
       })
     })
 
-    const bg = vec3(0.01, 0.012, 0.02)
+    // Dim starless sky for escaped rays (not a fake fill of the shadow)
+    const bg = vec3(0.008, 0.01, 0.018)
     If(escaped.greaterThan(0.5), () => {
       col.addAssign(bg.mul(transm))
     })
 
-    const mapped = col.div(col.add(1))
+    // Reinhard-ish tonemap
+    const mapped = col.div(col.add(0.85))
     return vec4(mapped, 1)
   })()
 
@@ -177,6 +195,12 @@ export function createSchwarzschildTracer(): SchwarzschildTracer {
     },
     setInclination: (radians: number) => {
       uInclination.value = radians
+    },
+    setAzimuth: (radians: number) => {
+      uAzimuth.value = radians
+    },
+    setFov: (fov: number) => {
+      uFov.value = fov
     },
   }
 }
