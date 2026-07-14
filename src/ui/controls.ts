@@ -1,4 +1,5 @@
 import { MAX_SPIN_STAR } from '../physics/constants'
+import { shadowDiagnostics } from '../physics/diagnostics'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import {
   CAMERA_LIMITS,
@@ -9,7 +10,7 @@ import {
   subscribeCamera,
   type CameraState,
 } from '../state/camera'
-import { getParams, setParams, subscribe } from '../state/params'
+import { getDerived, getParams, setParams, subscribe } from '../state/params'
 
 function fmt(n: number, digits = 3): string {
   if (!Number.isFinite(n)) return '—'
@@ -109,14 +110,20 @@ export function mountControls(
     if (fovVal) fovVal.textContent = fmt(c.fov, 2)
   }
 
-  function syncDerived(d: DerivedGeometry): void {
+  function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
     if (!derivedRoot) return
+    const diag = shadowDiagnostics(p, d)
     derivedRoot.innerHTML = `
+      <div class="diag-title">Radii</div>
       <div><dt>family</dt><dd>${d.family}</dd></div>
-      <div><dt>r₊</dt><dd>${fmt(d.rPlus)}</dd></div>
+      <div><dt>r₊</dt><dd>${fmt(d.rPlus)} <span class="dim">(${fmt(diag.rPlusOverM, 2)} M)</span></dd></div>
       <div><dt>r₋</dt><dd>${fmt(d.rMinus)}</dd></div>
-      <div><dt>r_ph</dt><dd>${fmt(d.rPhotonSphere)}</dd></div>
-      <div><dt>r_ISCO</dt><dd>${fmt(d.rIsco)}</dd></div>
+      <div><dt>r_ph</dt><dd>${fmt(d.rPhotonSphere)} <span class="dim">(${fmt(diag.rPhotonOverM, 2)} M)</span></dd></div>
+      <div><dt>r_ISCO</dt><dd>${fmt(d.rIsco)} <span class="dim">(${fmt(diag.rIscoOverM, 2)} M)</span></dd></div>
+      <div class="diag-title">Shadow / critical curve</div>
+      <div><dt>b_c⁺</dt><dd>${fmt(diag.bCritPro)} <span class="dim">(${fmt(diag.bCritProOverM, 2)} M)</span></dd></div>
+      <div><dt>b_c⁻</dt><dd>${fmt(diag.bCritRet)} <span class="dim">(${fmt(diag.bCritRetOverM, 2)} M)</span></dd></div>
+      <div><dt>⌀_shad</dt><dd>${fmt(diag.shadowDiameter)} <span class="dim">(~${fmt(diag.shadowDiameter / Math.max(p.mass, 1e-12), 2)} M)</span></dd></div>
       <div><dt>Δ_ext</dt><dd>${fmt(d.extremalityDelta)}</dd></div>
     `
   }
@@ -146,7 +153,7 @@ export function mountControls(
 
   subscribe((p, d) => {
     syncPhysicsInputs(p)
-    syncDerived(d)
+    syncDerived(d, p)
   })
 
   subscribeCamera((c) => {
@@ -161,6 +168,7 @@ export function mountControls(
 
   syncPhysicsInputs(getParams())
   syncCameraInputs(getCamera())
+  syncDerived(getDerived(), getParams())
 
   return {
     syncCameraUi: () => syncCameraInputs(getCamera()),

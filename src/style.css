@@ -148,8 +148,23 @@ canvas {
 
 .derived > div {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: 52px 1fr;
   gap: 8px;
+}
+
+.derived .diag-title {
+  display: block;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  color: #7aa2ff;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.derived .dim {
+  color: #666b73;
+  font-size: 10px;
 }
 
 .derived dt {

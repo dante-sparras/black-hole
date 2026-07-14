@@ -59,25 +59,24 @@ export function kerrHorizon(mass: number, spinLengthA: number): number {
 
 /**
  * Approximate equatorial critical impact parameters for photons
- * (Bardeen 1973). Used for HUD / tests — not a substitute for full GRRT.
+ * (Bardeen 1973). Used for HUD / diagnostics.
  *
  * b_c^± / M = ∓ a★ + 6 cos( (1/3) arccos(∓ a★) )
- * (common closed form; accurate enough for display)
+ * Prograde (co-rotating) uses the upper signs → smaller b for a★ > 0.
  */
 export function criticalImpacts(
   mass: number,
   spinStar: number,
 ): { prograde: number; retrograde: number } {
   const aStar = Math.min(0.999, Math.max(-0.999, spinStar))
-  // Standard: b_ph = r_ph / sqrt(1 - 2M/(3 r_ph) * something) — use photon radius form
-  // b_c = r_ph^{3/2} / sqrt(r_ph - 2M) for Schw; for Kerr use:
-  // b± = ±a + 6 cos(⅓ arccos(∓a))  (in units of M)
-  const bProM = -aStar + 6 * Math.cos((1 / 3) * Math.acos(aStar))
-  const bRetM = aStar + 6 * Math.cos((1 / 3) * Math.acos(-aStar))
-  // Ensure prograde < retrograde for a★ > 0
-  const pro = Math.min(bProM, bRetM) * mass
-  const ret = Math.max(bProM, bRetM) * mass
-  return { prograde: pro, retrograde: ret }
+  // Prograde: −a★ + 6 cos(⅓ arccos(−a★))
+  const bProM = -aStar + 6 * Math.cos((1 / 3) * Math.acos(-aStar))
+  // Retrograde: +a★ + 6 cos(⅓ arccos(+a★))
+  const bRetM = aStar + 6 * Math.cos((1 / 3) * Math.acos(+aStar))
+  return {
+    prograde: Math.abs(bProM) * mass,
+    retrograde: Math.abs(bRetM) * mass,
+  }
 }
 
 /** Kerr geometry (Q = 0). When |a★| ≈ 0, family is reported as schwarzschild. */

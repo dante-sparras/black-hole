@@ -5,6 +5,7 @@ export * from './schwarzschild'
 export * from './kerr'
 export * from './kn'
 export * from './disk'
+export * from './diagnostics'
 export * from './derive'
 export * from './geodesic/schwarzschildNull'
 export {

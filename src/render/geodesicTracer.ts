@@ -200,29 +200,33 @@ export function createGeodesicTracer(): GeodesicTracer {
             hits.addAssign(1)
             const x = rho.div(M)
 
-            // Static RN/Schw redshift g = √(1 − 2M/ρ + Q²/ρ²)
+            // Orbiting-emitter redshift: g = 1/(u^t (1 − Ω λ)), λ = ρ μ
+            // Kerr equatorial: u^t from −g_tt − 2Ω g_tφ − Ω² g_φφ
             const rhoSafe = max(rho, float(1e-5))
-            const g2 = float(1)
-              .sub(rs.div(rhoSafe))
-              .add(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
-            const g = max(g2, float(1e-4)).sqrt()
-
-            // Kerr/Kepler orbital speed about +Y (prograde)
             const sqrtM = sqrt(max(M, float(1e-8)))
-            const r32 = pow(max(rho, float(1e-5)), float(1.5))
+            const r32 = pow(rhoSafe, float(1.5))
             const Omega = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
-            const beta = min(Omega.mul(rho), float(0.92))
+
+            // Metric (equatorial, BL-like + RN g_tt)
+            const g_tt = float(-1).add(rs.div(rhoSafe)).sub(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
+            const g_tphi = a.mul(M).mul(-2).div(rhoSafe)
+            const g_phiphi = rhoSafe
+              .mul(rhoSafe)
+              .add(a.mul(a))
+              .add(M.mul(2).mul(a).mul(a).div(rhoSafe))
+            const Xorb = g_tt
+              .mul(-1)
+              .sub(Omega.mul(2).mul(g_tphi))
+              .sub(Omega.mul(Omega).mul(g_phiphi))
+            const u_t = float(1).div(sqrt(max(Xorb, float(1e-8))))
 
             const tdir = vec3(hz.mul(-1), float(0), hx).normalize()
             const nObs = vel.normalize().mul(-1)
             const mu = dot(tdir, nObs)
-
-            const gamma = float(1).div(sqrt(max(float(1).sub(beta.mul(beta)), float(1e-4))))
-            const D = float(1).div(
-              max(gamma.mul(float(1).sub(beta.mul(mu))), float(0.08)),
-            )
-            const freq = g.mul(D)
-            const beam = D.mul(D).mul(D)
+            const lambda = rhoSafe.mul(mu)
+            const freq = float(1).div(max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.08)))
+            // Bolometric I ∝ g³
+            const beam = freq.mul(freq).mul(freq)
 
             // Novikov–Thorne: F̃ ∝ ρ⁻³ (1 − √(r_in/ρ)), T ∝ F̃^{1/4}
             const gap = max(float(1).sub(sqrt(rin.div(max(rho, rin.mul(1.0001))))), float(0))
@@ -233,14 +237,12 @@ export function createGeodesicTracer(): GeodesicTracer {
             const tempRest = Tnt.mul(eff).mul(2.2)
             const Tobs = tempRest.mul(freq)
 
-            const fall = float(1)
             const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.1))
             const emit = vec3(
               min(float(2.2), float(0.45).add(Tobs.mul(1.15))),
               min(float(1.6), float(0.15).add(Tobs.mul(0.7))),
               min(float(1.2), float(0.03).add(Tobs.mul(Tobs).mul(0.25))),
             )
-              .mul(fall)
               .mul(bounce)
               .mul(beam)
 
