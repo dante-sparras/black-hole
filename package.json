@@ -1,0 +1,20 @@
+{
+  "name": "black-hole",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "bunx --bun tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "bun test tests"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  }
+}
