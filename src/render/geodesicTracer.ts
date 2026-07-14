@@ -30,6 +30,7 @@ export type GeodesicTracer = {
   setMass: (mass: number) => void
   setSpinStar: (spinStar: number) => void
   setCharge: (charge: number) => void
+  setMdot: (mdot: number) => void
   setRIscoM: (rIscoOverM: number) => void
   setCameraDistanceM: (distanceM: number) => void
   setInclination: (radians: number) => void
@@ -40,13 +41,14 @@ export type GeodesicTracer = {
 /**
  * Einstein–Maxwell null geodesic ray marcher (WebGPU / TSL).
  * Families: Schwarzschild / Kerr / RN / Kerr–Newman from (M, a★, Q).
- * Disk: Novikov–Thorne T(r) with family ISCO from CPU uniform.
+ * Disk: Novikov–Thorne T(r) with family ISCO; flux ∝ ṁ, T ∝ ṁ^{1/4}.
  * Spin ‖ +Y; disk in XZ (y = 0).
  */
 export function createGeodesicTracer(): GeodesicTracer {
   const uMass = uniform(1)
   const uSpinStar = uniform(0)
   const uCharge = uniform(0)
+  const uMdot = uniform(0.1)
   const uRIscoM = uniform(6) // r_isco / M from CPU diskIsco
   const uCamDistM = uniform(30)
   const uInclination = uniform(1.25)
@@ -60,6 +62,7 @@ export function createGeodesicTracer(): GeodesicTracer {
     const aStar = uSpinStar
     const a = aStar.mul(M)
     const Q = uCharge
+    const mdot = max(uMdot, float(1e-6))
     const rs = M.mul(2)
 
     // r₊ = M + √(M² − a² − Q²)
@@ -228,9 +231,9 @@ export function createGeodesicTracer(): GeodesicTracer {
             // Bolometric I ∝ g³
             const beam = freq.mul(freq).mul(freq)
 
-            // Novikov–Thorne: F̃ ∝ ρ⁻³ (1 − √(r_in/ρ)), T ∝ F̃^{1/4}
+            // Novikov–Thorne: F̃ ∝ ρ⁻³ (1 − √(r_in/ρ)); F ∝ ṁ F̃; T ∝ (ṁ F̃)^{1/4}
             const gap = max(float(1).sub(sqrt(rin.div(max(rho, rin.mul(1.0001))))), float(0))
-            const flux = gap.div(rho.mul(rho).mul(rho).add(1e-12))
+            const flux = gap.div(rho.mul(rho).mul(rho).add(1e-12)).mul(mdot)
             const Fm = flux.mul(M).mul(M).mul(M).mul(8000)
             const Tnt = pow(max(Fm, float(1e-12)), float(0.25))
             const eff = float(1).add(max(aStar, float(0)).mul(0.35))
@@ -238,6 +241,8 @@ export function createGeodesicTracer(): GeodesicTracer {
             const Tobs = tempRest.mul(freq)
 
             const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.1))
+            // Extra flux weight ∝ ṁ keeps dim disks truly dim (color already from T)
+            const iScale = pow(mdot.div(0.1), float(0.35))
             const emit = vec3(
               min(float(2.2), float(0.45).add(Tobs.mul(1.15))),
               min(float(1.6), float(0.15).add(Tobs.mul(0.7))),
@@ -245,6 +250,7 @@ export function createGeodesicTracer(): GeodesicTracer {
             )
               .mul(bounce)
               .mul(beam)
+              .mul(iScale)
 
             col.addAssign(emit.mul(transm))
             transm.mulAssign(0.4)
@@ -297,6 +303,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setCharge: (q) => {
       uCharge.value = q
+    },
+    setMdot: (m) => {
+      uMdot.value = m
     },
     setRIscoM: (r) => {
       uRIscoM.value = r

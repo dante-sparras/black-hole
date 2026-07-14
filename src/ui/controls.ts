@@ -1,4 +1,9 @@
-import { MAX_SPIN_STAR } from '../physics/constants'
+import { MAX_SPIN_STAR, MDOT_MAX, MDOT_MIN } from '../physics/constants'
+import {
+  mdotFromSlider as mdotFromSliderRange,
+  mdotTemperatureScale,
+  sliderFromMdot as sliderFromMdotRange,
+} from '../physics/disk'
 import { shadowDiagnostics } from '../physics/diagnostics'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import {
@@ -15,6 +20,21 @@ import { getDerived, getParams, setParams, subscribe } from '../state/params'
 function fmt(n: number, digits = 3): string {
   if (!Number.isFinite(n)) return '—'
   return n.toFixed(digits)
+}
+
+/** Log-space slider (0…1000) ↔ ṁ ∈ [MDOT_MIN, MDOT_MAX]. */
+export function mdotFromSlider(t: number): number {
+  return mdotFromSliderRange(t, MDOT_MIN, MDOT_MAX)
+}
+
+export function sliderFromMdot(mdot: number): number {
+  return sliderFromMdotRange(mdot, MDOT_MIN, MDOT_MAX)
+}
+
+function fmtMdot(m: number): string {
+  if (m >= 0.1) return fmt(m, 2)
+  if (m >= 0.01) return fmt(m, 3)
+  return m.toExponential(1)
 }
 
 export type ControlsApi = {
@@ -48,7 +68,12 @@ export function mountControls(
       <input type="range" id="p-charge" min="0" max="0.95" step="0.01" />
       <span class="ctrl-val" data-val="charge"></span>
     </label>
-    <p class="ctrl-hint">Families: Schw · Kerr · RN · KN (extremality clamps Q)</p>
+    <label class="ctrl">
+      <span class="ctrl-name">ṁ / ṁ_Edd</span>
+      <input type="range" id="p-mdot" min="0" max="1000" step="1" />
+      <span class="ctrl-val" data-val="mdot"></span>
+    </label>
+    <p class="ctrl-hint">ṁ = Eddington ratio (disk). T ∝ ṁ¼ · log slider · not hair</p>
 
     <div class="ctrl-section">Camera</div>
     <label class="ctrl">
@@ -77,9 +102,11 @@ export function mountControls(
   const massInput = root.querySelector<HTMLInputElement>('#p-mass')
   const spinInput = root.querySelector<HTMLInputElement>('#p-spin')
   const chargeInput = root.querySelector<HTMLInputElement>('#p-charge')
+  const mdotInput = root.querySelector<HTMLInputElement>('#p-mdot')
   const massVal = root.querySelector<HTMLElement>('[data-val="mass"]')
   const spinVal = root.querySelector<HTMLElement>('[data-val="spin"]')
   const chargeVal = root.querySelector<HTMLElement>('[data-val="charge"]')
+  const mdotVal = root.querySelector<HTMLElement>('[data-val="mdot"]')
 
   const distInput = root.querySelector<HTMLInputElement>('#c-dist')
   const incInput = root.querySelector<HTMLInputElement>('#c-inc')
@@ -94,9 +121,14 @@ export function mountControls(
     if (massInput) massInput.value = String(p.mass)
     if (spinInput) spinInput.value = String(p.spinStar)
     if (chargeInput) chargeInput.value = String(p.charge)
+    if (mdotInput) mdotInput.value = String(sliderFromMdot(p.mdot))
     if (massVal) massVal.textContent = fmt(p.mass, 2)
     if (spinVal) spinVal.textContent = fmt(p.spinStar, 3)
     if (chargeVal) chargeVal.textContent = fmt(p.charge, 3)
+    if (mdotVal) {
+      const tScale = mdotTemperatureScale(p.mdot)
+      mdotVal.textContent = `${fmtMdot(p.mdot)}  (T×${fmt(tScale, 2)})`
+    }
   }
 
   function syncCameraInputs(c: CameraState): void {
@@ -113,6 +145,7 @@ export function mountControls(
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
     if (!derivedRoot) return
     const diag = shadowDiagnostics(p, d)
+    const tScale = mdotTemperatureScale(p.mdot)
     derivedRoot.innerHTML = `
       <div class="diag-title">Radii</div>
       <div><dt>family</dt><dd>${d.family}</dd></div>
@@ -120,6 +153,9 @@ export function mountControls(
       <div><dt>r₋</dt><dd>${fmt(d.rMinus)}</dd></div>
       <div><dt>r_ph</dt><dd>${fmt(d.rPhotonSphere)} <span class="dim">(${fmt(diag.rPhotonOverM, 2)} M)</span></dd></div>
       <div><dt>r_ISCO</dt><dd>${fmt(d.rIsco)} <span class="dim">(${fmt(diag.rIscoOverM, 2)} M)</span></dd></div>
+      <div class="diag-title">Disk (not hair)</div>
+      <div><dt>ṁ</dt><dd>${fmtMdot(p.mdot)} ṁ_Edd</dd></div>
+      <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
       <div class="diag-title">Shadow / critical curve</div>
       <div><dt>b_c⁺</dt><dd>${fmt(diag.bCritPro)} <span class="dim">(${fmt(diag.bCritProOverM, 2)} M)</span></dd></div>
       <div><dt>b_c⁻</dt><dd>${fmt(diag.bCritRet)} <span class="dim">(${fmt(diag.bCritRetOverM, 2)} M)</span></dd></div>
@@ -136,6 +172,9 @@ export function mountControls(
   })
   chargeInput?.addEventListener('input', () => {
     setParams({ charge: Number(chargeInput.value) })
+  })
+  mdotInput?.addEventListener('input', () => {
+    setParams({ mdot: mdotFromSlider(Number(mdotInput.value)) })
   })
 
   distInput?.addEventListener('input', () => {

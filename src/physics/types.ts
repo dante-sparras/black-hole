@@ -1,15 +1,23 @@
 /**
- * Classical no-hair parameters for a stationary Einstein–Maxwell black hole.
+ * Classical no-hair parameters for a stationary Einstein–Maxwell black hole,
+ * plus disk accretion (not hair).
  * Geometric units G = c = 1:
  *   - mass M
  *   - dimensionless spin a★ = J / M²  (Kerr length a = a★ · M)
  *   - charge Q
+ *   - Eddington ratio ṁ = Ṁ / Ṁ_Edd  (thin-disk brightness / temperature)
  */
 export type BlackHoleParams = {
   readonly mass: number
   /** Dimensionless spin a★ after validation. */
   readonly spinStar: number
   readonly charge: number
+  /**
+   * Eddington ratio ṁ = Ṁ/Ṁ_Edd (dimensionless).
+   * Scales disk flux F ∝ ṁ and temperature T ∝ ṁ^{1/4}.
+   * Not a no-hair parameter.
+   */
+  readonly mdot: number
 }
 
 export type MetricFamily =

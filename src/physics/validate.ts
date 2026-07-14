@@ -1,15 +1,18 @@
 import {
   DEFAULT_CHARGE,
   DEFAULT_MASS,
+  DEFAULT_MDOT,
   DEFAULT_SPIN_STAR,
   MASS_MIN,
   MAX_SPIN_STAR,
+  MDOT_MAX,
+  MDOT_MIN,
 } from './constants'
 import type { BlackHoleParams } from './types'
 
 export type ParamsInput = Partial<BlackHoleParams>
 
-export function isExtremalOk(p: BlackHoleParams): boolean {
+export function isExtremalOk(p: Pick<BlackHoleParams, 'mass' | 'spinStar' | 'charge'>): boolean {
   const a = p.spinStar * p.mass
   return p.mass * p.mass >= a * a + p.charge * p.charge
 }
@@ -19,6 +22,7 @@ export function isExtremalOk(p: BlackHoleParams): boolean {
  * - mass > 0
  * - |spinStar| ≤ MAX_SPIN_STAR
  * - |charge| reduced if needed so M² ≥ a² + Q² (prefer keeping spin)
+ * - ṁ ∈ [MDOT_MIN, MDOT_MAX]
  */
 export function normalizeParams(input: ParamsInput): BlackHoleParams {
   let mass = Number.isFinite(input.mass) ? (input.mass as number) : DEFAULT_MASS
@@ -37,5 +41,8 @@ export function normalizeParams(input: ParamsInput): BlackHoleParams {
     charge = (charge === 0 ? 1 : Math.sign(charge)) * maxQ
   }
 
-  return { mass, spinStar, charge }
+  let mdot = Number.isFinite(input.mdot) ? (input.mdot as number) : DEFAULT_MDOT
+  mdot = Math.min(MDOT_MAX, Math.max(MDOT_MIN, mdot))
+
+  return { mass, spinStar, charge, mdot }
 }

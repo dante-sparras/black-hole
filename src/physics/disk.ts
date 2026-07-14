@@ -63,8 +63,9 @@ export function diskIsco(params: BlackHoleParams, prograde = true): number {
 }
 
 /**
- * Novikov–Thorne / zero-torque flux factor:
+ * Novikov–Thorne / zero-torque flux factor (shape only):
  *   F̃(r) = r⁻³ (1 − √(r_in / r))   for r > r_in
+ * Physical flux F ∝ ṁ · F̃.
  */
 export function novikovThorneFluxFactor(r: number, rIsco: number): number {
   if (!(r > rIsco) || rIsco <= 0) return 0
@@ -74,7 +75,46 @@ export function novikovThorneFluxFactor(r: number, rIsco: number): number {
 }
 
 /**
- * Dimensionless temperature scale T ∝ F̃^{1/4}.
+ * Temperature scale from Eddington ratio: T ∝ ṁ^{1/4}.
+ * Reference ṁ₀ = DEFAULT-like 0.1 → scale 1 at ṁ = 0.1 if desired;
+ * here scale is absolute: (ṁ)^{1/4} so ṁ=1 → 1, ṁ=0.1 → ~0.56.
+ */
+export function mdotTemperatureScale(mdot: number): number {
+  const m = Math.max(mdot, 1e-8)
+  return Math.pow(m, 0.25)
+}
+
+/** Flux / bolometric intensity scale: F ∝ ṁ. */
+export function mdotFluxScale(mdot: number): number {
+  return Math.max(mdot, 1e-8)
+}
+
+/** Log-space slider (0…1000) ↔ ṁ ∈ [mdotMin, mdotMax]. */
+export function mdotFromSlider(
+  t: number,
+  mdotMin: number,
+  mdotMax: number,
+): number {
+  const u = Math.min(1, Math.max(0, t / 1000))
+  const logMin = Math.log10(mdotMin)
+  const logMax = Math.log10(mdotMax)
+  return 10 ** (logMin + u * (logMax - logMin))
+}
+
+export function sliderFromMdot(
+  mdot: number,
+  mdotMin: number,
+  mdotMax: number,
+): number {
+  const m = Math.min(mdotMax, Math.max(mdotMin, mdot))
+  const logMin = Math.log10(mdotMin)
+  const logMax = Math.log10(mdotMax)
+  const u = (Math.log10(m) - logMin) / (logMax - logMin)
+  return Math.round(Math.min(1, Math.max(0, u)) * 1000)
+}
+
+/**
+ * Dimensionless temperature scale T ∝ (ṁ · F̃)^{1/4}.
  * Normalized for the renderer; spin raises efficiency slightly.
  */
 export function novikovThorneTemperature(
@@ -82,10 +122,11 @@ export function novikovThorneTemperature(
   rIsco: number,
   mass: number,
   spinStar = 0,
+  mdot = 0.1,
 ): number {
   const F = novikovThorneFluxFactor(r, rIsco)
   if (F <= 0) return 0
-  const Fm = F * mass * mass * mass
+  const Fm = F * mass * mass * mass * mdotFluxScale(mdot)
   const T0 = Math.pow(Fm * 8000, 0.25)
   const eff = 1 + 0.35 * Math.max(0, Math.min(spinStar, 0.998))
   return T0 * eff

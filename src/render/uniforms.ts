@@ -6,6 +6,7 @@ export type SpacetimeUniforms = {
   spinStar: number
   spinLength: number
   charge: number
+  mdot: number
   rPlus: number
   rMinus: number
   rIsco: number
@@ -17,6 +18,7 @@ export function toUniforms(p: BlackHoleParams, d: DerivedGeometry): SpacetimeUni
     spinStar: p.spinStar,
     spinLength: d.spinLength,
     charge: p.charge,
+    mdot: p.mdot,
     rPlus: d.rPlus,
     rMinus: d.rMinus,
     rIsco: d.rIsco,

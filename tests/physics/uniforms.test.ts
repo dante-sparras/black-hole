@@ -12,6 +12,7 @@ describe('toUniforms', () => {
     expect(u.spinStar).toBe(p.spinStar)
     expect(u.spinLength).toBe(d.spinLength)
     expect(u.charge).toBe(p.charge)
+    expect(u.mdot).toBe(p.mdot)
     expect(u.rPlus).toBe(d.rPlus)
     expect(u.rMinus).toBe(d.rMinus)
     expect(u.rIsco).toBe(d.rIsco)

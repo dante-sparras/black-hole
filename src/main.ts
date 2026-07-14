@@ -55,6 +55,7 @@ function applyPhysics(): void {
   tracer.setMass(p.mass)
   tracer.setSpinStar(p.spinStar)
   tracer.setCharge(p.charge)
+  tracer.setMdot(p.mdot)
   const d = getDerived()
   tracer.setRIscoM(d.rIsco / Math.max(p.mass, 1e-12))
 }
@@ -86,6 +87,7 @@ function formatStats(fps: number): string {
   const m = spacetime.mass.toFixed(2)
   const a = spacetime.spinStar.toFixed(3)
   const q = spacetime.charge.toFixed(3)
+  const md = spacetime.mdot >= 0.01 ? spacetime.mdot.toFixed(2) : spacetime.mdot.toExponential(1)
   const rp = Number.isFinite(spacetime.rPlus) ? spacetime.rPlus.toFixed(3) : '—'
   const dist = c.distanceM.toFixed(1)
   const hasA = Math.abs(spacetime.spinStar) >= 1e-6
@@ -98,7 +100,7 @@ function formatStats(fps: number): string {
         : !hasA && hasQ
           ? 'rn-RT'
           : 'kn-RT'
-  return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} · r₊=${rp} · D=${dist}M`
+  return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r₊=${rp} · D=${dist}M`
 }
 
 async function boot() {

@@ -1,13 +1,19 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_SPIN_STAR } from '../../src/physics/constants'
+import {
+  DEFAULT_MDOT,
+  MAX_SPIN_STAR,
+  MDOT_MAX,
+  MDOT_MIN,
+} from '../../src/physics/constants'
 import { isExtremalOk, normalizeParams } from '../../src/physics/validate'
 
 describe('normalizeParams', () => {
-  test('defaults to Schwarzschild unit mass', () => {
+  test('defaults to Schwarzschild unit mass + default ṁ', () => {
     const p = normalizeParams({})
     expect(p.mass).toBe(1)
     expect(p.spinStar).toBe(0)
     expect(p.charge).toBe(0)
+    expect(p.mdot).toBe(DEFAULT_MDOT)
   })
 
   test('clamps spinStar to MAX_SPIN_STAR', () => {
@@ -24,6 +30,12 @@ describe('normalizeParams', () => {
   test('rejects non-positive mass by clamping to epsilon', () => {
     const p = normalizeParams({ mass: 0, spinStar: 0, charge: 0 })
     expect(p.mass).toBeGreaterThan(0)
+  })
+
+  test('clamps ṁ to [MDOT_MIN, MDOT_MAX]', () => {
+    expect(normalizeParams({ mdot: 1e-9 }).mdot).toBe(MDOT_MIN)
+    expect(normalizeParams({ mdot: 100 }).mdot).toBe(MDOT_MAX)
+    expect(normalizeParams({ mdot: 0.25 }).mdot).toBeCloseTo(0.25, 10)
   })
 })
 
