@@ -247,22 +247,34 @@ export function createGeodesicTracer(): GeodesicTracer {
             // Extra flux weight ∝ ṁ keeps dim disks truly dim (color already from T)
             const iScale = pow(mdot.div(0.1), float(0.35))
 
-            // --- Disk texture: log spirals + multi-scale turbulence ---
-            const phi = atan(hz, hx)
+            // --- Disk texture: seamless log spirals + turbulence (no raw φ) ---
+            // Use (cosφ,sinφ) via hx/ρ, hz/ρ so atan2 branch cut cannot seam.
+            const invRho = float(1).div(max(rhoSafe, float(1e-5)))
+            const cphi = hx.mul(invRho)
+            const sphi = hz.mul(invRho)
             const lnR = log(max(rhoSafe.div(M), float(1e-4)))
-            const arms = float(2)
+
+            // m=2 spiral: cos(2φ − 2·pitch·lnR + phase)
+            // cos(2φ)=c²−s², sin(2φ)=2cs
+            const c2 = cphi.mul(cphi).sub(sphi.mul(sphi))
+            const s2 = cphi.mul(sphi).mul(2)
             const pitch = float(0.55)
-            const spiral = arms.mul(phi.sub(pitch.mul(lnR))).add(0.3)
-            const armWave = float(0.5).add(float(0.5).mul(cos(spiral)))
+            const alpha = pitch.mul(-2).mul(lnR).add(0.3)
+            const armWave = float(0.5).add(
+              float(0.5).mul(c2.mul(cos(alpha)).add(s2.mul(sin(alpha)))),
+            )
             const armsBright = pow(max(armWave, float(1e-4)), float(1.35))
             const armContrast = float(0.55)
             const armFac = float(1)
               .sub(armContrast)
               .add(armContrast.mul(float(0.35).add(armsBright.mul(0.9))))
 
-            // Hash noise helpers (inline; nested TSL Fn avoided)
-            const nUV = vec2(rhoSafe.div(M).mul(0.35), phi.mul(1.7).add(lnR.mul(0.8)))
-            // octave 1
+            // Seamless noise domain: (cosφ, sinφ) scaled + lnR as 3rd via offset mix
+            // Project to 2D for cheap value noise: (cφ, sφ) * scale + lnR drift on both axes equally
+            const nUV = vec2(
+              cphi.mul(1.4).add(lnR.mul(0.15)),
+              sphi.mul(1.4).add(lnR.mul(0.11)),
+            )
             const i1 = vec2(floor(nUV.x), floor(nUV.y))
             const f1 = vec2(nUV.x.sub(i1.x), nUV.y.sub(i1.y))
             const u1 = f1.mul(f1).mul(float(3).sub(f1.mul(2)))
@@ -281,7 +293,6 @@ export function createGeodesicTracer(): GeodesicTracer {
               .add(h10.mul(u1.x))
               .mul(float(1).sub(u1.y))
               .add(h01.mul(float(1).sub(u1.x)).add(h11.mul(u1.x)).mul(u1.y))
-            // octave 2 (scaled)
             const nUV2 = nUV.mul(2.1)
             const i2 = vec2(floor(nUV2.x), floor(nUV2.y))
             const f2 = vec2(nUV2.x.sub(i2.x), nUV2.y.sub(i2.y))
@@ -307,14 +318,12 @@ export function createGeodesicTracer(): GeodesicTracer {
               .sub(turbContrast)
               .add(turbContrast.mul(float(0.45).add(turb.mul(0.9))))
 
-            const ripple = float(0.5).add(
-              float(0.5).mul(sin(lnR.mul(4.2).add(phi.mul(0.5)))),
-            )
+            // Radial-only ripple (no φ) — seamless
+            const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.2))))
             const texFac = max(
               float(0.28),
               min(float(1.85), armFac.mul(turbFac).mul(float(0.92).add(ripple.mul(0.16)))),
             )
-            // Mild T jitter in dense filaments
             const tJitter = float(0.9).add(turb.mul(0.2))
 
             const emit = vec3(

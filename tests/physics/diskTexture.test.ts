@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  azimuthSeamDelta,
   diskTemperatureJitter,
   diskTextureFactor,
   hash2,
@@ -39,7 +40,6 @@ describe('diskTextureFactor', () => {
       armContrast: 0,
       turbContrast: 0,
     })
-    // only ripple remains
     expect(f).toBeGreaterThan(0.85)
     expect(f).toBeLessThan(1.15)
   })
@@ -55,11 +55,27 @@ describe('diskTextureFactor', () => {
     expect(max - min).toBeGreaterThan(0.08)
   })
 
-  test('varies with radius (spiral pitch)', () => {
-    const a = diskTextureFactor(8, 1, 1)
-    const b = diskTextureFactor(14, 1, 1)
-    // Not required different always, but factor is defined
-    expect(Number.isFinite(a + b)).toBe(true)
+  test('seamless across atan2 branch cut (no radial seam)', () => {
+    for (const rho of [6, 10, 14, 20]) {
+      expect(azimuthSeamDelta(rho, 1)).toBeLessThan(1e-3)
+    }
+  })
+
+  test('continuous when walking around the circle', () => {
+    const rho = 12
+    let maxStep = 0
+    let prev = diskTextureFactor(rho, 0, 1)
+    for (let i = 1; i <= 128; i++) {
+      const ang = (i / 128) * Math.PI * 2
+      const f = diskTextureFactor(rho * Math.cos(ang), rho * Math.sin(ang), 1)
+      maxStep = Math.max(maxStep, Math.abs(f - prev))
+      prev = f
+    }
+    // Closing the loop
+    const first = diskTextureFactor(rho, 0, 1)
+    maxStep = Math.max(maxStep, Math.abs(prev - first))
+    // Smooth walk: no single step jump like a branch-cut seam
+    expect(maxStep).toBeLessThan(0.12)
   })
 })
 
