@@ -57,21 +57,19 @@ let spacetime = toUniforms(getParams(), getDerived())
 
 function applyPhysics(): void {
   const p = getParams()
-  spacetime = toUniforms(p, getDerived())
-  tracer.setMass(p.mass)
-  tracer.setSpinStar(p.spinStar)
-  tracer.setCharge(p.charge)
-  tracer.setMdot(p.mdot)
   const d = getDerived()
-  tracer.setRIscoM(d.rIsco / Math.max(p.mass, 1e-12))
+  spacetime = toUniforms(p, d)
+  tracer.setSpacetime({
+    mass: p.mass,
+    spinStar: p.spinStar,
+    charge: p.charge,
+    mdot: p.mdot,
+    rIscoOverM: d.rIsco / Math.max(p.mass, 1e-12),
+  })
 }
 
 function applyCamera(): void {
-  const c = getCamera()
-  tracer.setCameraDistanceM(c.distanceM)
-  tracer.setInclination(c.inclination)
-  tracer.setAzimuth(c.azimuth)
-  tracer.setFov(c.fov)
+  tracer.setCamera(getCamera())
 }
 
 function applyLook(): void {

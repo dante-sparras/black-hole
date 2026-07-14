@@ -8,7 +8,7 @@
 
 ## Status
 
-No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Reissner–Nordström**, **Kerr–Newman** from \((M, a_\star, Q)\). Real-time Cartesian null geodesics (Binet RN term + Kerr frame-drag), Doppler beaming, orbit camera.
+No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Reissner–Nordström**, **Kerr–Newman** from \((M, a_\star, Q)\). Real-time Cartesian null geodesics (Binet RN term + Kerr frame-drag), Doppler beaming, NT disk + \(\dot{m}\), blackbody color, bloom, presets, orbit camera.
 
 ## Commands
 

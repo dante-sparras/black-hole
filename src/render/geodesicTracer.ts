@@ -26,10 +26,42 @@ import {
   vec3,
   vec4,
 } from 'three/tsl'
+import {
+  LAMBDA_B_NM,
+  LAMBDA_G_NM,
+  LAMBDA_R_NM,
+  PLANCK_C2_NM_K,
+} from '../physics/blackbody'
+import { DEFAULT_MDOT } from '../physics/constants'
+import {
+  DISK_EMISSION,
+  R_ISCO_SCHW_OVER_M,
+  T_PEAK_MDOT_REF,
+  T_PEAK_REF_K,
+} from '../physics/disk'
+import { CAMERA_DEFAULTS } from '../state/camera'
+
+export type SpacetimeTraceParams = {
+  mass: number
+  spinStar: number
+  charge: number
+  mdot: number
+  /** r_ISCO / M from CPU diskIsco */
+  rIscoOverM: number
+}
+
+export type CameraTraceParams = {
+  distanceM: number
+  inclination: number
+  azimuth: number
+  fov: number
+}
 
 export type GeodesicTracer = {
   material: THREE.MeshBasicNodeMaterial
   mesh: THREE.Mesh
+  setSpacetime: (p: SpacetimeTraceParams) => void
+  setCamera: (c: CameraTraceParams) => void
   setMass: (mass: number) => void
   setSpinStar: (spinStar: number) => void
   setCharge: (charge: number) => void
@@ -46,17 +78,20 @@ export type GeodesicTracer = {
  * Families: Schwarzschild / Kerr / RN / Kerr–Newman from (M, a★, Q).
  * Disk: Novikov–Thorne T(r) with family ISCO; flux ∝ ṁ, T ∝ ṁ^{1/4}.
  * Spin ‖ +Y; disk in XZ (y = 0).
+ *
+ * Emission constants: DISK_EMISSION in physics/disk.ts (CPU/GPU lockstep).
  */
 export function createGeodesicTracer(): GeodesicTracer {
+  const E = DISK_EMISSION
   const uMass = uniform(1)
   const uSpinStar = uniform(0)
   const uCharge = uniform(0)
-  const uMdot = uniform(0.1)
-  const uRIscoM = uniform(6) // r_isco / M from CPU diskIsco
-  const uCamDistM = uniform(30)
-  const uInclination = uniform(1.25)
-  const uAzimuth = uniform(0)
-  const uFov = uniform(0.65)
+  const uMdot = uniform(DEFAULT_MDOT)
+  const uRIscoM = uniform(R_ISCO_SCHW_OVER_M)
+  const uCamDistM = uniform(CAMERA_DEFAULTS.distanceM)
+  const uInclination = uniform(CAMERA_DEFAULTS.inclination)
+  const uAzimuth = uniform(CAMERA_DEFAULTS.azimuth)
+  const uFov = uniform(CAMERA_DEFAULTS.fov)
   const uRoutM = uniform(22)
   const STEPS = 900
 
@@ -233,13 +268,13 @@ export function createGeodesicTracer(): GeodesicTracer {
             const freq = float(1).div(
               max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)),
             )
-            // Mild Doppler boost (g²). Extreme g³ + low ṁ zeroed the disk face.
-            const beam = pow(max(freq, float(0.4)), float(2.0))
+            // Mild Doppler boost (g^n). Extreme g³ + low ṁ zeroed the disk face.
+            const beam = pow(max(freq, float(E.beamFloor)), float(E.beamExponent))
 
             // --- NT flux profile ---
             const gap = max(float(1).sub(sqrt(rin.div(max(rho, rin.mul(1.0001))))), float(0))
             const Ftilde = gap.div(rho.mul(rho).mul(rho).add(1e-12))
-            const rPeak = rin.mul(49 / 36)
+            const rPeak = rin.mul(E.ntPeakOverRin)
             const gapPeak = max(
               float(1).sub(sqrt(rin.div(max(rPeak, rin.mul(1.0001))))),
               float(0),
@@ -247,28 +282,28 @@ export function createGeodesicTracer(): GeodesicTracer {
             const FtildeMax = gapPeak.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
             const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
             // Softer radial falloff for optical display
-            const fluxVis = pow(max(fluxRel, float(1e-6)), float(0.5))
+            const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
 
             // --- Color temperature (Kelvin) — COLOR ONLY ---
             // Higher spin → smaller r_ISCO → hotter peak (T ∝ r_in^{-3/4}), not cooler.
-            // T(r) = T_peak (F/Fmax)^{1/4}; mild g on observed color (not full g³ wipe).
+            // T(r) = T_peak (F/Fmax)^{1/4}; mild g on observed color (not full g wipe).
             const rIscoM = max(uRIscoM, float(1.05))
-            const iscoHot = pow(float(6).div(rIscoM), float(0.75))
-            const spinFac = float(1).add(max(aStar, float(0)).mul(0.12))
-            const tPeakK = float(9000)
-              .mul(pow(max(mdot.div(0.1), float(1e-6)), float(0.25)))
+            const iscoHot = pow(float(R_ISCO_SCHW_OVER_M).div(rIscoM), float(E.iscoHotPower))
+            const spinFac = float(1).add(max(aStar, float(0)).mul(E.spinEtaNudge))
+            const tPeakK = float(T_PEAK_REF_K)
+              .mul(pow(max(mdot.div(T_PEAK_MDOT_REF), float(1e-6)), float(0.25)))
               .mul(iscoHot)
               .mul(spinFac)
             const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
             // Soft redshift on color: full g over-redshifts high-spin inner disk
-            const gColor = pow(max(freq, float(0.35)), float(0.45))
-            const TK = max(float(1800), min(float(45000), tRestK.mul(gColor)))
+            const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
+            const TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), tRestK.mul(gColor)))
 
             // Max-normalized blackbody chromaticity (always unit peak channel)
-            const planckC2 = float(1.4387769e7)
-            const lamR = float(680)
-            const lamG = float(550)
-            const lamB = float(440)
+            const planckC2 = float(PLANCK_C2_NM_K)
+            const lamR = float(LAMBDA_R_NM)
+            const lamG = float(LAMBDA_G_NM)
+            const lamB = float(LAMBDA_B_NM)
             const xR = min(planckC2.div(lamR.mul(TK)), float(80))
             const xG = min(planckC2.div(lamG.mul(TK)), float(80))
             const xB = min(planckC2.div(lamB.mul(TK)), float(80))
@@ -312,14 +347,15 @@ export function createGeodesicTracer(): GeodesicTracer {
             const texFac = max(float(0.75), min(float(1.25), armFac.mul(float(0.9).add(turb.mul(0.2)))))
 
             // --- Brightness from accretion power (NOT absolute optical B_λ) ---
-            // I ∝ F_vis · f(ṁ) · g² · texture
+            // I ∝ F_vis · f(ṁ) · g^n · texture
             // f(ṁ) soft so min slider still shows a glowing disk (thick thermal surface)
             const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.55))
-            // Map ṁ∈[0.001,3] → brightness ∈ ~[0.45, ~2.5] (visible at min)
-            const mdotBright = float(0.4).add(
-              pow(max(mdot.div(0.1), float(0.01)), float(0.35)).mul(1.2),
+            const mdotBright = float(E.mdotBrightBase).add(
+              pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
+                E.mdotBrightScale,
+              ),
             )
-            const iFlux = max(fluxVis, float(0.2)).mul(mdotBright).mul(2.2)
+            const iFlux = max(fluxVis, float(E.fluxVisFloor)).mul(mdotBright).mul(E.intensityGain)
             const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
 
             col.addAssign(emit.mul(transm))
@@ -365,6 +401,19 @@ export function createGeodesicTracer(): GeodesicTracer {
   return {
     material,
     mesh,
+    setSpacetime: (p) => {
+      uMass.value = p.mass
+      uSpinStar.value = p.spinStar
+      uCharge.value = p.charge
+      uMdot.value = p.mdot
+      uRIscoM.value = p.rIscoOverM
+    },
+    setCamera: (c) => {
+      uCamDistM.value = c.distanceM
+      uInclination.value = c.inclination
+      uAzimuth.value = c.azimuth
+      uFov.value = c.fov
+    },
     setMass: (m) => {
       uMass.value = m
     },
@@ -394,6 +443,3 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
   }
 }
-
-/** @deprecated alias */
-export const createSchwarzschildTracer = createGeodesicTracer

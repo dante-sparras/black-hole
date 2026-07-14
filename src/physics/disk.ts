@@ -74,11 +74,6 @@ export function novikovThorneFluxFactor(r: number, rIsco: number): number {
   return gap / (r * r * r)
 }
 
-/** Approx peak of simple NT flux: r ≈ (49/36) r_in */
-export function novikovThornePeakRadius(rIsco: number): number {
-  return (49 / 36) * rIsco
-}
-
 /**
  * Peak effective temperature [K] at the NT flux maximum.
  *
@@ -94,6 +89,46 @@ export const T_PEAK_MDOT_REF = 0.1
 export const R_ISCO_SCHW_OVER_M = 6
 
 /**
+ * Shared emission/display constants — CPU + GPU tracer must stay in lockstep.
+ * Do not hardcode these in geodesicTracer.ts.
+ */
+export const DISK_EMISSION = {
+  /** T ∝ (r_ISCO_Schw / r_ISCO)^{ISCO_HOT_POWER} */
+  iscoHotPower: 0.75,
+  /** Mild efficiency nudge: 1 + spinEtaNudge * a★ */
+  spinEtaNudge: 0.12,
+  /** Soft g exponent on color temperature (full g over-redshifts high spin) */
+  gColorExponent: 0.45,
+  gColorFloor: 0.35,
+  /** Optical color temperature clamp [K] for max-norm chroma */
+  tColorMinK: 1800,
+  tColorMaxK: 45_000,
+  /** Doppler beam I ∝ g^{beamExponent} */
+  beamExponent: 2.0,
+  beamFloor: 0.4,
+  /** Soft radial flux for display: fluxVis = fluxRel^{fluxVisPower} */
+  fluxVisPower: 0.5,
+  fluxVisFloor: 0.2,
+  /** Overall HDR gain into ACES */
+  intensityGain: 2.2,
+  /**
+   * Display brightness: base + scale * (ṁ/0.1)^{power}
+   * Soft curve keeps min-ṁ disks visible (not pure F∝ṁ).
+   */
+  mdotBrightBase: 0.4,
+  mdotBrightScale: 1.2,
+  mdotBrightPower: 0.35,
+  mdotBrightFloor: 0.01,
+  /** NT peak radius ≈ (49/36) r_in */
+  ntPeakOverRin: 49 / 36,
+} as const
+
+/** Approx peak of simple NT flux: r ≈ (49/36) r_in */
+export function novikovThornePeakRadius(rIsco: number): number {
+  return DISK_EMISSION.ntPeakOverRin * rIsco
+}
+
+/**
  * Peak T [K] from ṁ and r_ISCO/M (and mild residual spin factor).
  * Dominant effect: iscoHot = (6 / (r_ISCO/M))^{3/4}
  */
@@ -104,10 +139,9 @@ export function diskPeakTemperatureK(
 ): number {
   const m = Math.max(mdot, 1e-8)
   const rinM = Math.max(rIscoOverM, 1.05)
-  // Thin-disk: smaller ISCO (high prograde spin) → hotter peak
-  const iscoHot = Math.pow(R_ISCO_SCHW_OVER_M / rinM, 0.75)
-  // Small extra efficiency nudge with spin (η rises with a★)
-  const spinFac = 1 + 0.12 * Math.max(0, Math.min(spinStar, 0.998))
+  const { iscoHotPower, spinEtaNudge } = DISK_EMISSION
+  const iscoHot = Math.pow(R_ISCO_SCHW_OVER_M / rinM, iscoHotPower)
+  const spinFac = 1 + spinEtaNudge * Math.max(0, Math.min(spinStar, 0.998))
   return (
     T_PEAK_REF_K *
     Math.pow(m / T_PEAK_MDOT_REF, 0.25) *
@@ -145,6 +179,19 @@ export function observedTemperatureK(tRestK: number, g: number): number {
   return Math.max(0, tRestK) * Math.max(g, 0)
 }
 
+/** Soft g used for disk *color* (not full intensity beam). */
+export function colorRedshiftFactor(g: number): number {
+  const { gColorExponent, gColorFloor } = DISK_EMISSION
+  return Math.pow(Math.max(g, gColorFloor), gColorExponent)
+}
+
+/** Clamp T for optical chroma sampling (matches GPU). */
+export function clampDiskColorTemperatureK(tKelvin: number): number {
+  const { tColorMinK, tColorMaxK } = DISK_EMISSION
+  if (!Number.isFinite(tKelvin)) return tColorMinK
+  return Math.min(tColorMaxK, Math.max(tColorMinK, tKelvin))
+}
+
 /** Temperature scale from Eddington ratio: T ∝ ṁ^{1/4}. */
 export function mdotTemperatureScale(mdot: number): number {
   const m = Math.max(mdot, 1e-8)
@@ -157,8 +204,14 @@ export function mdotTemperatureScale(mdot: number): number {
  * still brightening toward high ṁ. Not pure F∝ṁ (that + ACES → black).
  */
 export function mdotDisplayBrightness(mdot: number): number {
-  const x = Math.max(mdot / 0.1, 0.01)
-  return 0.4 + 1.2 * Math.pow(x, 0.35)
+  const {
+    mdotBrightBase,
+    mdotBrightScale,
+    mdotBrightPower,
+    mdotBrightFloor,
+  } = DISK_EMISSION
+  const x = Math.max(mdot / T_PEAK_MDOT_REF, mdotBrightFloor)
+  return mdotBrightBase + mdotBrightScale * Math.pow(x, mdotBrightPower)
 }
 
 /** Flux / bolometric intensity scale: F ∝ ṁ. */

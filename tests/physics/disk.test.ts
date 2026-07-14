@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  colorRedshiftFactor,
   diskIsco,
+  DISK_EMISSION,
   mdotDisplayBrightness,
   mdotFluxScale,
   mdotFromSlider,
@@ -112,6 +114,22 @@ describe('mdot scales', () => {
     // Min ṁ still has substantial floor (visible disk)
     expect(a).toBeGreaterThan(0.35)
     expect(b / a).toBeLessThan(10)
+  })
+
+  test('DISK_EMISSION powers stay physical', () => {
+    expect(DISK_EMISSION.iscoHotPower).toBeCloseTo(0.75, 5)
+    expect(DISK_EMISSION.beamExponent).toBeGreaterThanOrEqual(1.5)
+    expect(DISK_EMISSION.beamExponent).toBeLessThanOrEqual(3)
+    expect(DISK_EMISSION.tColorMinK).toBeGreaterThanOrEqual(1000)
+    expect(DISK_EMISSION.intensityGain).toBeGreaterThan(0)
+  })
+
+  test('colorRedshiftFactor softens g', () => {
+    const full = 0.5
+    const soft = colorRedshiftFactor(full)
+    // soft g^0.45 > full g when g < 1 (less redshifting)
+    expect(soft).toBeGreaterThan(full)
+    expect(soft).toBeLessThan(1)
   })
 })
 
