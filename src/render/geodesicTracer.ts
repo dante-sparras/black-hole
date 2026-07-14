@@ -230,9 +230,9 @@ export function createGeodesicTracer(): GeodesicTracer {
             const nObs = vel.normalize().mul(-1)
             const mu = dot(tdir, nObs)
             const lambda = rhoSafe.mul(mu)
-            const freq = float(1).div(max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.08)))
-            // Bolometric I ∝ g³
-            const beam = freq.mul(freq).mul(freq)
+            const freq = float(1).div(max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.12)))
+            // Bolometric I ∝ g³, floored so receding side stays visible (not black holes)
+            const beam = max(freq.mul(freq).mul(freq), float(0.18))
 
             // Novikov–Thorne: F̃ ∝ ρ⁻³ (1 − √(r_in/ρ)); F ∝ ṁ F̃; T ∝ (ṁ F̃)^{1/4}
             const gap = max(float(1).sub(sqrt(rin.div(max(rho, rin.mul(1.0001))))), float(0))
@@ -244,8 +244,8 @@ export function createGeodesicTracer(): GeodesicTracer {
             const Tobs = tempRest.mul(freq)
 
             const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.1))
-            // Extra flux weight ∝ ṁ keeps dim disks truly dim (color already from T)
-            const iScale = pow(mdot.div(0.1), float(0.35))
+            // Mild ṁ brightness (floor keeps Cool preset solid, not transparent)
+            const iScale = max(pow(mdot.div(0.1), float(0.28)), float(0.4))
 
             // --- Disk texture: seamless log spirals + turbulence (no raw φ) ---
             // Use (cosφ,sinφ) via hx/ρ, hz/ρ so atan2 branch cut cannot seam.
@@ -263,11 +263,11 @@ export function createGeodesicTracer(): GeodesicTracer {
             const armWave = float(0.5).add(
               float(0.5).mul(c2.mul(cos(alpha)).add(s2.mul(sin(alpha)))),
             )
-            const armsBright = pow(max(armWave, float(1e-4)), float(1.35))
-            const armContrast = float(0.55)
+            const armsBright = pow(max(armWave, float(1e-4)), float(1.2))
+            const armContrast = float(0.4)
             const armFac = float(1)
               .sub(armContrast)
-              .add(armContrast.mul(float(0.35).add(armsBright.mul(0.9))))
+              .add(armContrast.mul(float(0.5).add(armsBright.mul(0.7))))
 
             // Seamless noise domain: (cosφ, sinφ) scaled + lnR as 3rd via offset mix
             // Project to 2D for cheap value noise: (cφ, sφ) * scale + lnR drift on both axes equally
@@ -313,18 +313,19 @@ export function createGeodesicTracer(): GeodesicTracer {
               .mul(float(1).sub(u2.y))
               .add(p01.mul(float(1).sub(u2.x)).add(p11.mul(u2.x)).mul(u2.y))
             const turb = n1.mul(0.67).add(n2.mul(0.33))
-            const turbContrast = float(0.4)
+            const turbContrast = float(0.28)
             const turbFac = float(1)
               .sub(turbContrast)
-              .add(turbContrast.mul(float(0.45).add(turb.mul(0.9))))
+              .add(turbContrast.mul(float(0.55).add(turb.mul(0.7))))
 
             // Radial-only ripple (no φ) — seamless
             const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.2))))
+            // Floor texture so troughs stay opaque red, not transparent black
             const texFac = max(
-              float(0.28),
-              min(float(1.85), armFac.mul(turbFac).mul(float(0.92).add(ripple.mul(0.16)))),
+              float(0.55),
+              min(float(1.55), armFac.mul(turbFac).mul(float(0.94).add(ripple.mul(0.12)))),
             )
-            const tJitter = float(0.9).add(turb.mul(0.2))
+            const tJitter = float(0.92).add(turb.mul(0.16))
 
             // Blackbody chromaticity from T_obs (power-law → Kelvin, then Planck)
             // T_K = 4500 · (Tobs / 0.75)^1.75  → cool red, hot blue-white
@@ -354,18 +355,23 @@ export function createGeodesicTracer(): GeodesicTracer {
             const bMax = max(br, max(bg, bb))
             const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-            // Brightness: beaming · ṁ · texture · soft T^2.2 (avoid ACES white-out)
+            // Brightness: beaming · ṁ · texture · soft T^2.2; floor keeps Cool solid
             const tRatio = TK.div(tPivotK)
-            const iBB = pow(tRatio, float(2.2))
+            const iBB = max(pow(tRatio, float(2.2)), float(0.22))
             const emit = chroma
               .mul(bounce)
               .mul(beam)
               .mul(iScale)
               .mul(texFac)
-              .mul(min(iBB.mul(1.2), float(3.5)))
+              .mul(min(iBB.mul(1.15), float(3.2)))
+              // Absolute floor so disk never punches black holes in the silhouette
+              .mul(1)
+            // Ensure minimum luminance in chroma direction
+            const emitFloor = chroma.mul(0.12)
+            const emitLit = max(emit, emitFloor)
 
-            col.addAssign(emit.mul(transm))
-            transm.mulAssign(0.4)
+            col.addAssign(emitLit.mul(transm))
+            transm.mulAssign(0.45)
           })
         },
       )

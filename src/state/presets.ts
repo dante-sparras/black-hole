@@ -92,20 +92,20 @@ export const PRESET_HOT: ScenePreset = {
 export const PRESET_COOL: ScenePreset = {
   id: 'cool',
   label: 'Cool',
-  hint: 'Low ṁ · muted · minimal bloom',
+  hint: 'Low ṁ · red/orange · solid disk',
   params: {
     mass: 1,
     spinStar: 0.5,
     charge: 0,
-    mdot: 0.015,
+    mdot: 0.035,
   },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
-    bloomStrength: 0.18,
-    bloomRadius: 0.5,
+    bloomStrength: 0.2,
+    bloomRadius: 0.48,
     bloomThreshold: 0.55,
-    exposure: 0.75,
+    exposure: 0.95,
   },
 }
 
