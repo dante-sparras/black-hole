@@ -30,6 +30,6 @@ bun run build
 
 - [x] Parameter domain + validation + derived geometry (Schwarzschild / Kerr / KN)
 - [x] HUD sliders + live \(r_\pm\), family, extremality
-- [ ] Null geodesic ray tracer (Schwarzschild first)
-- [ ] Thin accretion disk + photon ring from multi-orbit light
+- [x] Null geodesic ray tracer (Schwarzschild, WebGPU/TSL)
+- [x] Thin accretion disk + multi-orbit contribution (photon-ring path)
 - [ ] Kerr geodesic upgrade (asymmetric shadow / frame-dragging)

@@ -2,11 +2,13 @@ import './style.css'
 
 import * as THREE from 'three/webgpu'
 
+import { createSchwarzschildTracer } from './render/schwarzschildTracer'
 import { toUniforms } from './render/uniforms'
 import { getDerived, getParams, subscribe } from './state/params'
 import { mountControls } from './ui/controls'
 
 // Geometric units G = c = 1. Core controls: mass M, spin a★, charge Q (no-hair).
+// Phase B: Schwarzschild null geodesic ray marcher (spin/charge reserved for Kerr/KN).
 
 const errorEl = document.querySelector<HTMLElement>('#error')
 const statsEl = document.querySelector<HTMLElement>('#stats')
@@ -26,14 +28,15 @@ renderer.setClearColor(0x000000, 1)
 document.body.appendChild(renderer.domElement)
 
 const scene = new THREE.Scene()
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000)
-camera.position.set(0, 0, 10)
+// Full-screen NDC quad; rays are built in the shader from screenUV.
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+
+const tracer = createSchwarzschildTracer()
+scene.add(tracer.mesh)
 
 function onResize() {
   const w = window.innerWidth
   const h = window.innerHeight
-  camera.aspect = w / h
-  camera.updateProjectionMatrix()
   renderer.setSize(w, h)
 }
 window.addEventListener('resize', onResize)
@@ -42,11 +45,19 @@ if (controlsEl) {
   mountControls(controlsEl, derivedEl)
 }
 
-// Keep a live uniform snapshot ready for the future geodesic pipeline.
 let spacetime = toUniforms(getParams(), getDerived())
-subscribe((p, d) => {
-  spacetime = toUniforms(p, d)
+
+function applyParams(): void {
+  const p = getParams()
+  spacetime = toUniforms(p, getDerived())
+  // Camera distance fixed in units of M — mass rescales spacetime + camera together.
+  tracer.setMass(p.mass)
+}
+
+subscribe(() => {
+  applyParams()
 })
+applyParams()
 
 let frames = 0
 let fpsAccum = 0
@@ -58,7 +69,8 @@ function formatStats(fps: number): string {
   const a = spacetime.spinStar.toFixed(3)
   const q = spacetime.charge.toFixed(3)
   const rp = Number.isFinite(spacetime.rPlus) ? spacetime.rPlus.toFixed(3) : '—'
-  return `${fps} fps · ${d.family} · M=${m} a★=${a} Q=${q} · r₊=${rp}`
+  const mode = spacetime.spinStar === 0 && spacetime.charge === 0 ? 'schw-RT' : 'schw-RT*'
+  return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} · r₊=${rp}`
 }
 
 async function boot() {

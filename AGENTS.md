@@ -8,7 +8,7 @@
 
 ## Status
 
-No-hair parameter core is in place (mass \(M\), spin \(a_\star\), charge \(Q\)) with analytic derived geometry, unit tests, and HUD sliders. Geodesic ray tracing not yet implemented — blank WebGPU scene with live physics readout.
+No-hair parameter core (mass \(M\), spin \(a_\star\), charge \(Q\)) + Schwarzschild null geodesic ray marcher (WebGPU/TSL) with thin equatorial disk. Kerr geodesics not yet; spin/charge sliders reserve state for later.
 
 ## Commands
 
@@ -47,14 +47,16 @@ Stationary Einstein–Maxwell black holes are characterized by three classical p
 
 ```
 src/physics/     pure TS (no Three.js) — unit-tested
-  constants.ts   G=c=1, MAX_SPIN_STAR, defaults
-  types.ts       BlackHoleParams, DerivedGeometry, MetricFamily
-  validate.ts    normalizeParams, isExtremalOk
-  schwarzschild.ts / kerr.ts / kn.ts / derive.ts
+  constants.ts / types.ts / validate.ts / derive.ts
+  schwarzschild.ts / kerr.ts / kn.ts
+  geodesic/schwarzschildNull.ts  CPU RK4 null geodesics + disk hits
 src/state/params.ts   reactive store
 src/ui/controls.ts    sliders
-src/render/uniforms.ts  CPU snapshot for future GPU geodesics
+src/render/uniforms.ts
+src/render/schwarzschildTracer.ts  WebGPU/TSL full-screen GRRT
 ```
+
+**Camera:** distance fixed in units of \(M\) (default ~32\(M\)); changing \(M\) rescales spacetime and camera together (image framing stable).
 
 Metric family routing: Schwarzschild → Kerr → Reissner–Nordström / Kerr–Newman from \((a_\star, Q)\).
 
