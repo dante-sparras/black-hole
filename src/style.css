@@ -123,6 +123,47 @@ canvas {
   accent-color: #7aa2ff;
 }
 
+.preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.preset-btn {
+  appearance: none;
+  border: 1px solid #3a3a44;
+  background: #1a1a20;
+  color: #c8ccd2;
+  font: inherit;
+  font-size: 10px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.preset-btn:hover {
+  border-color: #5a6a9a;
+  color: #e8e8e8;
+  background: #22222a;
+}
+
+.preset-btn.active {
+  border-color: #7aa2ff;
+  background: #1e2a44;
+  color: #e8f0ff;
+}
+
+.preset-btn:focus-visible {
+  outline: 1px solid #7aa2ff;
+  outline-offset: 1px;
+}
+
 .advanced {
   color: #8a9099;
   font-size: 11px;

@@ -23,6 +23,7 @@ import {
   type LookState,
 } from '../state/look'
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
+import { ALL_PRESETS, applyPreset } from '../state/presets'
 
 function fmt(n: number, digits = 3): string {
   if (!Number.isFinite(n)) return '—'
@@ -59,6 +60,15 @@ export function mountControls(
   const fovLim = CAMERA_LIMITS.fov
 
   root.innerHTML = `
+    <div class="ctrl-section">Presets</div>
+    <div class="preset-grid" id="preset-grid">
+      ${ALL_PRESETS.map(
+        (p) =>
+          `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
+      ).join('')}
+    </div>
+    <p class="ctrl-hint" id="preset-hint">One-click scene: physics + camera + look</p>
+
     <div class="ctrl-section">Physics</div>
     <label class="ctrl">
       <span class="ctrl-name">Mass M</span>
@@ -162,6 +172,28 @@ export function mountControls(
   const bloomRadVal = root.querySelector<HTMLElement>('[data-val="bloomRad"]')
   const bloomThrVal = root.querySelector<HTMLElement>('[data-val="bloomThr"]')
   const exposureVal = root.querySelector<HTMLElement>('[data-val="exposure"]')
+  const presetHint = root.querySelector<HTMLElement>('#preset-hint')
+  const presetBtns = root.querySelectorAll<HTMLButtonElement>('.preset-btn')
+
+  let activePresetId: string | null = null
+
+  function setActivePresetUi(id: string | null, hint?: string): void {
+    activePresetId = id
+    for (const btn of presetBtns) {
+      const on = btn.dataset.preset === id
+      btn.classList.toggle('active', on)
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false')
+    }
+    if (presetHint) {
+      presetHint.textContent =
+        hint ?? 'One-click scene: physics + camera + look'
+    }
+  }
+
+  function onUserTweaked(): void {
+    // Manual slider changes leave presets; clear highlight
+    if (activePresetId !== null) setActivePresetUi(null)
+  }
 
   function syncPhysicsInputs(p: BlackHoleParams): void {
     if (massInput) massInput.value = String(p.mass)
@@ -224,46 +256,68 @@ export function mountControls(
   }
 
   massInput?.addEventListener('input', () => {
+    onUserTweaked()
     setParams({ mass: Number(massInput.value) })
   })
   spinInput?.addEventListener('input', () => {
+    onUserTweaked()
     setParams({ spinStar: Number(spinInput.value) })
   })
   chargeInput?.addEventListener('input', () => {
+    onUserTweaked()
     setParams({ charge: Number(chargeInput.value) })
   })
   mdotInput?.addEventListener('input', () => {
+    onUserTweaked()
     setParams({ mdot: mdotFromSlider(Number(mdotInput.value)) })
   })
 
   distInput?.addEventListener('input', () => {
+    onUserTweaked()
     setCamera({ distanceM: Number(distInput.value) })
   })
   incInput?.addEventListener('input', () => {
+    onUserTweaked()
     setCamera({ inclination: degToRad(Number(incInput.value)) })
   })
   azInput?.addEventListener('input', () => {
+    onUserTweaked()
     setCamera({ azimuth: degToRad(Number(azInput.value)) })
   })
   fovInput?.addEventListener('input', () => {
+    onUserTweaked()
     setCamera({ fov: Number(fovInput.value) })
   })
 
   bloomOnInput?.addEventListener('change', () => {
+    onUserTweaked()
     setLook({ bloomEnabled: Boolean(bloomOnInput.checked) })
   })
   bloomStrInput?.addEventListener('input', () => {
+    onUserTweaked()
     setLook({ bloomStrength: Number(bloomStrInput.value) })
   })
   bloomRadInput?.addEventListener('input', () => {
+    onUserTweaked()
     setLook({ bloomRadius: Number(bloomRadInput.value) })
   })
   bloomThrInput?.addEventListener('input', () => {
+    onUserTweaked()
     setLook({ bloomThreshold: Number(bloomThrInput.value) })
   })
   exposureInput?.addEventListener('input', () => {
+    onUserTweaked()
     setLook({ exposure: Number(exposureInput.value) })
   })
+
+  for (const btn of presetBtns) {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.preset
+      if (!id) return
+      const applied = applyPreset(id)
+      setActivePresetUi(applied.id, applied.hint)
+    })
+  }
 
   subscribe((p, d) => {
     syncPhysicsInputs(p)
