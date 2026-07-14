@@ -200,31 +200,49 @@ export function createGeodesicTracer(): GeodesicTracer {
           If(rho.greaterThanEqual(rin).and(rho.lessThanEqual(rout)), () => {
             hits.addAssign(1)
             const x = rho.div(M)
+
+            // Static gravitational redshift g = √(1 − rs/ρ)
             const g = max(float(1).sub(rs.div(max(rho, float(1e-5)))), float(1e-4)).sqrt()
 
-            // Prograde orbital dir about +Y: (−z, 0, x)
-            const tdir = vec3(hz.mul(-1), float(0), hx).normalize()
-            const vK = sqrt(M.div(max(rho, float(1e-5))))
-            const view = vel.normalize()
-            const mu = dot(tdir, view)
-            const beta = min(vK, float(0.55))
-            const doppler = float(1).div(max(float(1).sub(beta.mul(mu)), float(0.25)))
-            const beam = doppler.mul(doppler).mul(doppler)
+            // Kerr/Kepler orbital speed about +Y (prograde)
+            // Ω = √M / (ρ^{3/2} + a√M), β ≈ |Ω| ρ
+            const sqrtM = sqrt(max(M, float(1e-8)))
+            const r32 = pow(max(rho, float(1e-5)), float(1.5))
+            const Omega = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+            const beta = min(Omega.mul(rho), float(0.92))
 
-            const temp = float(3.5).div(max(x.sub(rin.div(M)).add(1), float(0.28)))
-            const fall = float(1.2).div(x.mul(0.09).add(0.45))
-            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.25))
+            // ê_φ = (−z, 0, x)/ρ
+            const tdir = vec3(hz.mul(-1), float(0), hx).normalize()
+            // Photon toward observer = −rayDir (backward RT)
+            const nObs = vel.normalize().mul(-1)
+            const mu = dot(tdir, nObs)
+
+            // Special-rel Doppler: D = 1 / (γ (1 − β μ))
+            const gamma = float(1).div(sqrt(max(float(1).sub(beta.mul(beta)), float(1e-4))))
+            const D = float(1).div(
+              max(gamma.mul(float(1).sub(beta.mul(mu))), float(0.08)),
+            )
+            // Frequency factor & bolometric beaming I ∝ D³
+            const freq = g.mul(D)
+            const beam = D.mul(D).mul(D)
+
+            // Rest temperature (hot near ISCO); observed T ∝ freq
+            const tempRest = float(2.8).div(max(x.sub(rin.div(M)).add(0.8), float(0.25)))
+            const Tobs = tempRest.mul(freq)
+            // Blackbody-ish RGB from observed temperature
+            const fall = float(1.15).div(x.mul(0.09).add(0.45))
+            const bounce = float(1).add(max(hits.sub(1), float(0)).mul(1.15))
             const emit = vec3(
-              temp.mul(2.0).mul(g),
-              temp.mul(0.55).mul(g).mul(g),
-              temp.mul(0.14).mul(g).mul(g),
+              min(float(2.2), float(0.55).add(Tobs.mul(1.1))),
+              min(float(1.6), float(0.18).add(Tobs.mul(0.65))),
+              min(float(1.2), float(0.04).add(Tobs.mul(Tobs).mul(0.22))),
             )
               .mul(fall)
               .mul(bounce)
               .mul(beam)
 
             col.addAssign(emit.mul(transm))
-            transm.mulAssign(0.42)
+            transm.mulAssign(0.4)
           })
         },
       )

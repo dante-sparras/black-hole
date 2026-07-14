@@ -15,4 +15,5 @@ export {
   type KerrTraceResult,
   type KerrTraceOptions,
 } from './geodesic/kerrNull'
+export * from './geodesic/doppler'
 export * from './geodesic/vec3'
