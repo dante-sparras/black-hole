@@ -64,7 +64,10 @@ src/main.ts      # WebGPU boot only
 
 **Integration:** `RT` + **RK2** (`rk2StepKn`) lockstep GPU TSL ↔ CPU `cpuRef` / `traceKnNull` (default). Step floor ≥0.2M.
 
-**BL (CPU, Phase 1):** `physics/geodesic/kerrBl.ts` — Boyer–Lindquist null geodesics with conserved \(E,L_z,Q\), Mino-time adaptive steps. Validated vs analytic \(b_c\) (Schw ≲5%, Kerr pro ~12%). **Live image still uses real-time Cartesian** until GPU BL ships.
+**BL (CPU):**
+- Phase 1: `geodesic/kerrBl.ts` — Mino-time nulls, \(E,L_z,Q\); Schw \(b_c\) ≲5%
+- Phase 2: `geodesic/blCamera.ts` — `OBSERVER_DEFAULTS` camera → conserved quantities + `traceCameraRayBl`
+- **Live image still real-time Cartesian** until GPU BL (Phase 4)
 
 **Analytic HUD:** `familyCriticalImpacts` / `shadowDiagnostics` — closed-form \(b_c^\pm\); image silhouette is from the real-time integrator.
 

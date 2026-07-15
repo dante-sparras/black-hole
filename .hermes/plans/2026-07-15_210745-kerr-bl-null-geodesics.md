@@ -14,9 +14,9 @@
 
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
-| **1** | Equatorial + 3D BL null tracer (Mino time), Schw/Kerr critical-curve tests | **NOW** |
-| **2** | Observer tetrad → \((E,L_z,Q)\) from camera ray (matches OBSERVER_DEFAULTS) | next |
-| **3** | Disk plane hits + orbiting \(g\) on BL path; optional `cpuRef` mode `bl` | later |
+| **1** | Equatorial + 3D BL null tracer (Mino time), Schw/Kerr critical-curve tests | ✅ |
+| **2** | Observer tetrad → \((E,L_z,Q)\) from camera ray (matches OBSERVER_DEFAULTS) | ✅ |
+| **3** | Disk plane hits + orbiting \(g\) on BL path; optional `cpuRef` mode `bl` | next |
 | **4** | GPU BL or hybrid; stats tag `kerr-BL`; keep RT as fallback | later |
 | Side | Exact KN photon/ISCO where closed form exists; film grade; pro/retro disk UI | parallel polish |
 
