@@ -19,18 +19,18 @@ import { MDOT_MAX, MDOT_MIN } from '../../src/physics/constants'
 
 describe('diskIsco', () => {
   test('Schwarzschild is 6M', () => {
-    expect(diskIsco({ mass: 1, spinStar: 0, charge: 0, mdot: 0.1 })).toBeCloseTo(6, 5)
+    expect(diskIsco({ mass: 1, spinStar: 0, charge: 0 })).toBeCloseTo(6, 5)
   })
 
   test('Kerr prograde ISCO shrinks with spin', () => {
-    const r0 = diskIsco({ mass: 1, spinStar: 0, charge: 0, mdot: 0.1 })
-    const r9 = diskIsco({ mass: 1, spinStar: 0.9, charge: 0, mdot: 0.1 })
+    const r0 = diskIsco({ mass: 1, spinStar: 0, charge: 0 })
+    const r9 = diskIsco({ mass: 1, spinStar: 0.9, charge: 0 })
     expect(r9).toBeLessThan(r0)
     expect(r9).toBeGreaterThan(1.5)
   })
 
   test('RN ISCO between 4M and 6M', () => {
-    const r = diskIsco({ mass: 1, spinStar: 0, charge: 0.7, mdot: 0.1 })
+    const r = diskIsco({ mass: 1, spinStar: 0, charge: 0.7 })
     expect(r).toBeLessThan(6)
     expect(r).toBeGreaterThan(4)
   })
@@ -81,10 +81,14 @@ describe('Novikov–Thorne flux / temperature', () => {
     expect(fPeak).toBeGreaterThan(fFar)
   })
 
-  test('higher spin → hotter at fixed r (efficiency boost)', () => {
-    const a = novikovThorneTemperature(12, 6, 1, 0, 0.1)
-    const b = novikovThorneTemperature(12, 6, 1, 0.9, 0.1)
-    expect(b).toBeGreaterThan(a)
+  test('smaller r_ISCO → hotter peak (spin heating via ISCO only)', () => {
+    // Physical channel: T ∝ r_in^{-3/4}. No extra spinEta nudge.
+    const tSchw = novikovThorneTemperature(12, 6, 1, 0, 0.1)
+    // Evaluate at the NT peak for a high-spin ISCO
+    const rInKerr = 1.5
+    const rPeak = novikovThornePeakRadius(rInKerr)
+    const tKerr = novikovThorneTemperature(rPeak, rInKerr, 1, 0.9, 0.1)
+    expect(tKerr).toBeGreaterThan(tSchw)
   })
 
   test('T scales as ṁ^{1/4}', () => {
@@ -116,8 +120,9 @@ describe('mdot scales', () => {
     expect(b / a).toBeLessThan(10)
   })
 
-  test('DISK_EMISSION powers stay physical', () => {
+  test('DISK_EMISSION powers stay physical / display-honest', () => {
     expect(DISK_EMISSION.iscoHotPower).toBeCloseTo(0.75, 5)
+    expect(DISK_EMISSION.spinEtaNudge).toBe(0)
     expect(DISK_EMISSION.beamExponent).toBeGreaterThanOrEqual(1.5)
     expect(DISK_EMISSION.beamExponent).toBeLessThanOrEqual(3)
     expect(DISK_EMISSION.tColorMinK).toBeGreaterThanOrEqual(1000)

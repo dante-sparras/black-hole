@@ -39,9 +39,9 @@ export type DerivedGeometry = {
    */
   readonly rPhotonSphere: number
   /**
-   * Critical impact parameter.
-   * Accurate for Schwarzschild (3√3 M); Kerr uses the same placeholder until
-   * the Kerr ray-tracer supplies pro/retro b_c.
+   * Prograde / co-rotating critical impact b_c (analytic closed form).
+   * Schw: 3√3 M; Kerr/RN/KN: familyCriticalImpact — HUD also exposes b_c^±.
+   * Image silhouette is from the real-time integrator, not this scalar.
    */
   readonly criticalImpact: number
   /** Prograde thin-disk ISCO (inner edge) */

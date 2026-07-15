@@ -50,7 +50,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 ## Physics layout
 
 ```
-src/physics/     # pure TS — metricFamily, observer, disk, geodesic/{rtConstants,cpuRef,kerrNull}
+src/physics/     # pure TS — metricFamily, observer, disk, criticalCurve, geodesic/{rtConstants,cpuRef,kerrNull}
 src/state/       # params, camera, look, presets, scene facade
 src/app/         # sceneBridge (scene → GPU)
 src/render/      # geodesicTracer (WebGPU/TSL) + bloom
@@ -60,9 +60,11 @@ src/main.ts      # WebGPU boot only
 
 **Camera:** distance in units of \(M\); spin ‖ +Y; disk in XZ (\(y=0\)). Defaults: `OBSERVER_DEFAULTS`.
 
-**Emission:** `DISK_EMISSION` in `physics/disk.ts` — shared with GPU tracer.
+**Emission:** `DISK_EMISSION` in `physics/disk.ts` — shared with GPU tracer (optical display curves, not SI bolometric).
 
-**Integration:** `RT` in `physics/geodesic/rtConstants.ts` — step floor ≥0.2M, used by GPU + CPU ref.
+**Integration:** `RT` + **RK2** (`rk2StepKn`) lockstep GPU TSL ↔ CPU `cpuRef` / `traceKnNull` (default). Step floor ≥0.2M.
+
+**Analytic HUD:** `familyCriticalImpacts` / `shadowDiagnostics` — closed-form \(b_c^\pm\); image silhouette is from the real-time integrator.
 
 **CPU ref:** `bun run test:ref` multi-case topology + soft golden checksums · `bun run test:ref:write` regenerates `tests/fixtures/cpu-ref-goldens.json`.
 

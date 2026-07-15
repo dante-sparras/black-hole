@@ -1,6 +1,13 @@
 /**
  * CPU reference ray-march — topology twin of the GPU geodesicTracer.
- * Uses knNullAccel + RT step floor (same physics family routing).
+ *
+ * Lockstep with GPU:
+ *   - knNullAccel force law
+ *   - RT step floor (≥ 0.2M)
+ *   - **rk2StepKn** (same midpoint stages as TSL)
+ *
+ * Not a pixel-perfect critical-curve twin (adaptive stepping + float precision
+ * still differ); use for capture/disk/escape topology + soft goldens.
  */
 import { diskIsco } from '../disk'
 import { knHorizon } from '../kn'
@@ -11,7 +18,7 @@ import {
 import type { BlackHoleParams } from '../types'
 import { spinLength } from '../types'
 import { normalizeParams } from '../validate'
-import { rk4StepKn } from './kerrNull'
+import { rk2StepKn } from './kerrNull'
 import { RT, rtStepSize } from './rtConstants'
 import {
   add,
@@ -144,7 +151,7 @@ export function traceCpuRefPixel(
     const ds = rtStepSize(r, M)
     prevY = pos.y
     const p0 = { ...pos }
-    const next = rk4StepKn(pos, vel, M, a, Q, ds)
+    const next = rk2StepKn(pos, vel, M, a, Q, ds)
     pos = next.pos
     vel = next.vel
 

@@ -4,18 +4,15 @@ import {
   kerrHorizon,
   photonSphereRadii,
 } from '../../src/physics/kerr'
-import {
-  kerrNullAccel,
-  traceKerrNull,
-} from '../../src/physics/geodesic/kerrNull'
+import { knNullAccel, traceKnNull } from '../../src/physics/geodesic/kerrNull'
 import { schwarzschildNullAccel } from '../../src/physics/geodesic/schwarzschildNull'
 import { vec3 } from '../../src/physics/geodesic/vec3'
 
-describe('kerrNullAccel', () => {
+describe('knNullAccel', () => {
   test('a=0 matches Schwarzschild accel', () => {
     const pos = vec3(10, 0, 2)
     const vel = vec3(0, 0.3, 0.9)
-    const k = kerrNullAccel(pos, vel, 1, 0)
+    const k = knNullAccel(pos, vel, 1, 0, 0)
     const s = schwarzschildNullAccel(pos, vel, 2)
     expect(k.x).toBeCloseTo(s.x, 10)
     expect(k.y).toBeCloseTo(s.y, 10)
@@ -25,18 +22,18 @@ describe('kerrNullAccel', () => {
   test('nonzero spin adds frame-drag (xz coupling on vx/vz)', () => {
     const pos = vec3(8, 0, 0)
     const vel = vec3(0, 0, 1)
-    const k0 = kerrNullAccel(pos, vel, 1, 0)
-    const k = kerrNullAccel(pos, vel, 1, 0.9)
+    const k0 = knNullAccel(pos, vel, 1, 0, 0)
+    const k = knNullAccel(pos, vel, 1, 0.9, 0)
     // LT: a_x = 2 Ω vz ≠ 0 when spin ≠ 0
     expect(Math.abs(k.x - k0.x)).toBeGreaterThan(1e-6)
   })
 })
 
-describe('traceKerrNull', () => {
+describe('traceKnNull (Kerr)', () => {
   const M = 1
 
   test('a=0 radial ray is captured', () => {
-    const result = traceKerrNull({
+    const result = traceKnNull({
       mass: M,
       spinLength: 0,
       origin: vec3(0, 0, -40),
@@ -49,13 +46,12 @@ describe('traceKerrNull', () => {
 
   test('a=0 high impact escapes', () => {
     const b = 10 * M
-    const result = traceKerrNull({
+    const result = traceKnNull({
       mass: M,
       spinLength: 0,
       origin: vec3(b, 0, -80),
       direction: vec3(0, 0, 1),
       maxSteps: 8000,
-      stepSize: 0.1 * M,
       escapeRadius: 200 * M,
     })
     expect(result.fate).toBe('escaped')
@@ -64,7 +60,7 @@ describe('traceKerrNull', () => {
   test('high spin still captures head-on', () => {
     const a = 0.95 * M
     const rPlus = kerrHorizon(M, a)
-    const result = traceKerrNull({
+    const result = traceKnNull({
       mass: M,
       spinLength: a,
       origin: vec3(0, 0, -50),
@@ -79,22 +75,20 @@ describe('traceKerrNull', () => {
     const a = 0.9 * M
     const b = 4.5 * M
     // Rays offset ±x (equatorial plane y=0), coming from -z
-    const left = traceKerrNull({
+    const left = traceKnNull({
       mass: M,
       spinLength: a,
       origin: vec3(-b, 0, -80),
       direction: vec3(0, 0, 1),
       maxSteps: 10000,
-      stepSize: 0.08 * M,
       escapeRadius: 200 * M,
     })
-    const right = traceKerrNull({
+    const right = traceKnNull({
       mass: M,
       spinLength: a,
       origin: vec3(+b, 0, -80),
       direction: vec3(0, 0, 1),
       maxSteps: 10000,
-      stepSize: 0.08 * M,
       escapeRadius: 200 * M,
     })
     // At least one of fate or minR should differ (asymmetry)

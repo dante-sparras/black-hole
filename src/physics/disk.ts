@@ -75,11 +75,13 @@ export function novikovThorneFluxFactor(r: number, rIsco: number): number {
 }
 
 /**
- * Peak effective temperature [K] at the NT flux maximum.
+ * Peak effective temperature [K] at the NT flux maximum (look-dev scale).
  *
- * Higher spin → smaller r_ISCO → hotter inner disk (thin-disk T ∝ r_in^{-3/4})
- * and higher radiative efficiency. Fixed ṁ, high a★ should look hotter/bluer,
- * not cooler.
+ * T_PEAK_REF_K is an optical visualization reference (~9000 K), not the
+ * keV-scale T_eff of a stellar-mass X-ray binary.
+ *
+ * Higher spin → smaller r_ISCO → hotter via T ∝ r_in^{-3/4} only
+ * (no extra spinEta factor — that double-counted).
  *
  * Reference: ṁ = 0.1, r_ISCO = 6M (Schw), a★ = 0 → T_peak = T_PEAK_REF_K.
  */
@@ -91,19 +93,31 @@ export const R_ISCO_SCHW_OVER_M = 6
 /**
  * Shared emission/display constants — CPU + GPU tracer must stay in lockstep.
  * Do not hardcode these in geodesicTracer.ts.
+ *
+ * HONESTY: these are *optical display* curves for interactive GRRT, not SI
+ * bolometric transfer. Physical structure (NT shape, T∝ṁ^{1/4}, orbiting g)
+ * is preserved; exponents/floors are softened so cool disks stay visible and
+ * high-spin faces are not wiped by full g³ + Wien cutoff.
  */
 export const DISK_EMISSION = {
-  /** T ∝ (r_ISCO_Schw / r_ISCO)^{ISCO_HOT_POWER} */
+  /** T ∝ (r_ISCO_Schw / r_ISCO)^{ISCO_HOT_POWER} — sole spin-heating channel */
   iscoHotPower: 0.75,
-  /** Mild efficiency nudge: 1 + spinEtaNudge * a★ */
-  spinEtaNudge: 0.12,
+  /**
+   * Extra η-style spin factor: 1 + spinEtaNudge * a★.
+   * Keep 0 — r_ISCO heating already encodes higher spin → hotter disk.
+   * Non-zero re-introduces double-counting vs iscoHotPower.
+   */
+  spinEtaNudge: 0,
   /** Soft g exponent on color temperature (full g over-redshifts high spin) */
   gColorExponent: 0.45,
   gColorFloor: 0.35,
   /** Optical color temperature clamp [K] for max-norm chroma */
   tColorMinK: 1800,
   tColorMaxK: 45_000,
-  /** Doppler beam I ∝ g^{beamExponent} */
+  /**
+   * Doppler beam I ∝ g^{beamExponent}.
+   * Ideal bolometric invariant is g³; 2 is a softer display choice.
+   */
   beamExponent: 2.0,
   beamFloor: 0.4,
   /** Soft radial flux for display: fluxVis = fluxRel^{fluxVisPower} */

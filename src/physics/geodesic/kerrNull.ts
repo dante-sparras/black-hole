@@ -1,5 +1,6 @@
 import { knHorizon } from '../kn'
 import { RT, rtStepSize } from './rtConstants'
+import { schwarzschildNullAccel } from './schwarzschildNull'
 import {
   add,
   clone,
@@ -10,7 +11,6 @@ import {
   scale,
   type Vec3,
 } from './vec3'
-import { schwarzschildNullAccel } from './schwarzschildNull'
 
 /**
  * Real-time Einstein–Maxwell null geodesics (Cartesian approx).
@@ -24,9 +24,13 @@ import { schwarzschildNullAccel } from './schwarzschildNull'
  * Radial force from Binet (RN):
  *   d²u/dφ² + u = 3 M u² − 2 Q² u³
  * → a = L² (−3M/r⁵ + 2 Q²/r⁶) x̂
- *   = −1.5 r_s L² x / r⁵ + 2 Q² L² x / r⁶   (r_s = 2M)
  *
- * Spin: Lense–Thirring + spin–orbit (same as kerrNull).
+ * Spin: Lense–Thirring + spin–orbit coup + post-step velocity twist
+ * (phenomenological frame-drag for silhouette / L–R asymmetry —
+ * not full Boyer–Lindquist Christoffels).
+ *
+ * GPU geodesicTracer uses the same force + RK2 + twist; cpuRef uses RK2.
+ * Prefer rk2StepKn for topology twinning; rk4StepKn for higher-order CPU probes.
  */
 
 export function knNullAccel(
@@ -85,17 +89,6 @@ export function knNullAccel(
   return add(radial, lt)
 }
 
-/** @deprecated alias — use knNullAccel */
-export function kerrNullAccel(
-  pos: Vec3,
-  vel: Vec3,
-  mass: number,
-  spinLengthA: number,
-  charge = 0,
-): Vec3 {
-  return knNullAccel(pos, vel, mass, spinLengthA, charge)
-}
-
 export function frameDragRotateVel(
   vel: Vec3,
   pos: Vec3,
@@ -117,6 +110,31 @@ export function frameDragRotateVel(
   }
 }
 
+/**
+ * Midpoint RK2 — matches GPU geodesicTracer stage structure:
+ *   a1 = accel(p,v); pm,vm mid; a2 = accel(pm,vm);
+ *   p += (v+vm)*h/2; v += (a1+a2)*h/2; then frame-drag twist.
+ */
+export function rk2StepKn(
+  pos: Vec3,
+  vel: Vec3,
+  mass: number,
+  spinLengthA: number,
+  charge: number,
+  h: number,
+): { pos: Vec3; vel: Vec3 } {
+  const a1 = knNullAccel(pos, vel, mass, spinLengthA, charge)
+  const pm = add(pos, scale(vel, h * 0.5))
+  const vm = add(vel, scale(a1, h * 0.5))
+  const a2 = knNullAccel(pm, vm, mass, spinLengthA, charge)
+
+  let newPos = add(pos, scale(add(vel, vm), h * 0.5))
+  let newVel = add(vel, scale(add(a1, a2), h * 0.5))
+  newVel = frameDragRotateVel(newVel, newPos, mass, spinLengthA, h)
+  return { pos: newPos, vel: newVel }
+}
+
+/** Classical RK4 + frame-drag twist (higher-order CPU probes). */
 export function rk4StepKn(
   pos: Vec3,
   vel: Vec3,
@@ -148,19 +166,7 @@ export function rk4StepKn(
   return { pos: newPos, vel: newVel }
 }
 
-export function rk4StepKerr(
-  pos: Vec3,
-  vel: Vec3,
-  mass: number,
-  spinLengthA: number,
-  h: number,
-  charge = 0,
-): { pos: Vec3; vel: Vec3 } {
-  return rk4StepKn(pos, vel, mass, spinLengthA, charge, h)
-}
-
 export type KnTraceFate = 'captured' | 'escaped' | 'max_steps'
-export type KerrTraceFate = KnTraceFate
 
 export type KnTraceResult = {
   fate: KnTraceFate
@@ -170,7 +176,8 @@ export type KnTraceResult = {
   diskHits: number
   impact: number
 }
-export type KerrTraceResult = KnTraceResult
+
+export type KnIntegrator = 'rk2' | 'rk4'
 
 export type KnTraceOptions = {
   mass: number
@@ -184,9 +191,14 @@ export type KnTraceOptions = {
   captureMargin?: number
   diskInner?: number
   diskOuter?: number
+  /** Disk plane normal axis. Project convention: spin ‖ +Y → disk y = 0. */
   diskAxis?: 'y' | 'z'
+  /**
+   * Integrator order. Default **rk2** matches GPU geodesicTracer / cpuRef.
+   * Use rk4 for higher-order single-ray probes.
+   */
+  integrator?: KnIntegrator
 }
-export type KerrTraceOptions = KnTraceOptions
 
 export function impactParameter(pos: Vec3, vel: Vec3): number {
   const v = normalize(vel)
@@ -196,6 +208,7 @@ export function impactParameter(pos: Vec3, vel: Vec3): number {
 /**
  * Integrate a backward null geodesic in RN / Kerr / KN / Schw.
  * Disk: y=0 (XZ) by default — spin ‖ +Y.
+ * Step policy defaults to RT (floor ≥ 0.2M).
  */
 export function traceKnNull(options: KnTraceOptions): KnTraceResult {
   const M = options.mass
@@ -210,6 +223,7 @@ export function traceKnNull(options: KnTraceOptions): KnTraceResult {
   const diskInner = options.diskInner ?? 6 * M
   const diskOuter = options.diskOuter ?? RT.diskOuterM * M
   const axis = options.diskAxis ?? 'y'
+  const stepFn = options.integrator === 'rk4' ? rk4StepKn : rk2StepKn
 
   let pos = clone(options.origin)
   let vel = normalize(options.direction)
@@ -233,12 +247,13 @@ export function traceKnNull(options: KnTraceOptions): KnTraceResult {
     }
 
     const h = options.stepSize
-      ? options.stepSize * Math.min(RT.adaptMax, Math.max(RT.adaptFloor, r / (RT.adaptScale * M)))
+      ? options.stepSize *
+        Math.min(RT.adaptMax, Math.max(RT.adaptFloor, r / (RT.adaptScale * M)))
       : rtStepSize(r, M)
     prevPos = clone(pos)
     prevAxis = axis === 'y' ? pos.y : pos.z
 
-    const next = rk4StepKn(pos, vel, M, a, Q, h)
+    const next = stepFn(pos, vel, M, a, Q, h)
     pos = next.pos
     vel = next.vel
 
@@ -249,8 +264,7 @@ export function traceKnNull(options: KnTraceOptions): KnTraceResult {
       const hx = prevPos.x + (pos.x - prevPos.x) * t
       const hy = prevPos.y + (pos.y - prevPos.y) * t
       const hz = prevPos.z + (pos.z - prevPos.z) * t
-      const hitR =
-        axis === 'y' ? Math.hypot(hx, hz) : Math.hypot(hx, hy)
+      const hitR = axis === 'y' ? Math.hypot(hx, hz) : Math.hypot(hx, hy)
       if (hitR >= diskInner && hitR <= diskOuter) diskHits++
     }
   }
@@ -274,9 +288,4 @@ export function traceKnNull(options: KnTraceOptions): KnTraceResult {
     diskHits,
     impact,
   }
-}
-
-/** @deprecated alias */
-export function traceKerrNull(options: KnTraceOptions): KnTraceResult {
-  return traceKnNull(options)
 }

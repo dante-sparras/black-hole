@@ -7,6 +7,7 @@ export * from './diskParams'
 export * from './schwarzschild'
 export * from './kerr'
 export * from './kn'
+export * from './criticalCurve'
 export * from './disk'
 export * from './diskTexture'
 export * from './blackbody'
@@ -17,18 +18,15 @@ export * from './geodesic/cpuRef'
 export * from './geodesic/schwarzschildNull'
 export {
   knNullAccel,
-  kerrNullAccel,
   frameDragRotateVel,
+  rk2StepKn,
   rk4StepKn,
-  rk4StepKerr,
   traceKnNull,
-  traceKerrNull,
+  impactParameter,
   type KnTraceFate,
   type KnTraceResult,
   type KnTraceOptions,
-  type KerrTraceFate,
-  type KerrTraceResult,
-  type KerrTraceOptions,
+  type KnIntegrator,
 } from './geodesic/kerrNull'
 export * from './geodesic/doppler'
 export * from './geodesic/vec3'

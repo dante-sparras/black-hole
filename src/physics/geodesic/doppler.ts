@@ -8,6 +8,9 @@
  *
  * Orbiting emitters use circular-orbit 4-velocity (u^t, Ω) from the equatorial
  * Kerr/RN metric so face-on redshift is √(1−3M/r) (Schw), not the static √(1−2M/r).
+ *
+ * Disk *color* on GPU uses blackbodyRgb (true Kelvin). Prefer that over any
+ * film palette for production emission.
  */
 
 import { type Vec3 } from './vec3'
@@ -206,46 +209,11 @@ export function diskFrequencyFactor(options: {
   return { D, g: gFace, factor: orb.g, mu, beta }
 }
 
-/** Bolometric intensity scaling (I ∝ g³ for the frequency factor). */
+/**
+ * Bolometric intensity scaling.
+ * Ideal GRRT: I ∝ g³. Display path may use DISK_EMISSION.beamExponent (softer).
+ */
 export function bolometricBeaming(D: number): number {
   const d = Math.max(D, 1e-4)
   return d * d * d
-}
-
-/**
- * Rough blackbody-ish RGB from a temperature scale T > 0.
- */
-export function temperatureToRgb(T: number): { r: number; g: number; b: number } {
-  const t = Math.max(T, 0.05)
-  const r = Math.min(1.5, 0.6 + t * 0.9)
-  const g = Math.min(1.2, 0.2 + t * 0.55)
-  const b = Math.min(1.0, 0.05 + t * t * 0.15)
-  return { r, g, b }
-}
-
-/**
- * Observed disk patch color using full orbiting redshift.
- */
-export function diskObservedEmit(options: {
-  mass: number
-  rho: number
-  hx: number
-  hz: number
-  rayDir: Vec3
-  spinLength?: number
-  charge?: number
-  tempRest: number
-}): { r: number; g: number; b: number; factor: number; D: number } {
-  const { factor, D } = diskFrequencyFactor(options)
-  const Tobs = options.tempRest * factor
-  const rgb = temperatureToRgb(Tobs)
-  // I_ν/ν³ invariant → bolometric ~ factor³
-  const beam = bolometricBeaming(factor)
-  return {
-    r: rgb.r * beam,
-    g: rgb.g * beam,
-    b: rgb.b * beam,
-    factor,
-    D,
-  }
 }

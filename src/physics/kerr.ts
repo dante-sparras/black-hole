@@ -58,8 +58,8 @@ export function kerrHorizon(mass: number, spinLengthA: number): number {
 }
 
 /**
- * Approximate equatorial critical impact parameters for photons
- * (Bardeen 1973). Used for HUD / diagnostics.
+ * Equatorial critical impact parameters for photons (Bardeen 1973).
+ * Analytic / HUD — image silhouette is from the integrator.
  *
  * b_c^± / M = ∓ a★ + 6 cos( (1/3) arccos(∓ a★) )
  * Prograde (co-rotating) uses the upper signs → smaller b for a★ > 0.
@@ -89,9 +89,9 @@ export function kerrGeometry(params: BlackHoleParams): DerivedGeometry {
   const sqrtDisc = hasHorizon ? Math.sqrt(Math.max(0, disc)) : 0
   const rPlus = hasHorizon ? M + sqrtDisc : Number.NaN
   const rMinus = hasHorizon ? M - sqrtDisc : Number.NaN
-  const { prograde } = photonSphereRadii(M, params.spinStar)
-  const { prograde: bPro } = criticalImpacts(M, params.spinStar)
   const { prograde: rIsco } = iscoRadii(M, params.spinStar)
+  const { prograde: rPh } = photonSphereRadii(M, params.spinStar)
+  const { prograde: bPro } = criticalImpacts(M, params.spinStar)
 
   const family: MetricFamily =
     Math.abs(params.spinStar) < 1e-12 ? 'schwarzschild' : 'kerr'
@@ -107,7 +107,7 @@ export function kerrGeometry(params: BlackHoleParams): DerivedGeometry {
     rPlus,
     rMinus,
     rErgoEquator,
-    rPhotonSphere: prograde,
+    rPhotonSphere: rPh,
     criticalImpact: bPro,
     rIsco,
     hasHorizon,

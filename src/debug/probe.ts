@@ -8,7 +8,7 @@ import { OBSERVER_DEFAULTS, type ObserverCamera } from '../physics/observer'
 import type { BlackHoleParams } from '../physics/types'
 import { spinLength } from '../physics/types'
 import { normalizeParams } from '../physics/validate'
-import { rk4StepKn } from '../physics/geodesic/kerrNull'
+import { rk2StepKn } from '../physics/geodesic/kerrNull'
 import { RT, rtStepSize } from '../physics/geodesic/rtConstants'
 import {
   add,
@@ -156,7 +156,7 @@ export function probeRay(options: ProbeOptions = {}): ProbeResult {
     const ds = rtStepSize(r, M)
     prevY = pos.y
     const p0 = { ...pos }
-    const next = rk4StepKn(pos, vel, M, a, Q, ds)
+    const next = rk2StepKn(pos, vel, M, a, Q, ds)
     pos = next.pos
     vel = next.vel
 

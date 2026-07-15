@@ -87,7 +87,11 @@ export type GeodesicTracer = {
  * Disk: Novikov–Thorne T(r) with family ISCO; flux ∝ ṁ, T ∝ ṁ^{1/4}.
  * Spin ‖ +Y; disk in XZ (y = 0).
  *
+ * Integrator: midpoint RK2 + kn force + frame-drag twist — topology twin of
+ * cpuRef / rk2StepKn (not full BL; analytic b_c is HUD-only).
+ *
  * Emission constants: DISK_EMISSION in physics/disk.ts (CPU/GPU lockstep).
+ * Optical display curves (soft beam / g-color / ṁ brightness), not SI bolometric.
  */
 export function createGeodesicTracer(): GeodesicTracer {
   const E = DISK_EMISSION
@@ -305,10 +309,11 @@ export function createGeodesicTracer(): GeodesicTracer {
             const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
 
             // --- Color temperature (Kelvin) — COLOR ONLY ---
-            // Higher spin → smaller r_ISCO → hotter peak (T ∝ r_in^{-3/4}), not cooler.
+            // Higher spin → smaller r_ISCO → hotter peak (T ∝ r_in^{-3/4}); no extra spinEta.
             // T(r) = T_peak (F/Fmax)^{1/4}; mild g on observed color (not full g wipe).
             const rIscoM = max(uRIscoM, float(1.05))
             const iscoHot = pow(float(R_ISCO_SCHW_OVER_M).div(rIscoM), float(E.iscoHotPower))
+            // spinEtaNudge kept for lockstep with DISK_EMISSION (default 0)
             const spinFac = float(1).add(max(aStar, float(0)).mul(E.spinEtaNudge))
             const tPeakK = float(T_PEAK_REF_K)
               .mul(pow(max(mdot.div(T_PEAK_MDOT_REF), float(1e-6)), float(0.25)))

@@ -1,21 +1,10 @@
-import { iscoRadii, photonSphereRadii } from './kerr'
+import { familyCriticalImpact, familyPhotonSphere } from './criticalCurve'
+import { iscoRadii } from './kerr'
+import { rnIsco } from './disk'
 import type { BlackHoleParams, DerivedGeometry, MetricFamily } from './types'
 import { spinLength } from './types'
-import { rnIsco } from './disk'
 
-/**
- * Outer RN photon-sphere radius (a = 0):
- * r_ph = [3M + √(9M² − 8Q²)] / 2   (requires 9M² ≥ 8Q²)
- */
-export function rnPhotonSphere(mass: number, charge: number): number {
-  const M = mass
-  const Q = charge
-  const disc = 9 * M * M - 8 * Q * Q
-  if (disc < 0) {
-    return 2 * M
-  }
-  return 0.5 * (3 * M + Math.sqrt(disc))
-}
+export { rnPhotonSphere } from './criticalCurve'
 
 /** Outer horizon r₊ = M + √(M² − a² − Q²). */
 export function knHorizon(
@@ -31,6 +20,8 @@ export function knHorizon(
 /**
  * Kerr–Newman / Reissner–Nordström geometry.
  * Horizons: r± = M ± √(M² − a² − Q²)
+ * Photon sphere / b_c: familyCritical* (shared with HUD).
+ * ISCO: RN closed-form or Kerr prograde × mild charge pull-in.
  */
 export function knGeometry(params: BlackHoleParams): DerivedGeometry {
   const M = params.mass
@@ -45,18 +36,17 @@ export function knGeometry(params: BlackHoleParams): DerivedGeometry {
   const spinning = Math.abs(params.spinStar) >= 1e-12
   const family: MetricFamily = spinning ? 'kerr-newman' : 'reissner-nordstrom'
 
-  const { prograde } = photonSphereRadii(M, params.spinStar)
-  const rPhotonSphere = spinning ? prograde : rnPhotonSphere(M, Q)
-
-  const qhat = Math.min(Math.abs(Q) / Math.max(M, 1e-12), 0.99)
-  const criticalImpact = 3 * Math.sqrt(3) * M * (1 - 0.2 * qhat * qhat)
+  const rPhotonSphere = familyPhotonSphere(params)
+  const criticalImpact = familyCriticalImpact(params)
 
   // ISCO: RN closed form, or Kerr prograde with mild charge pull-in
+  // (full KN ISCO has no simple closed form — limit-matched interpolation)
   let rIsco: number
   if (!spinning) {
     rIsco = rnIsco(M, Q)
   } else {
     const { prograde: rK } = iscoRadii(M, params.spinStar)
+    const qhat = Math.min(Math.abs(Q) / Math.max(M, 1e-12), 0.99)
     rIsco = rK * (1 - 0.12 * qhat * qhat)
   }
   if (Number.isFinite(rPlus)) {

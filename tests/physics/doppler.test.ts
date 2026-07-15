@@ -7,8 +7,8 @@ import {
   kerrOrbitalSpeed,
   progradeDirAboutY,
   specialRelDoppler,
-  temperatureToRgb,
 } from '../../src/physics/geodesic/doppler'
+import { blackbodyRgb } from '../../src/physics/blackbody'
 import { vec3 } from '../../src/physics/geodesic/vec3'
 
 describe('keplerOrbitalSpeed', () => {
@@ -117,14 +117,15 @@ describe('kerrOrbitalSpeed', () => {
   })
 })
 
-describe('bolometricBeaming / temperatureToRgb', () => {
-  test('D>1 boosts intensity', () => {
+describe('bolometricBeaming / blackbodyRgb', () => {
+  test('D>1 boosts intensity (ideal g³)', () => {
     expect(bolometricBeaming(1.5)).toBeGreaterThan(bolometricBeaming(1))
+    expect(bolometricBeaming(1.5)).toBeCloseTo(1.5 ** 3, 10)
   })
 
-  test('hotter is bluer', () => {
-    const cold = temperatureToRgb(0.5)
-    const hot = temperatureToRgb(3)
+  test('hotter Kelvin is bluer (max-norm Planck)', () => {
+    const cold = blackbodyRgb(2500)
+    const hot = blackbodyRgb(12000)
     expect(hot.b / (hot.r + 1e-6)).toBeGreaterThan(cold.b / (cold.r + 1e-6))
   })
 })
