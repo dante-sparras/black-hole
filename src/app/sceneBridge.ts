@@ -94,7 +94,8 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
     const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · D=${dist}M${dbg}`
-    return healthLine ? `${base}\n${healthLine}` : base
+        return healthLine ? `${base}
+${healthLine}` : base
   }
 
   return {

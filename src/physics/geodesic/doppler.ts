@@ -24,6 +24,8 @@ export function keplerOrbitalSpeed(mass: number, rho: number): number {
 /**
  * Kerr equatorial circular angular velocity (prograde / retrograde).
  * Ω = ±√M / (r^{3/2} ± a √M)
+ * Note: for charged (RN/KN) disks we still use Kerr Ω — full charged
+ * circular orbits are more involved; kinematics labeled Kerr-form.
  */
 export function circularOmega(
   mass: number,
@@ -41,8 +43,9 @@ export function circularOmega(
 }
 
 /**
- * Kerr/RN equatorial metric components (θ = π/2, Σ = r² for Kerr with BL-like form).
- * RN: a = 0, Δ/r² factors via g_tt = −(1 − 2M/r + Q²/r²).
+ * Kerr/RN equatorial metric components (θ = π/2, Σ = r²).
+ * KN: g_φφ includes −a²Q²/r² term from Δ = r²−2Mr+a²+Q².
+ * RN: a = 0, g_tt = −(1 − 2M/r + Q²/r²).
  */
 export function equatorialMetric(
   mass: number,
@@ -54,10 +57,11 @@ export function equatorialMetric(
   const M = mass
   const a = spinLength
   const Q = charge
-  // Effective g_tt includes RN charge
   const g_tt = -(1 - (2 * M) / rr + (Q * Q) / (rr * rr))
   const g_tphi = a === 0 ? 0 : (-2 * M * a) / rr
-  const g_phiphi = rr * rr + a * a + (2 * M * a * a) / rr
+  // [(r²+a²)² − a²Δ]/r² at equator with Δ = r²−2Mr+a²+Q²
+  const g_phiphi =
+    rr * rr + a * a + (2 * M * a * a) / rr - (a * a * Q * Q) / (rr * rr)
   return { g_tt, g_tphi, g_phiphi }
 }
 

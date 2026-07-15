@@ -92,7 +92,8 @@ export type GeodesicTracer = {
  * Integrators (uIntegratorMode):
  *   0 = real-time Cartesian RK2 + kn force (default, GPU twin of cpuRef)
  *   1 = Boyer–Lindquist Mino-time (CPU Phase 1–3 math on GPU; Kerr/Schw)
- * Capture horizon uses (M,a,Q). BL potentials are Kerr-form (a,M); Q in g_tt for RN tint.
+ * Capture horizon uses (M,a,Q). BL potentials Kerr-form Δ (a,M); Q in g + horizon.
+ * Escape sky: BL syncs vel from (r,θ,φ) so background is lensed.
  *
  * Emission constants: DISK_EMISSION in physics/disk.ts (CPU/GPU lockstep).
  */
@@ -330,6 +331,7 @@ export function createGeodesicTracer(): GeodesicTracer {
                   .mul(rhoSafe)
                   .add(a.mul(a))
                   .add(M.mul(2).mul(a).mul(a).div(rhoSafe))
+                  .sub(a.mul(a).mul(Q).mul(Q).div(rhoSafe.mul(rhoSafe)))
                 const Xorb = g_tt
                   .mul(-1)
                   .sub(Omega.mul(2).mul(g_tphi))
@@ -387,6 +389,38 @@ export function createGeodesicTracer(): GeodesicTracer {
                 )
                 const bMax = max(br, max(bg, bb))
                 const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
+                // Seamless texture (same as RT) using hit (r, φ)
+                const hitPh = prevBlPh.add(blPh.sub(prevBlPh).mul(tt))
+                const cphi = cos(hitPh)
+                const sphi = sin(hitPh)
+                const lnR = log(max(rhoSafe.div(M), float(1e-4)))
+                const c2a = cphi.mul(cphi).sub(sphi.mul(sphi))
+                const s2a = cphi.mul(sphi).mul(2)
+                const alpha = float(-1.1).mul(lnR).add(0.3)
+                const armWave = float(0.5).add(
+                  float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))),
+                )
+                const armFac = float(0.8).add(pow(max(armWave, float(1e-4)), float(1.1)).mul(0.32))
+                const nUVx = cphi.mul(1.3).add(lnR.mul(0.12))
+                const nUVy = sphi.mul(1.3).add(lnR.mul(0.1))
+                const ix = floor(nUVx)
+                const iy = floor(nUVy)
+                const fx = nUVx.sub(ix)
+                const fy = nUVy.sub(iy)
+                const ux = fx.mul(fx).mul(float(3).sub(fx.mul(2)))
+                const uy = fy.mul(fy).mul(float(3).sub(fy.mul(2)))
+                const n00 = fract(sin(ix.mul(127.1).add(iy.mul(311.7))).mul(43758.5453))
+                const n10 = fract(sin(ix.add(1).mul(127.1).add(iy.mul(311.7))).mul(43758.5453))
+                const n01 = fract(sin(ix.mul(127.1).add(iy.add(1).mul(311.7))).mul(43758.5453))
+                const n11 = fract(
+                  sin(ix.add(1).mul(127.1).add(iy.add(1).mul(311.7))).mul(43758.5453),
+                )
+                const turb = n00
+                  .mul(float(1).sub(ux))
+                  .add(n10.mul(ux))
+                  .mul(float(1).sub(uy))
+                  .add(n01.mul(float(1).sub(ux)).add(n11.mul(ux)).mul(uy))
+                const texFac = max(float(0.75), min(float(1.25), armFac.mul(float(0.9).add(turb.mul(0.2)))))
                 const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.55))
                 const mdotBright = float(E.mdotBrightBase).add(
                   pow(
@@ -397,7 +431,7 @@ export function createGeodesicTracer(): GeodesicTracer {
                 const iFlux = max(fluxVis, float(E.fluxVisFloor))
                   .mul(mdotBright)
                   .mul(E.intensityGain)
-                const emit = chroma.mul(iFlux).mul(beam).mul(bounce)
+                const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
                 dbgG.assign(freq)
                 dbgT.assign(TK.div(float(12000)))
                 dbgFlux.assign(fluxVis)
@@ -513,6 +547,7 @@ export function createGeodesicTracer(): GeodesicTracer {
               .mul(rhoSafe)
               .add(a.mul(a))
               .add(M.mul(2).mul(a).mul(a).div(rhoSafe))
+              .sub(a.mul(a).mul(Q).mul(Q).div(rhoSafe.mul(rhoSafe)))
             const Xorb = g_tt
               .mul(-1)
               .sub(Omega.mul(2).mul(g_tphi))
@@ -639,6 +674,42 @@ export function createGeodesicTracer(): GeodesicTracer {
     })
     If(done.lessThan(0.5).and(minR.greaterThanEqual(M.mul(RT.stalledCaptureM))), () => {
       escaped.assign(1)
+    })
+
+    // BL → Cartesian exit direction for lensed sky (RT already updates vel)
+    If(useBl, () => {
+      const stE = max(sin(blTh), float(1e-5))
+      const ctE = cos(blTh)
+      const spE = sin(blPh)
+      const cpE = cos(blPh)
+      const erE = vec3(stE.mul(cpE), ctE, stE.mul(spE))
+      const ethE = vec3(ctE.mul(cpE), stE.mul(-1), ctE.mul(spE))
+      const ephE = vec3(spE.mul(-1), float(0), cpE)
+      pos.assign(erE.mul(blR))
+      const DeltaE = max(
+        blR.mul(blR).sub(M.mul(2).mul(blR)).add(a.mul(a)),
+        float(1e-14),
+      )
+      const PE = blE.mul(blR.mul(blR).add(a.mul(a))).sub(a.mul(blLz))
+      const KtermE = blQ.add(blLz.sub(a.mul(blE)).mul(blLz.sub(a.mul(blE))))
+      const RvE = max(PE.mul(PE).sub(DeltaE.mul(KtermE)), float(0))
+      const TvE = max(
+        blQ.sub(
+          ctE
+            .mul(ctE)
+            .mul(a.mul(a).mul(blE).mul(blE).mul(-1).add(blLz.mul(blLz).div(stE.mul(stE)))),
+        ),
+        float(0),
+      )
+      const drE = blSr.mul(sqrt(RvE))
+      const dthE = blSt.mul(sqrt(TvE))
+      const dphE = blLz.div(stE.mul(stE)).sub(a.mul(blE)).add(a.mul(PE).div(DeltaE))
+      const vCart = erE
+        .mul(drE)
+        .add(ethE.mul(blR.mul(dthE)))
+        .add(ephE.mul(blR.mul(stE).mul(dphE)))
+      const vLen = vCart.length()
+      vel.assign(vLen.greaterThan(1e-12).select(vCart.normalize(), erE.mul(blSr)))
     })
 
     If(escaped.greaterThan(0.5), () => {

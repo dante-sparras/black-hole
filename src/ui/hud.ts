@@ -27,10 +27,12 @@ export function renderDerivedHud(
       <div><dt>ṁ</dt><dd>${fmtMdot(disk.mdot)} ṁ_Edd</dd></div>
       <div><dt>r_out</dt><dd>${fmt(disk.outerM, 1)} M</dd></div>
       <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
-      <div class="diag-title">Shadow / critical curve (analytic)</div>
-      <div><dt>b_c⁺</dt><dd>${fmt(diag.bCritPro)} <span class="dim">(${fmt(diag.bCritProOverM, 2)} M)</span></dd></div>
-      <div><dt>b_c⁻</dt><dd>${fmt(diag.bCritRet)} <span class="dim">(${fmt(diag.bCritRetOverM, 2)} M)</span></dd></div>
-      <div><dt>⌀_shad</dt><dd>${fmt(diag.shadowDiameter)} <span class="dim">(~${fmt(diag.shadowDiameter / m, 2)} M · analytic)</span></dd></div>
+      <div class="diag-title">Shadow / critical curve (analytic HUD)</div>
+      <div><dt>b_c⁺</dt><dd>${fmt(diag.bCritPro)} <span class="dim">(${fmt(diag.bCritProOverM, 2)} M · co-rot)</span></dd></div>
+      <div><dt>b_c⁻</dt><dd>${fmt(diag.bCritRet)} <span class="dim">(${fmt(diag.bCritRetOverM, 2)} M · counter)</span></dd></div>
+      <div><dt>⌀_shad</dt><dd>${fmt(diag.shadowDiameter)} <span class="dim">(~${fmt(diag.shadowDiameter / m, 2)} M · analytic ≠ image)</span></dd></div>
+      <div><dt>r_ergo</dt><dd>${fmt(derived.rErgoEquator)} <span class="dim">(eq. static limit)</span></dd></div>
       <div><dt>Δ_ext</dt><dd>${fmt(derived.extremalityDelta)}</dd></div>
+      <p class="ctrl-hint" style="margin-top:6px">Image from RT~ force or BL Mino · KN b_c/ISCO approx · RT≠full Kerr</p>
     `
 }

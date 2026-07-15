@@ -4,11 +4,11 @@
  * Conserved E, Lz, Carter Q; Mino-time integration of (r, θ, φ).
  * Geometric units G = c = 1. Pure physics — no Three.js.
  *
- * Phase 3: equatorial disk (θ = π/2) crossings + orbiting redshift g
+ * Disk: equatorial (θ = π/2) crossings + orbiting redshift g
  * using photon λ = Lz/E at the hit radius.
  *
- * Live GPU still uses the real-time Cartesian approx (knNullAccel) until
- * Phase 4 wires BL to the tracer.
+ * Live GPU: optional BL mode via geodesic integrator toggle (Phase 4).
+ * BL potentials use Kerr Δ = r²−2Mr+a² (charge enters horizon capture / g).
  */
 
 import { knHorizon } from '../kn'
@@ -154,10 +154,11 @@ export function blOrbitingRedshiftG(
   E: number,
   Lz: number,
   prograde = true,
+  charge = 0,
 ): number {
   const rr = Math.max(r, 1e-8)
   const Omega = circularOmega(mass, rr, spinLength, prograde)
-  const u_t = circularU_t(mass, rr, spinLength, 0, prograde)
+  const u_t = circularU_t(mass, rr, spinLength, charge, prograde)
   const lambda = Math.abs(E) > 1e-14 ? Lz / E : Lz
   const denom = Math.max(u_t * (1 - Omega * lambda), 1e-4)
   return 1 / denom

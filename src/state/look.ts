@@ -27,7 +27,7 @@ export const LOOK_DEFAULTS: LookState = {
 }
 
 export const LOOK_LIMITS = {
-  bloomStrength: { min: 0, max: 2.5 },
+  bloomStrength: { min: 0, max: 0.85 },
   bloomRadius: { min: 0, max: 1 },
   bloomThreshold: { min: 0, max: 2 },
   exposure: { min: 0.2, max: 3 },

@@ -1,6 +1,7 @@
 export * from './constants'
 export * from './types'
 export * from './validate'
+export * from './geometry'
 export * from './metricFamily'
 export * from './observer'
 export * from './diskParams'

@@ -68,6 +68,8 @@ src/main.ts      # WebGPU boot only
 - Phase 1–3: `kerrBl` / `blCamera` / disk hits + `cpuRef({ integrator: 'bl' })`
 - Phase 4: live GPU BL via **Geodesics → Integrator** (global, not presets); stats `schw-BL` / `kerr-BL` / …
 - Default remains **RT** (Cartesian); BL is opt-in for science silhouette
+- Tags with `~` mean approx (e.g. `kerr-RT~`, `rn-BL~` when Q≠0 on Kerr Δ)
+- BL escape sky uses exit dir from \((r,\theta,\varphi)\) (lensed)
 
 **Analytic HUD:** `familyCriticalImpacts` / `shadowDiagnostics` — closed-form \(b_c^\pm\); image silhouette is from the real-time integrator.
 

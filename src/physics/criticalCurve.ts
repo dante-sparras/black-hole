@@ -2,13 +2,15 @@
  * Analytic photon-sphere radii and critical impact parameters.
  *
  * Single source for DerivedGeometry + HUD shadowDiagnostics.
- * The *image* silhouette comes from the real-time null integrator
- * (knNullAccel), not these closed forms — see geodesic tests for
- * how close the integrator sits to analytic b_c.
+ * The *image* silhouette comes from the null integrator (RT or BL),
+ * not these closed forms.
  *
  * Geometric units G = c = 1.
  */
-import { criticalImpacts as kerrCriticalImpacts, photonSphereRadii } from './kerr'
+import {
+  coRotatingCriticalImpacts,
+  coRotatingPhotonSphereRadii,
+} from './kerr'
 import type { BlackHoleParams } from './types'
 
 const EPS = 1e-12
@@ -22,7 +24,6 @@ export function rnPhotonSphere(mass: number, charge: number): number {
   const Q = charge
   const disc = 9 * M * M - 8 * Q * Q
   if (disc < 0) {
-    // No unstable photon orbit (near-extremal naked / pathological) — floor at horizon scale
     return 2 * M
   }
   return 0.5 * (3 * M + Math.sqrt(disc))
@@ -41,17 +42,14 @@ export function rnCriticalImpact(mass: number, charge: number): number {
   return rph / Math.sqrt(f)
 }
 
-/** Mild charge shrink of Kerr critical curve (display / HUD for KN). */
+/** Mild charge shrink of Kerr critical curve (display / HUD for KN — approx). */
 export function knCriticalShrink(mass: number, charge: number): number {
   const qhat = Math.min(Math.abs(charge) / Math.max(mass, 1e-12), 0.99)
   return 1 - 0.15 * qhat * qhat
 }
 
 /**
- * Primary photon-sphere radius for display (prograde when spinning).
- * - Schw: 3M
- * - Kerr / KN: Bardeen prograde equatorial
- * - RN: closed-form RN photon sphere
+ * Primary photon-sphere radius for display (co-rotating when spinning).
  */
 export function familyPhotonSphere(
   params: Pick<BlackHoleParams, 'mass' | 'spinStar' | 'charge'>,
@@ -61,15 +59,16 @@ export function familyPhotonSphere(
   const hasQ = Math.abs(params.charge) >= EPS
 
   if (!hasA && !hasQ) return 3 * M
-  if (hasA && !hasQ) return photonSphereRadii(M, params.spinStar).prograde
+  if (hasA && !hasQ) {
+    return coRotatingPhotonSphereRadii(M, params.spinStar).coRotating
+  }
   if (!hasA && hasQ) return rnPhotonSphere(M, params.charge)
-  // KN: Kerr prograde (full KN photon orbits not closed-form here)
-  return photonSphereRadii(M, params.spinStar).prograde
+  return coRotatingPhotonSphereRadii(M, params.spinStar).coRotating
 }
 
 /**
  * Critical impacts b_c^± for HUD / DerivedGeometry.
- * Prograde = co-rotating side (shrinks with a★ > 0).
+ * prograde field = co-rotating (smaller for |a★|>0); retrograde = counter.
  */
 export function familyCriticalImpacts(
   params: Pick<BlackHoleParams, 'mass' | 'spinStar' | 'charge'>,
@@ -83,19 +82,22 @@ export function familyCriticalImpacts(
     return { prograde: b, retrograde: b }
   }
   if (hasA && !hasQ) {
-    return kerrCriticalImpacts(M, params.spinStar)
+    const b = coRotatingCriticalImpacts(M, params.spinStar)
+    return { prograde: b.coRotating, retrograde: b.counterRotating }
   }
   if (!hasA && hasQ) {
     const b = rnCriticalImpact(M, params.charge)
     return { prograde: b, retrograde: b }
   }
-  // KN: Kerr curve with mild charge shrink
-  const b = kerrCriticalImpacts(M, params.spinStar)
+  // KN: Kerr co-rotating curve with mild charge shrink (approx)
+  const b = coRotatingCriticalImpacts(M, params.spinStar)
   const s = knCriticalShrink(M, params.charge)
-  return { prograde: b.prograde * s, retrograde: b.retrograde * s }
+  return {
+    prograde: b.coRotating * s,
+    retrograde: b.counterRotating * s,
+  }
 }
 
-/** Prograde / co-rotating critical impact (single scalar for DerivedGeometry). */
 export function familyCriticalImpact(
   params: Pick<BlackHoleParams, 'mass' | 'spinStar' | 'charge'>,
 ): number {

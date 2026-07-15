@@ -41,6 +41,10 @@ scene.add(tracer.mesh)
 
 const bridge = createSceneBridge(tracer)
 bridge.connect()
+bridge.applyPhysics()
+bridge.applyCamera()
+bridge.applySky()
+bridge.applyGeodesic()
 bridge.applyDebug()
 
 let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null

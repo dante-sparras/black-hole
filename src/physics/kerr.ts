@@ -1,10 +1,12 @@
 import type { BlackHoleParams, DerivedGeometry, MetricFamily } from './types'
 import { spinLength } from './types'
+import { equatorialErgosphere } from './geometry'
 
 /**
  * Equatorial circular photon-orbit radii (Bardeen, Press & Teukolsky).
  * r_ph^± / M = 2 ( 1 + cos( (2/3) arccos(∓ a★) ) )
- * prograde uses −a★ inside arccos; retrograde uses +a★.
+ * “prograde” = L > 0 branch (coordinate); for co-rotating with any sign(a★)
+ * use coRotatingPhotonSphereRadii.
  */
 export function photonSphereRadii(
   mass: number,
@@ -19,7 +21,8 @@ export function photonSphereRadii(
 
 /**
  * Prograde/retrograde ISCO radii for Kerr (Bardeen et al. 1972).
- * a★ > 0 → prograde ISCO moves in; retrograde moves out.
+ * Coordinate L>0 / L<0 branches. For co-rotating fluid (L ‖ J) at any
+ * sign(a★), use coRotatingIscoRadii.
  */
 export function iscoRadii(
   mass: number,
@@ -34,8 +37,10 @@ export function iscoRadii(
       (Math.pow(1 + aStar, 1 / 3) + Math.pow(1 - aStar, 1 / 3))
   const Z2 = Math.sqrt(3 * a2 + Z1 * Z1)
   const rPro =
-    M * (3 + Z2 - Math.sign(aStar || 1) * Math.sqrt((3 - Z1) * (3 + Z1 + 2 * Z2)))
-  // Retrograde: flip spin sign in the formula
+    M *
+    (3 +
+      Z2 -
+      Math.sign(aStar || 1) * Math.sqrt((3 - Z1) * (3 + Z1 + 2 * Z2)))
   const aR = -aStar
   const Z1r =
     1 +
@@ -50,6 +55,40 @@ export function iscoRadii(
   return { prograde: rPro, retrograde: rRet }
 }
 
+/**
+ * Co-rotating / counter-rotating ISCO for any sign of a★.
+ * Uses |a★| so co-rotating is always the smaller ISCO (fluid L ‖ J).
+ */
+export function coRotatingIscoRadii(
+  mass: number,
+  spinStar: number,
+): { coRotating: number; counterRotating: number } {
+  const { prograde, retrograde } = iscoRadii(mass, Math.abs(spinStar))
+  return { coRotating: prograde, counterRotating: retrograde }
+}
+
+/**
+ * Co-rotating / counter-rotating photon-sphere radii (any sign of a★).
+ */
+export function coRotatingPhotonSphereRadii(
+  mass: number,
+  spinStar: number,
+): { coRotating: number; counterRotating: number } {
+  const { prograde, retrograde } = photonSphereRadii(mass, Math.abs(spinStar))
+  return { coRotating: prograde, counterRotating: retrograde }
+}
+
+/**
+ * Co-rotating / counter-rotating critical impacts b_c (any sign of a★).
+ */
+export function coRotatingCriticalImpacts(
+  mass: number,
+  spinStar: number,
+): { coRotating: number; counterRotating: number } {
+  const { prograde, retrograde } = criticalImpacts(mass, Math.abs(spinStar))
+  return { coRotating: prograde, counterRotating: retrograde }
+}
+
 /** Event horizon r₊ = M + √(M² − a²) for Kerr (Q=0). */
 export function kerrHorizon(mass: number, spinLengthA: number): number {
   const disc = mass * mass - spinLengthA * spinLengthA
@@ -62,16 +101,14 @@ export function kerrHorizon(mass: number, spinLengthA: number): number {
  * Analytic / HUD — image silhouette is from the integrator.
  *
  * b_c^± / M = ∓ a★ + 6 cos( (1/3) arccos(∓ a★) )
- * Prograde (co-rotating) uses the upper signs → smaller b for a★ > 0.
+ * Coordinate prograde (L>0). Co-rotating: coRotatingCriticalImpacts.
  */
 export function criticalImpacts(
   mass: number,
   spinStar: number,
 ): { prograde: number; retrograde: number } {
   const aStar = Math.min(0.999, Math.max(-0.999, spinStar))
-  // Prograde: −a★ + 6 cos(⅓ arccos(−a★))
   const bProM = -aStar + 6 * Math.cos((1 / 3) * Math.acos(-aStar))
-  // Retrograde: +a★ + 6 cos(⅓ arccos(+a★))
   const bRetM = aStar + 6 * Math.cos((1 / 3) * Math.acos(+aStar))
   return {
     prograde: Math.abs(bProM) * mass,
@@ -89,14 +126,12 @@ export function kerrGeometry(params: BlackHoleParams): DerivedGeometry {
   const sqrtDisc = hasHorizon ? Math.sqrt(Math.max(0, disc)) : 0
   const rPlus = hasHorizon ? M + sqrtDisc : Number.NaN
   const rMinus = hasHorizon ? M - sqrtDisc : Number.NaN
-  const { prograde: rIsco } = iscoRadii(M, params.spinStar)
-  const { prograde: rPh } = photonSphereRadii(M, params.spinStar)
-  const { prograde: bPro } = criticalImpacts(M, params.spinStar)
+  const { coRotating: rIsco } = coRotatingIscoRadii(M, params.spinStar)
+  const { coRotating: rPh } = coRotatingPhotonSphereRadii(M, params.spinStar)
+  const { coRotating: bPro } = coRotatingCriticalImpacts(M, params.spinStar)
 
   const family: MetricFamily =
     Math.abs(params.spinStar) < 1e-12 ? 'schwarzschild' : 'kerr'
-
-  const rErgoEquator = 2 * M
 
   return {
     mass: M,
@@ -106,7 +141,7 @@ export function kerrGeometry(params: BlackHoleParams): DerivedGeometry {
     family,
     rPlus,
     rMinus,
-    rErgoEquator,
+    rErgoEquator: equatorialErgosphere(M, 0),
     rPhotonSphere: rPh,
     criticalImpact: bPro,
     rIsco,

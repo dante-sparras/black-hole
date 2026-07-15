@@ -3,18 +3,12 @@
  * Geometric units G = c = 1.
  */
 
-import { iscoRadii } from './kerr'
+import { horizonPlus, knIscoFromKerr } from './geometry'
+import { coRotatingIscoRadii } from './kerr'
 import type { BlackHoleParams } from './types'
-import { spinLength } from './types'
-
-function horizonPlus(mass: number, spinLengthA: number, charge: number): number {
-  const disc = mass * mass - spinLengthA * spinLengthA - charge * charge
-  if (disc < 0) return Number.NaN
-  return mass + Math.sqrt(disc)
-}
 
 /**
- * RN ISCO (equatorial, timelike), limits:
+ * RN ISCO (equatorial, timelike) — endpoint fit, not exact literature root:
  *   Q → 0  → 6M
  *   |Q| → M → 4M (extremal)
  * Interpolation: r/M = 4 + 2 √(1 − q²)  with q = Q/M
@@ -26,15 +20,17 @@ export function rnIsco(mass: number, charge: number): number {
 }
 
 /**
- * Prograde disk inner edge (ISCO) for the no-hair parameters.
+ * Disk inner edge (ISCO) for the no-hair parameters.
+ * @param coRotating — fluid L ‖ hole J (default true). Uses |a★| so signed
+ *   spin still picks the smaller (co-rotating) or larger (counter) radius.
  * - Schw: 6M
- * - Kerr: Bardeen prograde
- * - RN: rnIsco
- * - KN: Kerr prograde × mild charge correction, floored above r₊
+ * - Kerr: Bardeen co-/counter-rotating
+ * - RN: rnIsco (approx)
+ * - KN: Kerr × mild charge correction, floored above r₊
  */
-export function diskIsco(params: BlackHoleParams, prograde = true): number {
+export function diskIsco(params: BlackHoleParams, coRotating = true): number {
   const M = params.mass
-  const a = spinLength(params)
+  const a = params.spinStar * M
   const Q = params.charge
   const aStar = params.spinStar
   const hasA = Math.abs(aStar) >= 1e-12
@@ -44,15 +40,22 @@ export function diskIsco(params: BlackHoleParams, prograde = true): number {
   if (!hasA && !hasQ) {
     r = 6 * M
   } else if (hasA && !hasQ) {
-    const { prograde: rp, retrograde: rr } = iscoRadii(M, aStar)
-    r = prograde ? rp : rr
+    const { coRotating: rCo, counterRotating: rCounter } = coRotatingIscoRadii(
+      M,
+      aStar,
+    )
+    r = coRotating ? rCo : rCounter
   } else if (!hasA && hasQ) {
     r = rnIsco(M, Q)
   } else {
-    const { prograde: rp, retrograde: rr } = iscoRadii(M, aStar)
-    const rK = prograde ? rp : rr
-    const qhat = Math.min(Math.abs(Q) / Math.max(M, 1e-12), 0.99)
-    r = rK * (1 - 0.12 * qhat * qhat)
+    const { coRotating: rCo, counterRotating: rCounter } = coRotatingIscoRadii(
+      M,
+      aStar,
+    )
+    const rK = coRotating ? rCo : rCounter
+    const rPlus = horizonPlus(M, a, Q)
+    r = knIscoFromKerr(rK, M, Q, rPlus)
+    return r
   }
 
   const rPlus = horizonPlus(M, a, Q)
