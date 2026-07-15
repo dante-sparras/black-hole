@@ -26,6 +26,14 @@ import {
 } from '../state/look'
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
 import { ALL_PRESETS, applyPreset } from '../state/presets'
+import {
+  getSky,
+  resetSky,
+  setSky,
+  SKY_LIMITS,
+  subscribeSky,
+  type SkyState,
+} from '../state/sky'
 import { fmt, fmtMdot } from './format'
 import { renderDerivedHud } from './hud'
 
@@ -143,6 +151,30 @@ export function mountControls(
       <span class="ctrl-val" data-val="exposure"></span>
     </label>
     <p class="ctrl-hint">Unreal bloom on HDR · ACES tone map · not hair</p>
+
+    <div class="ctrl-section">Deep space (global)</div>
+    <label class="ctrl">
+      <span class="ctrl-name">Stars</span>
+      <input type="range" id="s-density" min="${SKY_LIMITS.starDensity.min}" max="${SKY_LIMITS.starDensity.max}" step="0.05" />
+      <span class="ctrl-val" data-val="starDens"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Star bright</span>
+      <input type="range" id="s-bright" min="${SKY_LIMITS.starBrightness.min}" max="${SKY_LIMITS.starBrightness.max}" step="0.05" />
+      <span class="ctrl-val" data-val="starBright"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Nebula</span>
+      <input type="range" id="s-nebula" min="${SKY_LIMITS.nebula.min}" max="${SKY_LIMITS.nebula.max}" step="0.05" />
+      <span class="ctrl-val" data-val="nebula"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Milky lane</span>
+      <input type="range" id="s-milky" min="${SKY_LIMITS.milky.min}" max="${SKY_LIMITS.milky.max}" step="0.05" />
+      <span class="ctrl-val" data-val="milky"></span>
+    </label>
+    <button type="button" class="preset-btn" id="s-reset" style="margin-top:6px;width:100%">Reset sky defaults</button>
+    <p class="ctrl-hint">Same sky for every preset · not hair</p>
   `
 
   const massInput = root.querySelector<HTMLInputElement>('#p-mass')
@@ -175,8 +207,19 @@ export function mountControls(
   const bloomRadVal = root.querySelector<HTMLElement>('[data-val="bloomRad"]')
   const bloomThrVal = root.querySelector<HTMLElement>('[data-val="bloomThr"]')
   const exposureVal = root.querySelector<HTMLElement>('[data-val="exposure"]')
+
+  const starDensInput = root.querySelector<HTMLInputElement>('#s-density')
+  const starBrightInput = root.querySelector<HTMLInputElement>('#s-bright')
+  const nebulaInput = root.querySelector<HTMLInputElement>('#s-nebula')
+  const milkyInput = root.querySelector<HTMLInputElement>('#s-milky')
+  const skyResetBtn = root.querySelector<HTMLButtonElement>('#s-reset')
+  const starDensVal = root.querySelector<HTMLElement>('[data-val="starDens"]')
+  const starBrightVal = root.querySelector<HTMLElement>('[data-val="starBright"]')
+  const nebulaVal = root.querySelector<HTMLElement>('[data-val="nebula"]')
+  const milkyVal = root.querySelector<HTMLElement>('[data-val="milky"]')
+
   const presetHint = root.querySelector<HTMLElement>('#preset-hint')
-  const presetBtns = root.querySelectorAll<HTMLButtonElement>('.preset-btn')
+  const presetBtns = root.querySelectorAll<HTMLButtonElement>('.preset-btn:not(#s-reset)')
 
   let activePresetId: string | null = null
 
@@ -239,6 +282,17 @@ export function mountControls(
     if (bloomRadVal) bloomRadVal.textContent = fmt(l.bloomRadius, 2)
     if (bloomThrVal) bloomThrVal.textContent = fmt(l.bloomThreshold, 2)
     if (exposureVal) exposureVal.textContent = fmt(l.exposure, 2)
+  }
+
+  function syncSkyInputs(s: SkyState): void {
+    if (starDensInput) starDensInput.value = String(s.starDensity)
+    if (starBrightInput) starBrightInput.value = String(s.starBrightness)
+    if (nebulaInput) nebulaInput.value = String(s.nebula)
+    if (milkyInput) milkyInput.value = String(s.milky)
+    if (starDensVal) starDensVal.textContent = fmt(s.starDensity, 2)
+    if (starBrightVal) starBrightVal.textContent = fmt(s.starBrightness, 2)
+    if (nebulaVal) nebulaVal.textContent = fmt(s.nebula, 2)
+    if (milkyVal) milkyVal.textContent = fmt(s.milky, 2)
   }
 
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
@@ -305,6 +359,22 @@ export function mountControls(
     setLook({ exposure: Number(exposureInput.value) })
   })
 
+  starDensInput?.addEventListener('input', () => {
+    setSky({ starDensity: Number(starDensInput.value) })
+  })
+  starBrightInput?.addEventListener('input', () => {
+    setSky({ starBrightness: Number(starBrightInput.value) })
+  })
+  nebulaInput?.addEventListener('input', () => {
+    setSky({ nebula: Number(nebulaInput.value) })
+  })
+  milkyInput?.addEventListener('input', () => {
+    setSky({ milky: Number(milkyInput.value) })
+  })
+  skyResetBtn?.addEventListener('click', () => {
+    resetSky()
+  })
+
   for (const btn of presetBtns) {
     btn.addEventListener('click', () => {
       const id = btn.dataset.preset
@@ -332,6 +402,10 @@ export function mountControls(
     syncLookInputs(l)
   })
 
+  subscribeSky((s) => {
+    syncSkyInputs(s)
+  })
+
   massInput?.addEventListener('input', () => {
     if (!chargeInput) return
     const m = Number(massInput.value)
@@ -342,6 +416,7 @@ export function mountControls(
   syncDiskInputs(getDisk())
   syncCameraInputs(getCamera())
   syncLookInputs(getLook())
+  syncSkyInputs(getSky())
   syncDerived(getDerived(), getParams())
 
   return {

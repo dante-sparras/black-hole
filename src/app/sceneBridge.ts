@@ -14,6 +14,7 @@ export type SceneBridge = {
   applyPhysics: () => void
   applyCamera: () => void
   applyLook: () => void
+  applySky: () => void
   connect: () => () => void
   getSpacetime: () => SpacetimeUniforms
   formatStats: (fps: number) => string
@@ -46,11 +47,16 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     if (bloom) bloom.applyLook(getScene().look)
   }
 
+  function applySky(): void {
+    tracer.setSky(getScene().sky)
+  }
+
   function connect(): () => void {
     return subscribeScene(() => {
       applyPhysics()
       applyCamera()
       applyLook()
+      applySky()
     })
   }
 
@@ -73,6 +79,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     applyPhysics,
     applyCamera,
     applyLook,
+    applySky,
     connect,
     getSpacetime: () => spacetime,
     formatStats,

@@ -42,6 +42,7 @@ import {
 } from '../physics/disk'
 import { RT } from '../physics/geodesic/rtConstants'
 import { OBSERVER_DEFAULTS } from '../physics/observer'
+import { SKY_DEFAULTS, type SkyState } from '../state/sky'
 
 export type SpacetimeTraceParams = {
   mass: number
@@ -66,6 +67,7 @@ export type GeodesicTracer = {
   mesh: THREE.Mesh
   setSpacetime: (p: SpacetimeTraceParams) => void
   setCamera: (c: CameraTraceParams) => void
+  setSky: (s: SkyState) => void
   setMass: (mass: number) => void
   setSpinStar: (spinStar: number) => void
   setCharge: (charge: number) => void
@@ -97,6 +99,10 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uAzimuth = uniform(OBSERVER_DEFAULTS.azimuth)
   const uFov = uniform(OBSERVER_DEFAULTS.fov)
   const uRoutM = uniform(RT.diskOuterM)
+  const uStarDensity = uniform(SKY_DEFAULTS.starDensity)
+  const uStarBright = uniform(SKY_DEFAULTS.starBrightness)
+  const uNebula = uniform(SKY_DEFAULTS.nebula)
+  const uMilky = uniform(SKY_DEFAULTS.milky)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -443,23 +449,24 @@ export function createGeodesicTracer(): GeodesicTracer {
 
       const fbm = n1.mul(0.65).add(n2.mul(0.35))
 
-      // Soft milky haze (desaturated, low gain)
+      // Soft milky haze (desaturated, low gain) — amount via uMilky
       const galN = vec3(0.18, 0.9, 0.35).normalize()
       const band = float(1).sub(abs(dot(d, galN)))
-      const milky = pow(max(band, float(0)), float(10.0))
+      const milky = pow(max(band, float(0)), float(10.0)).mul(uMilky)
 
-      // --- Mostly black void + faint cool dust (not rainbow) ---
+      // --- Mostly black void + faint cool dust (uNebula) ---
       const voidCol = vec3(0.0015, 0.0018, 0.0035)
-      // Desaturated blue-grey nebulae only
       const dustMask = pow(max(fbm.sub(0.42), float(0)).mul(1.8), float(1.8))
-      const dust = vec3(0.04, 0.05, 0.08).mul(dustMask.mul(0.22))
+      const dust = vec3(0.04, 0.05, 0.08).mul(dustMask.mul(0.22).mul(uNebula))
       const lane = vec3(0.05, 0.055, 0.07).mul(milky.mul(fbm.mul(0.5).add(0.25)).mul(0.18))
       let sky = voidCol.add(dust).add(lane)
 
       // ============================================================
-      // Circular stars: hash places a star in each cell; smooth disc
-      // falloff in cell UV → round points (not grid pixels).
+      // Circular stars — density/brightness from uniforms
+      // spawn fraction ~ 0.014 * density (layer1), etc.
       // ============================================================
+      const dens = max(uStarDensity, float(0))
+      const sBright = max(uStarBright, float(0))
 
       // Layer 1 — dense faint field
       const s1 = float(95.0)
@@ -476,8 +483,9 @@ export function createGeodesicTracer(): GeodesicTracer {
       const h1b = fract(sin(i1x.mul(269.5).add(i1y.mul(183.3)).add(i1z.mul(419.2)).add(12.2)).mul(43758.5453))
       const h1c = fract(sin(i1x.mul(419.2).add(i1y.mul(371.9)).add(i1z.mul(127.1)).add(13.3)).mul(43758.5453))
       const h1d = fract(sin(i1x.mul(71.7).add(i1y.mul(113.5)).add(i1z.mul(271.9)).add(14.4)).mul(43758.5453))
-      // Only ~1.2% of cells spawn a star
-      const spawn1 = h1a.greaterThan(0.988).select(float(1), float(0))
+      // Base ~1.8% cells at density=1; scales with dens
+      const thr1 = float(1).sub(float(0.018).mul(dens))
+      const spawn1 = h1a.greaterThan(thr1).select(float(1), float(0))
       const cx1 = h1b.mul(0.7).add(0.15)
       const cy1 = h1c.mul(0.7).add(0.15)
       const cz1 = h1d.mul(0.7).add(0.15)
@@ -486,7 +494,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       )
       const rad1 = float(0.028).add(h1b.mul(0.018))
       const disc1 = exp(dist1.mul(dist1).div(rad1.mul(rad1).add(1e-8)).mul(-1))
-      const bright1 = spawn1.mul(disc1).mul(float(0.35).add(h1c.mul(0.45)))
+      const bright1 = spawn1.mul(disc1).mul(float(0.35).add(h1c.mul(0.45))).mul(sBright)
 
       // Layer 2 — medium stars
       const s2 = float(42.0)
@@ -503,7 +511,8 @@ export function createGeodesicTracer(): GeodesicTracer {
       const h2b = fract(sin(i2x.mul(269.5).add(i2y.mul(183.3)).add(i2z.mul(419.2)).add(22.2)).mul(43758.5453))
       const h2c = fract(sin(i2x.mul(419.2).add(i2y.mul(371.9)).add(i2z.mul(127.1)).add(23.3)).mul(43758.5453))
       const h2d = fract(sin(i2x.mul(71.7).add(i2y.mul(113.5)).add(i2z.mul(271.9)).add(24.4)).mul(43758.5453))
-      const spawn2 = h2a.greaterThan(0.993).select(float(1), float(0))
+      const thr2 = float(1).sub(float(0.01).mul(dens))
+      const spawn2 = h2a.greaterThan(thr2).select(float(1), float(0))
       const cx2 = h2b.mul(0.65).add(0.175)
       const cy2 = h2c.mul(0.65).add(0.175)
       const cz2 = h2d.mul(0.65).add(0.175)
@@ -512,7 +521,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       )
       const rad2 = float(0.035).add(h2b.mul(0.025))
       const disc2 = exp(dist2.mul(dist2).div(rad2.mul(rad2).add(1e-8)).mul(-1))
-      const bright2 = spawn2.mul(disc2).mul(float(0.7).add(h2c.mul(0.9)))
+      const bright2 = spawn2.mul(disc2).mul(float(0.7).add(h2c.mul(0.9))).mul(sBright)
 
       // Layer 3 — rare bright circular stars
       const s3 = float(18.0)
@@ -529,7 +538,8 @@ export function createGeodesicTracer(): GeodesicTracer {
       const h3b = fract(sin(i3x.mul(269.5).add(i3y.mul(183.3)).add(i3z.mul(419.2)).add(32.2)).mul(43758.5453))
       const h3c = fract(sin(i3x.mul(419.2).add(i3y.mul(371.9)).add(i3z.mul(127.1)).add(33.3)).mul(43758.5453))
       const h3d = fract(sin(i3x.mul(71.7).add(i3y.mul(113.5)).add(i3z.mul(271.9)).add(34.4)).mul(43758.5453))
-      const spawn3 = h3a.greaterThan(0.9965).select(float(1), float(0))
+      const thr3 = float(1).sub(float(0.0045).mul(dens))
+      const spawn3 = h3a.greaterThan(thr3).select(float(1), float(0))
       const cx3 = h3b.mul(0.55).add(0.225)
       const cy3 = h3c.mul(0.55).add(0.225)
       const cz3 = h3d.mul(0.55).add(0.225)
@@ -538,9 +548,8 @@ export function createGeodesicTracer(): GeodesicTracer {
       )
       const rad3 = float(0.045).add(h3b.mul(0.03))
       const disc3 = exp(dist3.mul(dist3).div(rad3.mul(rad3).add(1e-8)).mul(-1))
-      // Soft halo for round glow
       const halo3 = exp(dist3.mul(dist3).div(rad3.mul(rad3).mul(4.5).add(1e-8)).mul(-1)).mul(0.25)
-      const bright3 = spawn3.mul(disc3.add(halo3)).mul(float(1.4).add(h3c.mul(1.6)))
+      const bright3 = spawn3.mul(disc3.add(halo3)).mul(float(1.4).add(h3c.mul(1.6))).mul(sBright)
 
       // Nearly white stars with very mild temperature tint
       const tintH = fract(sin(i2x.mul(91.7).add(i2y.mul(51.3)).add(i2z.mul(17.9)).add(44.4)).mul(43758.5453))
@@ -588,6 +597,12 @@ export function createGeodesicTracer(): GeodesicTracer {
       uInclination.value = c.inclination
       uAzimuth.value = c.azimuth
       uFov.value = c.fov
+    },
+    setSky: (s) => {
+      uStarDensity.value = s.starDensity
+      uStarBright.value = s.starBrightness
+      uNebula.value = s.nebula
+      uMilky.value = s.milky
     },
     setMass: (m) => {
       uMass.value = m

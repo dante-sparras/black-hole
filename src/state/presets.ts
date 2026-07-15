@@ -1,6 +1,7 @@
 /**
  * Named scene presets: no-hair + disk + look (disk is not hair).
  * All presets share CAMERA_DEFAULTS.
+ * Deep-space sky is GLOBAL (state/sky) — presets never touch it.
  *
  * Temperature ladder:
  *   Cool < Schwarzschild ≲ RN < Default < Interstellar < Extremal < Hot
