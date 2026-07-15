@@ -27,6 +27,11 @@ import {
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
 import { ALL_PRESETS, applyPreset } from '../state/presets'
 import {
+  getGeodesicIntegrator,
+  setGeodesicIntegrator,
+  subscribeGeodesic,
+} from '../state/geodesic'
+import {
   getSky,
   resetSky,
   setSky,
@@ -124,6 +129,17 @@ export function mountControls(
     </label>
     <p class="ctrl-hint">Drag canvas to orbit · scroll/pinch to zoom</p>
 
+    <div class="ctrl-section">Geodesics (global)</div>
+    <label class="ctrl">
+      <span class="ctrl-name">Integrator</span>
+      <select id="g-integr" style="flex:1;min-width:0">
+        <option value="rt">RT (Cartesian, default)</option>
+        <option value="bl">BL (Boyer–Lindquist)</option>
+      </select>
+      <span class="ctrl-val" data-val="geodesic"></span>
+    </label>
+    <p class="ctrl-hint">RT = live force approx · BL = Mino Kerr nulls · not hair · not presets</p>
+
     <div class="ctrl-section">Look</div>
     <label class="ctrl">
       <span class="ctrl-name">Bloom</span>
@@ -218,6 +234,9 @@ export function mountControls(
   const nebulaVal = root.querySelector<HTMLElement>('[data-val="nebula"]')
   const milkyVal = root.querySelector<HTMLElement>('[data-val="milky"]')
 
+  const geodesicSelect = root.querySelector<HTMLSelectElement>('#g-integr')
+  const geodesicVal = root.querySelector<HTMLElement>('[data-val="geodesic"]')
+
   const presetHint = root.querySelector<HTMLElement>('#preset-hint')
   const presetBtns = root.querySelectorAll<HTMLButtonElement>('.preset-btn:not(#s-reset)')
 
@@ -293,6 +312,12 @@ export function mountControls(
     if (starBrightVal) starBrightVal.textContent = fmt(s.starBrightness, 2)
     if (nebulaVal) nebulaVal.textContent = fmt(s.nebula, 2)
     if (milkyVal) milkyVal.textContent = fmt(s.milky, 2)
+  }
+
+  function syncGeodesicUi(): void {
+    const mode = getGeodesicIntegrator()
+    if (geodesicSelect) geodesicSelect.value = mode
+    if (geodesicVal) geodesicVal.textContent = mode === 'bl' ? 'BL' : 'RT'
   }
 
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
@@ -375,6 +400,11 @@ export function mountControls(
     resetSky()
   })
 
+  geodesicSelect?.addEventListener('change', () => {
+    const v = geodesicSelect.value === 'bl' ? 'bl' : 'rt'
+    setGeodesicIntegrator(v)
+  })
+
   for (const btn of presetBtns) {
     btn.addEventListener('click', () => {
       const id = btn.dataset.preset
@@ -405,6 +435,12 @@ export function mountControls(
   subscribeSky((s) => {
     syncSkyInputs(s)
   })
+
+  subscribeGeodesic(() => {
+    syncGeodesicUi()
+  })
+
+  syncGeodesicUi()
 
   massInput?.addEventListener('input', () => {
     if (!chargeInput) return

@@ -57,4 +57,4 @@ src/
 | CPU BL Kerr nulls (Phase 1) | ✅ critical-curve validated |
 | BL camera → (E,Lz,Q) (Phase 2) | ✅ OBSERVER_DEFAULTS rays |
 | BL disk hits + cpuRef `bl` (Phase 3) | ✅ θ=π/2 + orbiting g |
-| Full BL on GPU / live image | ⏳ later |
+| Live GPU BL + stats tags (Phase 4) | ✅ RT/BL toggle · `*-BL` tags |

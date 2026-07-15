@@ -79,6 +79,8 @@ export type GeodesicTracer = {
   setInclination: (radians: number) => void
   setAzimuth: (radians: number) => void
   setFov: (fov: number) => void
+  /** 0 = real-time Cartesian (default), 1 = Boyer–Lindquist Mino */
+  setIntegratorMode: (mode: 0 | 1) => void
 }
 
 /**
@@ -87,11 +89,12 @@ export type GeodesicTracer = {
  * Disk: Novikov–Thorne T(r) with family ISCO; flux ∝ ṁ, T ∝ ṁ^{1/4}.
  * Spin ‖ +Y; disk in XZ (y = 0).
  *
- * Integrator: midpoint RK2 + kn force + frame-drag twist — topology twin of
- * cpuRef / rk2StepKn (not full BL; analytic b_c is HUD-only).
+ * Integrators (uIntegratorMode):
+ *   0 = real-time Cartesian RK2 + kn force (default, GPU twin of cpuRef)
+ *   1 = Boyer–Lindquist Mino-time (CPU Phase 1–3 math on GPU; Kerr/Schw)
+ * Capture horizon uses (M,a,Q). BL potentials are Kerr-form (a,M); Q in g_tt for RN tint.
  *
  * Emission constants: DISK_EMISSION in physics/disk.ts (CPU/GPU lockstep).
- * Optical display curves (soft beam / g-color / ṁ brightness), not SI bolometric.
  */
 export function createGeodesicTracer(): GeodesicTracer {
   const E = DISK_EMISSION
@@ -110,6 +113,8 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uNebula = uniform(SKY_DEFAULTS.nebula)
   const uMilky = uniform(SKY_DEFAULTS.milky)
   const uDebugMode = uniform(DEBUG_DEFAULTS.mode)
+  /** 0 = RT Cartesian, 1 = BL Mino */
+  const uIntegratorMode = uniform(0)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -173,12 +178,241 @@ export function createGeodesicTracer(): GeodesicTracer {
     // Impact parameter scale |r × n| at camera
     const impactB = cross(camPos, dir0).length().toVar()
 
+    // --- BL camera init (asymptotic spherical frame, Phase 2/4) ---
+    const useBl = uIntegratorMode.greaterThan(0.5)
+    const rHat = camPos.normalize()
+    const stCam = max(sin(th), float(1e-5))
+    const ctCam = cos(th)
+    const spCam = sin(ph)
+    const cpCam = cos(ph)
+    const thetaHat = vec3(ctCam.mul(cpCam), stCam.mul(-1), ctCam.mul(spCam))
+    const phiHat = vec3(spCam.mul(-1), float(0), cpCam)
+    const n_r = dot(dir0, rHat)
+    const n_th = dot(dir0, thetaHat)
+    const n_ph = dot(dir0, phiHat)
+    const blE = float(1)
+    const blLz = camD.mul(stCam).mul(n_ph).mul(blE).toVar()
+    const pTheta = camD.mul(n_th).mul(blE)
+    const blQ = pTheta
+      .mul(pTheta)
+      .add(
+        ctCam
+          .mul(ctCam)
+          .mul(a.mul(a).mul(blE).mul(blE).mul(-1).add(blLz.mul(blLz).div(stCam.mul(stCam)))),
+      )
+      .toVar()
+    const blR = camD.toVar()
+    const blTh = th.toVar()
+    const blPh = ph.toVar()
+    const blSr = n_r.lessThan(0).select(float(-1), float(1)).toVar()
+    const blSt = blQ
+      .abs()
+      .greaterThan(1e-8)
+      .select(n_th.greaterThanEqual(0).select(float(1), float(-1)), float(0))
+      .toVar()
+    const prevTh = th.toVar()
+    const prevBlR = camD.toVar()
+    const prevBlPh = ph.toVar()
+    const halfPi = float(1.57079632679)
+
     Loop({ start: int(0), end: int(STEPS), type: 'int', condition: '<' }, () => {
       If(done.greaterThan(0.5), () => {
         Break()
       })
       stepCount.addAssign(1)
 
+      // ========== BL Mino path ==========
+      If(useBl, () => {
+        minR.assign(min(minR, blR))
+        If(blR.lessThanEqual(rCapture), () => {
+          captured.assign(1)
+          done.assign(1)
+        })
+        If(
+          done
+            .lessThan(0.5)
+            .and(blR.greaterThan(camD.mul(RT.escapeCamFactor)))
+            .and(blSr.greaterThan(0)),
+          () => {
+            escaped.assign(1)
+            done.assign(1)
+          },
+        )
+        If(done.lessThan(0.5), () => {
+          prevTh.assign(blTh)
+          prevBlR.assign(blR)
+          prevBlPh.assign(blPh)
+          const Delta = max(
+            blR.mul(blR).sub(M.mul(2).mul(blR)).add(a.mul(a)),
+            float(1e-14),
+          )
+          const P = blE.mul(blR.mul(blR).add(a.mul(a))).sub(a.mul(blLz))
+          const Kterm = blQ.add(blLz.sub(a.mul(blE)).mul(blLz.sub(a.mul(blE))))
+          const Rv0 = P.mul(P).sub(Delta.mul(Kterm))
+          const sTh = max(sin(blTh), float(1e-5))
+          const cTh = cos(blTh)
+          const Tv0 = blQ.sub(
+            cTh
+              .mul(cTh)
+              .mul(a.mul(a).mul(blE).mul(blE).mul(-1).add(blLz.mul(blLz).div(sTh.mul(sTh)))),
+          )
+          const srFlip = Rv0.lessThanEqual(1e-12).select(float(-1), float(1))
+          const stFlip = Tv0.lessThanEqual(1e-12)
+            .and(blSt.abs().greaterThan(0.5))
+            .select(float(-1), float(1))
+          blSr.assign(blSr.mul(srFlip))
+          blSt.assign(blSt.mul(stFlip))
+          const Rv = max(Rv0, float(0))
+          const Tv = max(Tv0, float(0))
+          const sqrtR = sqrt(Rv)
+          const sqrtT = sqrt(Tv)
+          const targetDr = max(blR.mul(0.02), M.mul(1e-4))
+          const dL0 = sqrtR.greaterThan(1e-14).select(targetDr.div(sqrtR), float(0.002))
+          const dL1 = sqrtT.greaterThan(1e-14)
+            .and(blSt.abs().greaterThan(0.5))
+            .select(min(dL0, float(0.05).div(max(sqrtT, float(1e-8)))), dL0)
+          const dL = min(max(dL1, float(1e-10)), float(0.5))
+          const rM = max(blR.add(blSr.mul(sqrtR).mul(dL).mul(0.5)), M.mul(1e-6))
+          const thM = min(
+            max(blTh.add(blSt.mul(sqrtT).mul(dL).mul(0.5)), float(1e-5)),
+            float(3.14159265).sub(1e-5),
+          )
+          const DeltaM = max(rM.mul(rM).sub(M.mul(2).mul(rM)).add(a.mul(a)), float(1e-14))
+          const PM = blE.mul(rM.mul(rM).add(a.mul(a))).sub(a.mul(blLz))
+          const KtermM = blQ.add(blLz.sub(a.mul(blE)).mul(blLz.sub(a.mul(blE))))
+          const RvM0 = PM.mul(PM).sub(DeltaM.mul(KtermM))
+          const sThM = max(sin(thM), float(1e-5))
+          const cThM = cos(thM)
+          const TvM0 = blQ.sub(
+            cThM
+              .mul(cThM)
+              .mul(a.mul(a).mul(blE).mul(blE).mul(-1).add(blLz.mul(blLz).div(sThM.mul(sThM)))),
+          )
+          const srM = blSr.mul(RvM0.lessThanEqual(1e-12).select(float(-1), float(1)))
+          const stM = blSt.mul(
+            TvM0.lessThanEqual(1e-12)
+              .and(blSt.abs().greaterThan(0.5))
+              .select(float(-1), float(1)),
+          )
+          const drM = srM.mul(sqrt(max(RvM0, float(0))))
+          const dthM = stM.mul(sqrt(max(TvM0, float(0))))
+          const dph = blLz.div(sThM.mul(sThM)).sub(a.mul(blE)).add(a.mul(PM).div(DeltaM))
+          blR.assign(max(blR.add(drM.mul(dL)), M.mul(1e-6)))
+          blTh.assign(
+            min(max(blTh.add(dthM.mul(dL)), float(1e-5)), float(3.14159265).sub(1e-5)),
+          )
+          blPh.assign(blPh.add(dph.mul(dL)))
+          blSr.assign(srM)
+          blSt.assign(stM)
+          If(
+            prevTh
+              .sub(halfPi)
+              .mul(blTh.sub(halfPi))
+              .lessThan(0)
+              .and(transm.greaterThan(0.02))
+              .and(hits.lessThan(8)),
+            () => {
+              const denom = prevTh.sub(blTh)
+              const t = abs(denom)
+                .lessThan(1e-15)
+                .select(float(0), prevTh.sub(halfPi).div(denom))
+              const tt = min(max(t, float(0)), float(1))
+              const hitR = prevBlR.add(blR.sub(prevBlR).mul(tt))
+              If(hitR.greaterThanEqual(rin).and(hitR.lessThanEqual(rout)), () => {
+                hits.addAssign(1)
+                const rhoSafe = max(hitR, float(1e-5))
+                const sqrtM = sqrt(max(M, float(1e-8)))
+                const r32 = pow(rhoSafe, float(1.5))
+                const Omega = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+                const g_tt = float(-1).add(rs.div(rhoSafe)).sub(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
+                const g_tphi = a.mul(M).mul(-2).div(rhoSafe)
+                const g_phiphi = rhoSafe
+                  .mul(rhoSafe)
+                  .add(a.mul(a))
+                  .add(M.mul(2).mul(a).mul(a).div(rhoSafe))
+                const Xorb = g_tt
+                  .mul(-1)
+                  .sub(Omega.mul(2).mul(g_tphi))
+                  .sub(Omega.mul(Omega).mul(g_phiphi))
+                const u_t = float(1).div(sqrt(max(Xorb, float(1e-8))))
+                const lambda = blLz.div(max(blE, float(1e-8)))
+                const freq = float(1).div(
+                  max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)),
+                )
+                const beam = pow(max(freq, float(E.beamFloor)), float(E.beamExponent))
+                const gap = max(
+                  float(1).sub(sqrt(rin.div(max(hitR, rin.mul(1.0001))))),
+                  float(0),
+                )
+                const Ftilde = gap.div(hitR.mul(hitR).mul(hitR).add(1e-12))
+                const rPeak = rin.mul(E.ntPeakOverRin)
+                const gapPeak = max(
+                  float(1).sub(sqrt(rin.div(max(rPeak, rin.mul(1.0001))))),
+                  float(0),
+                )
+                const FtildeMax = gapPeak.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
+                const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
+                const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
+                const rIscoM = max(uRIscoM, float(1.05))
+                const iscoHot = pow(
+                  float(R_ISCO_SCHW_OVER_M).div(rIscoM),
+                  float(E.iscoHotPower),
+                )
+                const spinFac = float(1).add(max(aStar, float(0)).mul(E.spinEtaNudge))
+                const tPeakK = float(T_PEAK_REF_K)
+                  .mul(pow(max(mdot.div(T_PEAK_MDOT_REF), float(1e-6)), float(0.25)))
+                  .mul(iscoHot)
+                  .mul(spinFac)
+                const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
+                const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
+                const TK = max(
+                  float(E.tColorMinK),
+                  min(float(E.tColorMaxK), tRestK.mul(gColor)),
+                )
+                const planckC2 = float(PLANCK_C2_NM_K)
+                const lamR = float(LAMBDA_R_NM)
+                const lamG = float(LAMBDA_G_NM)
+                const lamB = float(LAMBDA_B_NM)
+                const xR = min(planckC2.div(lamR.mul(TK)), float(80))
+                const xG = min(planckC2.div(lamG.mul(TK)), float(80))
+                const xB = min(planckC2.div(lamB.mul(TK)), float(80))
+                const br = float(1).div(
+                  pow(lamR, float(5)).mul(max(exp(xR).sub(1), float(1e-20))),
+                )
+                const bg = float(1).div(
+                  pow(lamG, float(5)).mul(max(exp(xG).sub(1), float(1e-20))),
+                )
+                const bb = float(1).div(
+                  pow(lamB, float(5)).mul(max(exp(xB).sub(1), float(1e-20))),
+                )
+                const bMax = max(br, max(bg, bb))
+                const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
+                const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.55))
+                const mdotBright = float(E.mdotBrightBase).add(
+                  pow(
+                    max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)),
+                    float(E.mdotBrightPower),
+                  ).mul(E.mdotBrightScale),
+                )
+                const iFlux = max(fluxVis, float(E.fluxVisFloor))
+                  .mul(mdotBright)
+                  .mul(E.intensityGain)
+                const emit = chroma.mul(iFlux).mul(beam).mul(bounce)
+                dbgG.assign(freq)
+                dbgT.assign(TK.div(float(12000)))
+                dbgFlux.assign(fluxVis)
+                If(uDebugMode.notEqual(float(8)), () => {
+                  col.addAssign(emit.mul(transm))
+                  transm.mulAssign(0.5)
+                })
+              })
+            },
+          )
+        })
+      })
+
+      // ========== RT Cartesian path (default) ==========
+      If(useBl.not(), () => {
       const r = pos.length()
       minR.assign(min(minR, r))
 
@@ -396,6 +630,8 @@ export function createGeodesicTracer(): GeodesicTracer {
           })
         },
       )
+      }) // end RT path (useBl.not)
+
     })
 
     If(done.lessThan(0.5).and(minR.lessThan(M.mul(RT.stalledCaptureM))), () => {
@@ -740,6 +976,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setFov: (f) => {
       uFov.value = f
+    },
+    setIntegratorMode: (mode) => {
+      uIntegratorMode.value = mode
     },
   }
 }

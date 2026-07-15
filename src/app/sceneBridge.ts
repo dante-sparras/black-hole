@@ -16,6 +16,7 @@ export type SceneBridge = {
   applyLook: () => void
   applySky: () => void
   applyDebug: () => void
+  applyGeodesic: () => void
   connect: () => () => void
   getSpacetime: () => SpacetimeUniforms
   formatStats: (fps: number, healthLine?: string) => string
@@ -56,6 +57,11 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     tracer.setDebugMode(getDebug().mode)
   }
 
+  function applyGeodesic(): void {
+    const mode = getScene().geodesic
+    tracer.setIntegratorMode(mode === 'bl' ? 1 : 0)
+  }
+
   function connect(): () => void {
     const uScene = subscribeScene(() => {
       applyPhysics()
@@ -63,6 +69,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       applyLook()
       applySky()
       applyDebug()
+      applyGeodesic()
     })
     const uDbg = subscribeDebug(() => {
       applyDebug()
@@ -74,14 +81,14 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   }
 
   function formatStats(fps: number, healthLine?: string): string {
-    const { params: p, derived: d, disk, camera: c, look } = getScene()
+    const { params: p, derived: d, disk, camera: c, look, geodesic } = getScene()
     const m = p.mass.toFixed(2)
     const a = p.spinStar.toFixed(3)
     const q = p.charge.toFixed(3)
     const md = disk.mdot >= 0.01 ? disk.mdot.toFixed(2) : disk.mdot.toExponential(1)
     const rp = Number.isFinite(d.rPlus) ? d.rPlus.toFixed(3) : '—'
     const dist = c.distanceM.toFixed(1)
-    const mode = realtimeModeTag(p)
+    const mode = realtimeModeTag(p, geodesic)
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
@@ -96,6 +103,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     applyLook,
     applySky,
     applyDebug,
+    applyGeodesic,
     connect,
     getSpacetime: () => spacetime,
     formatStats,

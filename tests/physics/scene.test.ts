@@ -6,17 +6,18 @@ import { getParams, setParams } from '../../src/state/params'
 import { getScene, setScene, subscribeScene } from '../../src/state/scene'
 
 describe('scene facade', () => {
-  test('getScene returns all slices including disk', () => {
-    setParams({ mass: 1, spinStar: 0.2, charge: 0 })
-    setDisk({ mdot: 0.15, outerM: 25 })
-    const s = getScene()
-    expect(s.params.spinStar).toBeCloseTo(0.2, 5)
-    expect(s.disk.mdot).toBeCloseTo(0.15, 5)
-    expect(s.disk.outerM).toBe(25)
-    expect(s.camera.distanceM).toBe(getCamera().distanceM)
-    expect(s.look.exposure).toBe(getLook().exposure)
-    expect(s.derived.family).toBe('kerr')
-  })
+  test('getScene returns all slices including disk + geodesic', () => {
+      setParams({ mass: 1, spinStar: 0.2, charge: 0 })
+      setDisk({ mdot: 0.15, outerM: 25 })
+      const s = getScene()
+      expect(s.params.spinStar).toBeCloseTo(0.2, 5)
+      expect(s.disk.mdot).toBeCloseTo(0.15, 5)
+      expect(s.disk.outerM).toBe(25)
+      expect(s.camera.distanceM).toBe(getCamera().distanceM)
+      expect(s.look.exposure).toBe(getLook().exposure)
+      expect(s.derived.family).toBe('kerr')
+      expect(s.geodesic === 'rt' || s.geodesic === 'bl').toBe(true)
+    })
 
   test('setScene patches multiple stores', () => {
     setScene({

@@ -1,12 +1,22 @@
 /**
  * Metric-family routing from no-hair parameters.
- * Single source of truth for schw / kerr / rn / kn labels and RT mode tags.
+ * Single source of truth for schw / kerr / rn / kn labels and mode tags.
  */
 import type { BlackHoleParams, MetricFamily } from './types'
 
 const EPS = 1e-12
 
-export type RealtimeModeTag = 'schw-RT' | 'kerr-RT' | 'rn-RT' | 'kn-RT'
+export type GeodesicModeKind = 'rt' | 'bl'
+
+export type RealtimeModeTag =
+  | 'schw-RT'
+  | 'kerr-RT'
+  | 'rn-RT'
+  | 'kn-RT'
+  | 'schw-BL'
+  | 'kerr-BL'
+  | 'rn-BL'
+  | 'kn-BL'
 
 export function hasSpin(params: Pick<BlackHoleParams, 'spinStar'>): boolean {
   return Math.abs(params.spinStar) >= EPS
@@ -29,18 +39,20 @@ export function metricFamilyFromParams(
 }
 
 /**
- * Short stats-bar tag for the real-time integrator path.
- * Matches GPU force law routing (not full Boyer–Lindquist).
+ * Short stats-bar tag for the active integrator path.
+ * RT = Cartesian real-time force; BL = Boyer–Lindquist Mino-time.
  */
 export function realtimeModeTag(
   params: Pick<BlackHoleParams, 'spinStar' | 'charge'>,
+  mode: GeodesicModeKind = 'rt',
 ): RealtimeModeTag {
   const a = hasSpin(params)
   const q = hasCharge(params)
-  if (!a && !q) return 'schw-RT'
-  if (a && !q) return 'kerr-RT'
-  if (!a && q) return 'rn-RT'
-  return 'kn-RT'
+  const suffix = mode === 'bl' ? 'BL' : 'RT'
+  if (!a && !q) return `schw-${suffix}` as RealtimeModeTag
+  if (a && !q) return `kerr-${suffix}` as RealtimeModeTag
+  if (!a && q) return `rn-${suffix}` as RealtimeModeTag
+  return `kn-${suffix}` as RealtimeModeTag
 }
 
 /** r_ISCO / M for GPU upload (scale-free). */

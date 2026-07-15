@@ -1,6 +1,6 @@
 /**
- * Unified scene snapshot: no-hair + disk + camera + look + sky.
- * Sky is global (not overridden by presets).
+ * Unified scene snapshot: no-hair + disk + camera + look + sky + geodesic mode.
+ * Sky and geodesic integrator are global (not overridden by presets).
  */
 import type { DiskInput, DiskParams } from '../physics/diskParams'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
@@ -12,6 +12,12 @@ import {
   type CameraState,
 } from './camera'
 import { getDisk, setDisk, subscribeDisk } from './disk'
+import {
+  getGeodesicIntegrator,
+  setGeodesicIntegrator,
+  subscribeGeodesic,
+  type GeodesicIntegrator,
+} from './geodesic'
 import { getLook, setLook, subscribeLook, type LookState } from './look'
 import {
   getDerived,
@@ -28,6 +34,8 @@ export type SceneSnapshot = {
   camera: CameraState
   look: LookState
   sky: SkyState
+  /** Global geodesic integrator (rt | bl) — not hair, not per-preset */
+  geodesic: GeodesicIntegrator
 }
 
 export type ScenePatch = {
@@ -37,6 +45,7 @@ export type ScenePatch = {
   look?: Partial<LookState>
   /** Optional — presets should leave sky alone */
   sky?: Partial<SkyState>
+  geodesic?: GeodesicIntegrator
 }
 
 type SceneListener = (scene: SceneSnapshot) => void
@@ -49,6 +58,7 @@ export function getScene(): SceneSnapshot {
     camera: getCamera(),
     look: getLook(),
     sky: getSky(),
+    geodesic: getGeodesicIntegrator(),
   }
 }
 
@@ -58,6 +68,7 @@ export function setScene(patch: ScenePatch): SceneSnapshot {
   if (patch.camera) setCamera(patch.camera)
   if (patch.look) setLook(patch.look)
   if (patch.sky) setSky(patch.sky)
+  if (patch.geodesic) setGeodesicIntegrator(patch.geodesic)
   return getScene()
 }
 
@@ -68,6 +79,7 @@ export function subscribeScene(listener: SceneListener): () => void {
   const u3 = subscribeCamera(() => fire())
   const u4 = subscribeLook(() => fire())
   const u5 = subscribeSky(() => fire())
+  const u6 = subscribeGeodesic(() => fire())
   fire()
   return () => {
     u1()
@@ -75,5 +87,6 @@ export function subscribeScene(listener: SceneListener): () => void {
     u3()
     u4()
     u5()
+    u6()
   }
 }
