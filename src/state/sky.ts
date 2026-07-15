@@ -21,10 +21,10 @@ export const SKY_DEFAULTS: SkyState = {
 }
 
 export const SKY_LIMITS = {
-  starDensity: { min: 0, max: 2.5 },
-  starBrightness: { min: 0, max: 2.5 },
-  nebula: { min: 0, max: 2 },
-  milky: { min: 0, max: 2 },
+  starDensity: { min: 0, max: 6 },
+  starBrightness: { min: 0, max: 6 },
+  nebula: { min: 0, max: 5 },
+  milky: { min: 0, max: 5 },
 } as const
 
 type Listener = (sky: SkyState) => void
