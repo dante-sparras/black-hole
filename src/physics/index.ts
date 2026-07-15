@@ -28,5 +28,6 @@ export {
   type KnTraceOptions,
   type KnIntegrator,
 } from './geodesic/kerrNull'
+export * from './geodesic/kerrBl'
 export * from './geodesic/doppler'
 export * from './geodesic/vec3'

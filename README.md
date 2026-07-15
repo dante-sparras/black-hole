@@ -54,4 +54,5 @@ src/
 | NT disk + ṁ + blackbody | ✅ |
 | Bloom + presets | ✅ |
 | CPU ref topology tests | ✅ |
-| Full BL Kerr | ⏳ later |
+| CPU BL Kerr nulls (Phase 1) | ✅ critical-curve validated |
+| Full BL on GPU / live image | ⏳ later |
