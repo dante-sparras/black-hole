@@ -203,6 +203,7 @@ export function cameraRayToBl(options: {
 
 /**
  * Trace one camera ray with the BL integrator.
+ * Optional disk annulus for Phase 3 hit counting + g.
  */
 export function traceCameraRayBl(options: {
   mass: number
@@ -212,6 +213,8 @@ export function traceCameraRayBl(options: {
   ndcY: number
   maxSteps?: number
   fracStep?: number
+  diskInner?: number
+  diskOuter?: number
 }): BlTraceResult & { ray: CameraRayBl } {
   const ray = cameraRayToBl(options)
   const result = traceKerrBlNull({
@@ -224,6 +227,8 @@ export function traceCameraRayBl(options: {
     maxSteps: options.maxSteps ?? 80_000,
     fracStep: options.fracStep ?? 0.02,
     escapeRadius: Math.max(250 * options.mass, ray.origin.r * 4),
+    diskInner: options.diskInner,
+    diskOuter: options.diskOuter,
   })
   return { ...result, ray }
 }

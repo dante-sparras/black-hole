@@ -1,13 +1,19 @@
 /**
- * CPU reference ray-march — topology twin of the GPU geodesicTracer.
+ * CPU reference ray-march — topology twin of the GPU geodesicTracer (default),
+ * or optional Boyer–Lindquist mode for Phase 3 science checks.
  *
- * Lockstep with GPU:
+ * Lockstep with GPU (integrator: 'rt', default):
  *   - knNullAccel force law
  *   - RT step floor (≥ 0.2M)
  *   - **rk2StepKn** (same midpoint stages as TSL)
  *
- * Not a pixel-perfect critical-curve twin (adaptive stepping + float precision
- * still differ); use for capture/disk/escape topology + soft goldens.
+ * BL mode (integrator: 'bl'):
+ *   - cameraRayToBl + traceKerrBlNull (Mino time)
+ *   - disk hits from θ = π/2 crossings
+ *   - slower; use smaller width/height for topology scans
+ *
+ * Not a pixel-perfect critical-curve twin for RT; use for capture/disk/escape
+ * topology + soft goldens.
  */
 import { diskIsco } from '../disk'
 import { knHorizon } from '../kn'
@@ -18,6 +24,8 @@ import {
 import type { BlackHoleParams } from '../types'
 import { spinLength } from '../types'
 import { normalizeParams } from '../validate'
+import { cameraRayToBl } from './blCamera'
+import { traceKerrBlNull } from './kerrBl'
 import { rk2StepKn } from './kerrNull'
 import { RT, rtStepSize } from './rtConstants'
 import {
@@ -40,7 +48,11 @@ export type CpuRefPixel = {
   hits: number
   minR: number
   steps: number
+  /** First-disk g when available (BL mode); 0 otherwise */
+  firstDiskG?: number
 }
+
+export type CpuRefIntegrator = 'rt' | 'bl'
 
 export type CpuRefOptions = {
   params?: Partial<BlackHoleParams>
@@ -51,6 +63,11 @@ export type CpuRefOptions = {
   width?: number
   height?: number
   maxSteps?: number
+  /**
+   * 'rt' (default) = GPU topology twin (Cartesian RK2).
+   * 'bl' = Boyer–Lindquist Mino tracer (disk g available).
+   */
+  integrator?: CpuRefIntegrator
 }
 
 export type CpuRefResult = {
@@ -60,6 +77,7 @@ export type CpuRefResult = {
   center: CpuRefPixel
   params: BlackHoleParams
   camera: ObserverCamera
+  integrator: CpuRefIntegrator
   /** Row-major RGB 0–255 for optional PPM */
   rgb: Uint8Array
 }
@@ -168,8 +186,56 @@ export function traceCpuRefPixel(
   if (minR < RT.stalledCaptureM * M) {
     return { fate: hits > 0 ? 'disk' : 'capture', hits, minR, steps: stepsUsed }
   }
-  // Match GPU: unfinished rays that never skim the photon sphere → escape
   return { fate: hits > 0 ? 'disk' : 'escape', hits, minR, steps: stepsUsed }
+}
+
+/** One pixel via BL camera init + Mino tracer. */
+export function traceCpuRefPixelBl(
+  ndcX: number,
+  ndcY: number,
+  opts: {
+    mass: number
+    spinLength: number
+    camera: ObserverCamera
+    rin: number
+    rout: number
+    maxSteps: number
+  },
+): CpuRefPixel {
+  const ray = cameraRayToBl({
+    mass: opts.mass,
+    spinLength: opts.spinLength,
+    camera: opts.camera,
+    ndcX,
+    ndcY,
+  })
+  const tr = traceKerrBlNull({
+    mass: opts.mass,
+    spinLength: opts.spinLength,
+    conserved: ray.conserved,
+    origin: ray.origin,
+    signR: ray.signR,
+    signTheta: ray.signTheta,
+    maxSteps: opts.maxSteps,
+    diskInner: opts.rin,
+    diskOuter: opts.rout,
+    fracStep: 0.025,
+    escapeRadius: Math.max(250 * opts.mass, ray.origin.r * 4),
+  })
+
+  const hits = tr.diskHits
+  let fate: CpuRefFate
+  if (tr.fate === 'captured') fate = hits > 0 ? 'disk' : 'capture'
+  else if (tr.fate === 'escaped') fate = hits > 0 ? 'disk' : 'escape'
+  else fate = hits > 0 ? 'disk' : 'max'
+
+  return {
+    fate,
+    hits,
+    minR: tr.minR,
+    steps: tr.steps,
+    firstDiskG: tr.firstDiskG,
+  }
 }
 
 function fateRgb(fate: CpuRefFate, minR: number, mass: number): [number, number, number] {
@@ -188,9 +254,12 @@ function fateRgb(fate: CpuRefFate, minR: number, mass: number): [number, number,
 export function renderCpuRef(options: CpuRefOptions = {}): CpuRefResult {
   const params = normalizeParams(options.params ?? {})
   const camera: ObserverCamera = { ...OBSERVER_DEFAULTS, ...options.camera }
-  const W = options.width ?? 96
-  const H = options.height ?? 54
-  const maxSteps = options.maxSteps ?? RT.maxSteps
+  const integrator: CpuRefIntegrator = options.integrator ?? 'rt'
+  // BL is slower — default to a smaller grid unless caller overrides
+  const W = options.width ?? (integrator === 'bl' ? 48 : 96)
+  const H = options.height ?? (integrator === 'bl' ? 27 : 54)
+  const maxSteps =
+    options.maxSteps ?? (integrator === 'bl' ? 40_000 : RT.maxSteps)
   const diskOuterM = options.diskOuterM ?? RT.diskOuterM
 
   const M = params.mass
@@ -211,7 +280,7 @@ export function renderCpuRef(options: CpuRefOptions = {}): CpuRefResult {
   let center: CpuRefPixel | null = null
   const aspect = W / H
 
-  const traceOpts = {
+  const rtOpts = {
     mass: M,
     spinLength: a,
     charge: Q,
@@ -226,11 +295,23 @@ export function renderCpuRef(options: CpuRefOptions = {}): CpuRefResult {
     maxSteps,
   }
 
+  const blOpts = {
+    mass: M,
+    spinLength: a,
+    camera,
+    rin,
+    rout,
+    maxSteps,
+  }
+
   for (let j = 0; j < H; j++) {
     for (let i = 0; i < W; i++) {
       const ndcX = ((i + 0.5) / W) * 2 - 1
       const ndcY = -(((j + 0.5) / H) * 2 - 1)
-      const pix = traceCpuRefPixel(ndcX * aspect, ndcY, traceOpts)
+      const pix =
+        integrator === 'bl'
+          ? traceCpuRefPixelBl(ndcX * aspect, ndcY, blOpts)
+          : traceCpuRefPixel(ndcX * aspect, ndcY, rtOpts)
       counts[pix.fate]++
 
       const isCenter =
@@ -249,9 +330,14 @@ export function renderCpuRef(options: CpuRefOptions = {}): CpuRefResult {
     counts,
     width: W,
     height: H,
-    center: center ?? traceCpuRefPixel(0, 0, traceOpts),
+    center:
+      center ??
+      (integrator === 'bl'
+        ? traceCpuRefPixelBl(0, 0, blOpts)
+        : traceCpuRefPixel(0, 0, rtOpts)),
     params,
     camera,
+    integrator,
     rgb,
   }
 }

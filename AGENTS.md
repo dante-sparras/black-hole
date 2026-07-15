@@ -67,6 +67,7 @@ src/main.ts      # WebGPU boot only
 **BL (CPU):**
 - Phase 1: `geodesic/kerrBl.ts` — Mino-time nulls, \(E,L_z,Q\); Schw \(b_c\) ≲5%
 - Phase 2: `geodesic/blCamera.ts` — `OBSERVER_DEFAULTS` camera → conserved quantities + `traceCameraRayBl`
+- Phase 3: disk θ=π/2 hits + \(g=1/(u^t(1-\Omega\lambda))\) with \(\lambda=L_z/E\); `renderCpuRef({ integrator: 'bl' })`
 - **Live image still real-time Cartesian** until GPU BL (Phase 4)
 
 **Analytic HUD:** `familyCriticalImpacts` / `shadowDiagnostics` — closed-form \(b_c^\pm\); image silhouette is from the real-time integrator.

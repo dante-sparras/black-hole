@@ -4,26 +4,16 @@
  * Conserved E, Lz, Carter Q; Mino-time integration of (r, θ, φ).
  * Geometric units G = c = 1. Pure physics — no Three.js.
  *
- * Live GPU still uses the real-time Cartesian approx (knNullAccel) until a
- * later phase wires BL to the tracer.
+ * Phase 3: equatorial disk (θ = π/2) crossings + orbiting redshift g
+ * using photon λ = Lz/E at the hit radius.
  *
- * Conventions:
- *   - Kerr length a = a★ M
- *   - BL polar θ = 0 along +Y (same spin axis as the project)
- *   - Null μ = 0; default E = 1
- *   - Equatorial disk: θ = π/2
- *
- * Potentials:
- *   P = E(r² + a²) − a Lz
- *   Δ = r² − 2 M r + a²
- *   R(r) = P² − Δ [Q + (Lz − a E)²]
- *   Θ(θ) = Q − cos²θ (−a² E² + Lz²/sin²θ)   (μ = 0)
- *
- * Note: at large r, √R ~ E r², so Mino steps must target fractional Δr
- * (not a fixed dλ ≈ 0.05M — that jumps over the entire domain).
+ * Live GPU still uses the real-time Cartesian approx (knNullAccel) until
+ * Phase 4 wires BL to the tracer.
  */
 
 import { knHorizon } from '../kn'
+import { circularOmega, circularU_t } from './doppler'
+import { RT } from './rtConstants'
 
 export type BlConserved = {
   readonly E: number
@@ -37,6 +27,14 @@ export type BlCoords = {
   phi: number
 }
 
+export type BlDiskHit = {
+  /** BL r at equatorial crossing */
+  r: number
+  /** Orbiting-emitter frequency factor g = 1/(u^t (1 − Ω λ)), λ = Lz/E */
+  g: number
+  phi: number
+}
+
 export type BlTraceFate = 'captured' | 'escaped' | 'max_steps'
 
 export type BlTraceResult = {
@@ -47,6 +45,12 @@ export type BlTraceResult = {
   steps: number
   impactB: number
   conserved: BlConserved
+  /** Equatorial annulus crossings in [diskInner, diskOuter] */
+  diskHits: number
+  /** First few hits (for redshift diagnostics) */
+  diskHitList: BlDiskHit[]
+  /** g of first disk hit, or 0 if none */
+  firstDiskG: number
 }
 
 export type BlTraceOptions = {
@@ -62,6 +66,11 @@ export type BlTraceOptions = {
   fracStep?: number
   escapeRadius?: number
   captureMargin?: number
+  /** Disk annulus (absolute). Default: [6M, RT.diskOuterM·M] */
+  diskInner?: number
+  diskOuter?: number
+  /** Max recorded hits in diskHitList (default 4) */
+  maxRecordedHits?: number
 }
 
 /** Δ = r² − 2Mr + a² */
@@ -133,6 +142,27 @@ export function dphiDlambda(
   return -(a * E - Lz / s2) + (a * P) / Delta
 }
 
+/**
+ * Orbiting-disk redshift using the photon’s conserved λ = Lz/E
+ * (exact impact parameter for equatorial Kerr nulls).
+ * g = 1 / (u^t (1 − Ω λ))
+ */
+export function blOrbitingRedshiftG(
+  mass: number,
+  r: number,
+  spinLength: number,
+  E: number,
+  Lz: number,
+  prograde = true,
+): number {
+  const rr = Math.max(r, 1e-8)
+  const Omega = circularOmega(mass, rr, spinLength, prograde)
+  const u_t = circularU_t(mass, rr, spinLength, 0, prograde)
+  const lambda = Math.abs(E) > 1e-14 ? Lz / E : Lz
+  const denom = Math.max(u_t * (1 - Omega * lambda), 1e-4)
+  return 1 / denom
+}
+
 function clampTheta(theta: number): number {
   const eps = 1e-5
   if (theta < eps) return eps
@@ -159,7 +189,6 @@ export function blMinoStep(
   let R0 = radialPotentialR(r, mass, a, E, Lz, Q)
   let T0 = thetaPotential(theta, a, E, Lz, Q)
 
-  // Turning points: flip before taking a zero step
   if (R0 <= 1e-12) {
     signR = -signR
     R0 = Math.max(R0, 0)
@@ -172,10 +201,8 @@ export function blMinoStep(
   const sqrtR = Math.sqrt(Math.max(R0, 0))
   const sqrtT = Math.sqrt(Math.max(T0, 0))
 
-  // Target radial displacement
   const targetDr = Math.max(fracStep * r, 1e-4 * mass)
   let dL = sqrtR > 1e-14 ? targetDr / sqrtR : fracStep * 0.1
-  // Also limit polar motion
   if (sqrtT > 1e-14 && Math.abs(signTheta) > 0) {
     const targetDth = 0.05
     dL = Math.min(dL, targetDth / sqrtT)
@@ -185,7 +212,6 @@ export function blMinoStep(
   const dr = signR * sqrtR
   const dth = signTheta * sqrtT
 
-  // Midpoint
   const rM = Math.max(r + 0.5 * dL * dr, 1e-6 * mass)
   const thM = clampTheta(theta + 0.5 * dL * dth)
   let RM = radialPotentialR(rM, mass, a, E, Lz, Q)
@@ -209,13 +235,10 @@ export function blMinoStep(
   let thN = clampTheta(theta + dL * dthM)
   const phN = phi + dL * dphM
 
-  // If step crossed into forbidden R<0, reflect at current r
   if (rN > 0 && radialPotentialR(rN, mass, a, E, Lz, Q) < 0) {
     signR = -signR
-    // Place just outside the turning region: stay near r, reverse
     rN = r
   } else {
-    // Accept midpoint signs if we successfully advanced
     signR = srM
     signTheta = stM
   }
@@ -225,7 +248,6 @@ export function blMinoStep(
     thN = theta
   }
 
-  // Never go non-positive
   if (!(rN > 0) || !Number.isFinite(rN)) {
     rN = r * 0.5
     signR = -signR
@@ -234,8 +256,32 @@ export function blMinoStep(
   return { r: rN, theta: thN, phi: phN, signR, signTheta }
 }
 
+function equatorCrossed(th0: number, th1: number): boolean {
+  const eq = Math.PI / 2
+  return (th0 - eq) * (th1 - eq) < 0
+}
+
+function interpolateEquatorHit(
+  r0: number,
+  th0: number,
+  ph0: number,
+  r1: number,
+  th1: number,
+  ph1: number,
+): { r: number; phi: number } {
+  const eq = Math.PI / 2
+  const denom = th0 - th1
+  const t = Math.abs(denom) < 1e-15 ? 0 : (th0 - eq) / denom
+  const tt = Math.min(1, Math.max(0, t))
+  return {
+    r: r0 + (r1 - r0) * tt,
+    phi: ph0 + (ph1 - ph0) * tt,
+  }
+}
+
 /**
  * Trace a Kerr null geodesic in BL (Mino time, adaptive fractional steps).
+ * Counts thin-disk hits when θ crosses π/2 inside [diskInner, diskOuter].
  */
 export function traceKerrBlNull(options: BlTraceOptions): BlTraceResult {
   const M = options.mass
@@ -244,6 +290,9 @@ export function traceKerrBlNull(options: BlTraceOptions): BlTraceResult {
   const maxSteps = options.maxSteps ?? 50_000
   const escapeR = options.escapeRadius ?? 250 * M
   const fracStep = options.fracStep ?? 0.02
+  const diskInner = options.diskInner ?? 6 * M
+  const diskOuter = options.diskOuter ?? RT.diskOuterM * M
+  const maxRec = options.maxRecordedHits ?? 4
   const rPlus = knHorizon(M, a, 0)
   const captureR =
     (Number.isFinite(rPlus) ? rPlus : 2 * M) *
@@ -255,30 +304,52 @@ export function traceKerrBlNull(options: BlTraceOptions): BlTraceResult {
   let signR = options.signR ?? -1
   let signTheta = options.signTheta ?? 1
 
-  // Stay equatorial when Q≈0 and θ≈π/2
-  if (Math.abs(cons.Q) < 1e-14 && Math.abs(theta - Math.PI / 2) < 1e-5) {
+  const forceEquatorial =
+    Math.abs(cons.Q) < 1e-14 && Math.abs(theta - Math.PI / 2) < 1e-5
+  if (forceEquatorial) {
     signTheta = 0
     theta = Math.PI / 2
   }
 
   let minR = r
   const rStart = r
+  let diskHits = 0
+  const diskHitList: BlDiskHit[] = []
+  let prevTheta = theta
+  let prevR = r
+  let prevPhi = phi
+
+  const pack = (fate: BlTraceFate, steps: number): BlTraceResult => ({
+    fate,
+    minR,
+    finalR: r,
+    finalTheta: theta,
+    steps,
+    impactB:
+      Math.abs(cons.E) > 1e-14 ? Math.abs(cons.Lz / cons.E) : Math.abs(cons.Lz),
+    conserved: cons,
+    diskHits,
+    diskHitList,
+    firstDiskG: diskHitList[0]?.g ?? 0,
+  })
 
   for (let i = 0; i < maxSteps; i++) {
     if (r < minR) minR = r
 
     if (r <= captureR) {
-      return finish('captured', minR, r, theta, i, cons)
+      return pack('captured', i)
     }
 
-    // Escaped: outside start shell and moving out (or past escapeR)
     if (r >= escapeR && signR > 0) {
-      return finish('escaped', minR, r, theta, i, cons)
+      return pack('escaped', i)
     }
-    // Also count bounce-back past launch radius as escape
     if (r > rStart * 1.02 && signR > 0 && i > 10) {
-      return finish('escaped', minR, r, theta, i, cons)
+      return pack('escaped', i)
     }
+
+    prevR = r
+    prevTheta = theta
+    prevPhi = phi
 
     const next = blMinoStep(
       { r, theta, phi, signR, signTheta },
@@ -294,38 +365,35 @@ export function traceKerrBlNull(options: BlTraceOptions): BlTraceResult {
     signTheta = next.signTheta
 
     if (!Number.isFinite(r) || !Number.isFinite(theta)) {
-      return finish('max_steps', minR, r, theta, i, cons)
+      return pack('max_steps', i)
+    }
+
+    if (!forceEquatorial && equatorCrossed(prevTheta, theta)) {
+      const hit = interpolateEquatorHit(
+        prevR,
+        prevTheta,
+        prevPhi,
+        r,
+        theta,
+        phi,
+      )
+      if (hit.r >= diskInner && hit.r <= diskOuter) {
+        diskHits++
+        if (diskHitList.length < maxRec) {
+          const g = blOrbitingRedshiftG(M, hit.r, a, cons.E, cons.Lz, true)
+          diskHitList.push({ r: hit.r, g, phi: hit.phi })
+        }
+      }
     }
   }
 
-  // Near-horizon unfinished → capture; otherwise treat as escape if outbound far
   if (minR < 1.15 * captureR) {
-    return finish('captured', minR, r, theta, maxSteps, cons)
+    return pack('captured', maxSteps)
   }
   if (signR > 0 && r > 10 * M) {
-    return finish('escaped', minR, r, theta, maxSteps, cons)
+    return pack('escaped', maxSteps)
   }
-  return finish('max_steps', minR, r, theta, maxSteps, cons)
-}
-
-function finish(
-  fate: BlTraceFate,
-  minR: number,
-  r: number,
-  theta: number,
-  steps: number,
-  cons: BlConserved,
-): BlTraceResult {
-  return {
-    fate,
-    minR,
-    finalR: r,
-    finalTheta: theta,
-    steps,
-    impactB:
-      Math.abs(cons.E) > 1e-14 ? Math.abs(cons.Lz / cons.E) : Math.abs(cons.Lz),
-    conserved: cons,
-  }
+  return pack('max_steps', maxSteps)
 }
 
 /** Equatorial ray from large r with impact b = Lz/E. */
