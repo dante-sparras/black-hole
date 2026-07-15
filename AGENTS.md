@@ -64,7 +64,9 @@ src/main.ts      # WebGPU boot only
 
 **Integration:** `RT` in `physics/geodesic/rtConstants.ts` — step floor ≥0.2M, used by GPU + CPU ref.
 
-**CPU ref:** `bun run test:ref` / `renderCpuRef()` — topology twin of the GPU path.
+**CPU ref:** `bun run test:ref` multi-case topology + soft golden checksums · `bun run test:ref:write` regenerates `tests/fixtures/cpu-ref-goldens.json`.
+
+**Debug (runtime):** HUD panel — view modes (fate/steps/g/T/flux/b/sky), live CPU health strip, click-to-probe rays (`src/debug/*`). Not hair / not presets.
 
 ## Code hygiene
 

@@ -1,0 +1,130 @@
+[
+  {
+    "id": "schw-default",
+    "description": "Schwarzschild default camera",
+    "params": {
+      "mass": 1,
+      "spinStar": 0,
+      "charge": 0
+    },
+    "width": 96,
+    "height": 54,
+    "checksum": {
+      "width": 96,
+      "height": 54,
+      "meanLuma": 0.10944793875574489,
+      "meanRgb": [
+        0.10418179617526023,
+        0.10628177196804647,
+        0.15631808278867104
+      ],
+      "centerLuma": 0.17710326797385623,
+      "blackFrac": 0.003472222222222222,
+      "brightFrac": 0.033179012345679014,
+      "hash": "5c48b34d"
+    },
+    "topology": {
+      "captureFrac": 0.003472222222222222,
+      "diskFrac": 0.033179012345679014,
+      "escapeFrac": 0.9633487654320988,
+      "maxFrac": 0,
+      "centerFate": "capture"
+    }
+  },
+  {
+    "id": "kerr-high-spin",
+    "description": "Kerr a★=0.9",
+    "params": {
+      "mass": 1,
+      "spinStar": 0.9,
+      "charge": 0
+    },
+    "width": 80,
+    "height": 45,
+    "checksum": {
+      "width": 80,
+      "height": 45,
+      "meanLuma": 0.11126174814815074,
+      "meanRgb": [
+        0.10727668845315903,
+        0.10786928104575164,
+        0.15660130718954246
+      ],
+      "centerLuma": 0.17710326797385623,
+      "blackFrac": 0.0016666666666666668,
+      "brightFrac": 0.036944444444444446,
+      "hash": "e830994d"
+    },
+    "topology": {
+      "captureFrac": 0.0016666666666666668,
+      "diskFrac": 0.036944444444444446,
+      "escapeFrac": 0.9613888888888888,
+      "maxFrac": 0,
+      "centerFate": "capture"
+    }
+  },
+  {
+    "id": "rn-q05",
+    "description": "RN Q=0.5",
+    "params": {
+      "mass": 1,
+      "spinStar": 0,
+      "charge": 0.5
+    },
+    "width": 80,
+    "height": 45,
+    "checksum": {
+      "width": 80,
+      "height": 45,
+      "meanLuma": 0.10982363224401134,
+      "meanRgb": [
+        0.10479302832244008,
+        0.10661437908496732,
+        0.15642701525054464
+      ],
+      "centerLuma": 0.17710326797385623,
+      "blackFrac": 0.002777777777777778,
+      "brightFrac": 0.03388888888888889,
+      "hash": "4a4548ed"
+    },
+    "topology": {
+      "captureFrac": 0.002777777777777778,
+      "diskFrac": 0.03388888888888889,
+      "escapeFrac": 0.9633333333333334,
+      "maxFrac": 0,
+      "centerFate": "capture"
+    }
+  },
+  {
+    "id": "extremal-near",
+    "description": "Near-extremal Kerr a★=0.998",
+    "params": {
+      "mass": 1,
+      "spinStar": 0.998,
+      "charge": 0
+    },
+    "width": 64,
+    "height": 36,
+    "checksum": {
+      "width": 64,
+      "height": 36,
+      "meanLuma": 0.11169362745098284,
+      "meanRgb": [
+        0.10797930283224401,
+        0.10825163398692811,
+        0.15672657952069718
+      ],
+      "centerLuma": 0.4132409586056645,
+      "blackFrac": 0.0008680555555555555,
+      "brightFrac": 0.037760416666666664,
+      "hash": "e2aaee95"
+    },
+    "topology": {
+      "captureFrac": 0.0008680555555555555,
+      "diskFrac": 0.037760416666666664,
+      "escapeFrac": 0.9613715277777778,
+      "maxFrac": 0,
+      "centerFate": "disk"
+    }
+  }
+]

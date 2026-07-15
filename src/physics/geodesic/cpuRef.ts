@@ -32,6 +32,7 @@ export type CpuRefPixel = {
   fate: CpuRefFate
   hits: number
   minR: number
+  steps: number
 }
 
 export type CpuRefOptions = {
@@ -126,16 +127,18 @@ export function traceCpuRefPixel(
   let prevY = pos.y
   let hits = 0
   let minR = length3(pos)
+  let stepsUsed = 0
 
   for (let i = 0; i < maxSteps; i++) {
+    stepsUsed = i + 1
     const r = length3(pos)
     if (r < minR) minR = r
 
     if (r <= captureR) {
-      return { fate: hits > 0 ? 'disk' : 'capture', hits, minR }
+      return { fate: hits > 0 ? 'disk' : 'capture', hits, minR, steps: stepsUsed }
     }
     if (r > camD * RT.escapeCamFactor && dot(pos, vel) > 0) {
-      return { fate: hits > 0 ? 'disk' : 'escape', hits, minR }
+      return { fate: hits > 0 ? 'disk' : 'escape', hits, minR, steps: stepsUsed }
     }
 
     const ds = rtStepSize(r, M)
@@ -156,10 +159,10 @@ export function traceCpuRefPixel(
   }
 
   if (minR < RT.stalledCaptureM * M) {
-    return { fate: hits > 0 ? 'disk' : 'capture', hits, minR }
+    return { fate: hits > 0 ? 'disk' : 'capture', hits, minR, steps: stepsUsed }
   }
   // Match GPU: unfinished rays that never skim the photon sphere → escape
-  return { fate: hits > 0 ? 'disk' : 'escape', hits, minR }
+  return { fate: hits > 0 ? 'disk' : 'escape', hits, minR, steps: stepsUsed }
 }
 
 function fateRgb(fate: CpuRefFate, minR: number, mass: number): [number, number, number] {

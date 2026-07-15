@@ -1,7 +1,7 @@
 /**
- * Application bridge: pure stores → render tracer / bloom.
- * Keeps main.ts as a thin WebGPU boot entry.
+ * Application bridge: pure stores → render tracer / bloom / debug mode.
  */
+import { getDebug, subscribeDebug } from '../debug/state'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
 import type { GeodesicTracer } from '../render/geodesicTracer'
@@ -15,9 +15,10 @@ export type SceneBridge = {
   applyCamera: () => void
   applyLook: () => void
   applySky: () => void
+  applyDebug: () => void
   connect: () => () => void
   getSpacetime: () => SpacetimeUniforms
-  formatStats: (fps: number) => string
+  formatStats: (fps: number, healthLine?: string) => string
   setBloomPipeline: (pipeline: BloomPipeline | null) => void
 }
 
@@ -51,16 +52,28 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     tracer.setSky(getScene().sky)
   }
 
+  function applyDebug(): void {
+    tracer.setDebugMode(getDebug().mode)
+  }
+
   function connect(): () => void {
-    return subscribeScene(() => {
+    const uScene = subscribeScene(() => {
       applyPhysics()
       applyCamera()
       applyLook()
       applySky()
+      applyDebug()
     })
+    const uDbg = subscribeDebug(() => {
+      applyDebug()
+    })
+    return () => {
+      uScene()
+      uDbg()
+    }
   }
 
-  function formatStats(fps: number): string {
+  function formatStats(fps: number, healthLine?: string): string {
     const { params: p, derived: d, disk, camera: c, look } = getScene()
     const m = p.mass.toFixed(2)
     const a = p.spinStar.toFixed(3)
@@ -72,7 +85,9 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
-    return `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · D=${dist}M`
+    const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
+    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · D=${dist}M${dbg}`
+    return healthLine ? `${base}\n${healthLine}` : base
   }
 
   return {
@@ -80,6 +95,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     applyCamera,
     applyLook,
     applySky,
+    applyDebug,
     connect,
     getSpacetime: () => spacetime,
     formatStats,

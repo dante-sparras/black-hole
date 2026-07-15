@@ -3,10 +3,12 @@ import './style.css'
 import * as THREE from 'three/webgpu'
 
 import { createSceneBridge } from './app/sceneBridge'
+import { getDebug } from './debug/state'
 import { createBloomPipeline } from './render/bloomPipeline'
 import { createGeodesicTracer } from './render/geodesicTracer'
 import { getLook } from './state/look'
 import { mountControls } from './ui/controls'
+import { mountDebugHud } from './ui/debugHud'
 import { mountOrbitControls } from './ui/orbit'
 
 // Geometric units G = c = 1. No-hair: M, a★, Q + disk ṁ (not hair).
@@ -15,6 +17,7 @@ const errorEl = document.querySelector<HTMLElement>('#error')
 const statsEl = document.querySelector<HTMLElement>('#stats')
 const controlsEl = document.querySelector<HTMLElement>('#controls')
 const derivedEl = document.querySelector<HTMLElement>('#derived')
+const debugEl = document.querySelector<HTMLElement>('#debug-panel')
 
 function showError(message: string): void {
   if (!errorEl) return
@@ -38,8 +41,10 @@ scene.add(tracer.mesh)
 
 const bridge = createSceneBridge(tracer)
 bridge.connect()
+bridge.applyDebug()
 
 let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
+let debugHud: ReturnType<typeof mountDebugHud> | null = null
 
 function onResize(): void {
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -50,7 +55,19 @@ window.addEventListener('resize', onResize)
 if (controlsEl) {
   mountControls(controlsEl, derivedEl)
 }
-mountOrbitControls(renderer.domElement)
+if (debugEl) {
+  debugHud = mountDebugHud(debugEl)
+}
+
+const orbit = mountOrbitControls(renderer.domElement)
+
+// Shift+click (or probe enabled + click without drag) for ray probe
+renderer.domElement.addEventListener('click', (ev) => {
+  if (!debugHud || !getDebug().probeEnabled) return
+  if (orbit.didDrag()) return
+  if (ev.button !== 0) return
+  debugHud.probeAtClient(ev.clientX, ev.clientY, renderer.domElement)
+})
 
 let frames = 0
 let fpsAccum = 0
@@ -81,13 +98,21 @@ async function boot(): Promise<void> {
       renderer.render(scene, camera)
     }
 
+    debugHud?.tickHealth()
+
     frames++
     fpsAccum += dt
     if (fpsAccum >= 0.5) {
       const fps = Math.round(frames / fpsAccum)
       frames = 0
       fpsAccum = 0
-      if (statsEl) statsEl.textContent = bridge.formatStats(fps)
+      if (statsEl) {
+        const health = debugHud?.getLastHealth()
+        statsEl.textContent = bridge.formatStats(
+          fps,
+          health ? `health: ${health.summary}` : undefined,
+        )
+      }
     }
   })
 }

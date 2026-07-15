@@ -7,6 +7,8 @@ import {
 
 export type OrbitHandles = {
   dispose: () => void
+  /** True if last pointer gesture moved more than a few pixels (orbit drag). */
+  didDrag: () => boolean
 }
 
 /**
@@ -22,6 +24,8 @@ export function mountOrbitControls(
   let lastX = 0
   let lastY = 0
   let pointerId: number | null = null
+  let dragDist = 0
+  let lastDragDist = 0
 
   const DRAG_SENS = 0.005
   const WHEEL_SENS = 0.0015
@@ -41,6 +45,7 @@ export function mountOrbitControls(
     if (t?.closest?.('#hud')) return
 
     dragging = true
+    dragDist = 0
     lastX = e.clientX
     lastY = e.clientY
     pointerId = e.pointerId
@@ -52,6 +57,7 @@ export function mountOrbitControls(
     if (!dragging || pointerId !== e.pointerId) return
     const dx = e.clientX - lastX
     const dy = e.clientY - lastY
+    dragDist += Math.hypot(dx, dy)
     lastX = e.clientX
     lastY = e.clientY
 
@@ -65,6 +71,7 @@ export function mountOrbitControls(
 
   function onPointerUp(e: PointerEvent): void {
     if (pointerId !== e.pointerId) return
+    lastDragDist = dragDist
     dragging = false
     pointerId = null
     try {
@@ -145,6 +152,7 @@ export function mountOrbitControls(
       canvas.style.cursor = ''
       canvas.style.touchAction = ''
     },
+    didDrag: () => lastDragDist > 6,
   }
 }
 

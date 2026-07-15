@@ -42,6 +42,7 @@ import {
 } from '../physics/disk'
 import { RT } from '../physics/geodesic/rtConstants'
 import { OBSERVER_DEFAULTS } from '../physics/observer'
+import { DEBUG_DEFAULTS } from '../debug/state'
 import { SKY_DEFAULTS, type SkyState } from '../state/sky'
 
 export type SpacetimeTraceParams = {
@@ -68,6 +69,7 @@ export type GeodesicTracer = {
   setSpacetime: (p: SpacetimeTraceParams) => void
   setCamera: (c: CameraTraceParams) => void
   setSky: (s: SkyState) => void
+  setDebugMode: (mode: number) => void
   setMass: (mass: number) => void
   setSpinStar: (spinStar: number) => void
   setCharge: (charge: number) => void
@@ -103,6 +105,7 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uStarBright = uniform(SKY_DEFAULTS.starBrightness)
   const uNebula = uniform(SKY_DEFAULTS.nebula)
   const uMilky = uniform(SKY_DEFAULTS.milky)
+  const uDebugMode = uniform(DEBUG_DEFAULTS.mode)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -159,11 +162,18 @@ export function createGeodesicTracer(): GeodesicTracer {
     const captured = float(0).toVar()
     const minR = camD.toVar()
     const hits = float(0).toVar()
+    const stepCount = float(0).toVar()
+    const dbgG = float(0).toVar()
+    const dbgT = float(0).toVar()
+    const dbgFlux = float(0).toVar()
+    // Impact parameter scale |r × n| at camera
+    const impactB = cross(camPos, dir0).length().toVar()
 
     Loop({ start: int(0), end: int(STEPS), type: 'int', condition: '<' }, () => {
       If(done.greaterThan(0.5), () => {
         Break()
       })
+      stepCount.addAssign(1)
 
       const r = pos.length()
       minR.assign(min(minR, r))
@@ -368,8 +378,16 @@ export function createGeodesicTracer(): GeodesicTracer {
             const iFlux = max(fluxVis, float(E.fluxVisFloor)).mul(mdotBright).mul(E.intensityGain)
             const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
 
-            col.addAssign(emit.mul(transm))
-            transm.mulAssign(0.5)
+            // Debug channels (last disk hit wins)
+            dbgG.assign(freq)
+            dbgT.assign(TK.div(float(12000)))
+            dbgFlux.assign(fluxVis)
+
+            // Sky-only mode: skip disk emission
+            If(uDebugMode.notEqual(float(8)), () => {
+              col.addAssign(emit.mul(transm))
+              transm.mulAssign(0.5)
+            })
           })
         },
       )
@@ -569,6 +587,90 @@ export function createGeodesicTracer(): GeodesicTracer {
       col.assign(vec3(0, 0, 0))
     })
 
+    // ============================================================
+    // Debug false-color modes (uDebugMode): 0 = normal
+    // ============================================================
+    const mode = uDebugMode
+    If(mode.equal(float(1)), () => {
+      // Fate: capture black, disk orange, escape cyan/blue
+      If(hits.greaterThan(0.5), () => {
+        col.assign(vec3(0.95, 0.45, 0.12))
+      })
+      If(hits.lessThan(0.5).and(captured.greaterThan(0.5)), () => {
+        col.assign(vec3(0.02, 0.02, 0.02))
+      })
+      If(hits.lessThan(0.5).and(escaped.greaterThan(0.5)), () => {
+        const near = minR.lessThan(M.mul(4.0)).select(float(1), float(0))
+        col.assign(
+          near
+            .greaterThan(0.5)
+            .select(vec3(0.15, 0.75, 0.85), vec3(0.08, 0.1, 0.18)),
+        )
+      })
+    })
+    If(mode.equal(float(2)), () => {
+      // Steps heatmap (blue → green → red)
+      const t = min(stepCount.div(float(STEPS)), float(1))
+      col.assign(
+        vec3(t, float(1).sub(abs(t.mul(2).sub(1))), float(1).sub(t)).mul(1.2),
+      )
+    })
+    If(mode.equal(float(3)), () => {
+      // min r / (8M) heat
+      const t = min(minR.div(M.mul(8)), float(1))
+      col.assign(vec3(float(1).sub(t), t.mul(0.6), t))
+    })
+    If(mode.equal(float(4)), () => {
+      // g-factor on disk; dark elsewhere
+      If(hits.greaterThan(0.5), () => {
+        const g = min(dbgG.mul(0.7), float(1.5))
+        col.assign(vec3(g, g.mul(0.85), g.mul(0.55)))
+      })
+      If(hits.lessThan(0.5), () => {
+        col.assign(
+          captured
+            .greaterThan(0.5)
+            .select(vec3(0, 0, 0), vec3(0.03, 0.03, 0.05)),
+        )
+      })
+    })
+    If(mode.equal(float(5)), () => {
+      If(hits.greaterThan(0.5), () => {
+        const t = min(dbgT, float(1.2))
+        col.assign(vec3(t, t.mul(0.7), t.mul(0.35)))
+      })
+      If(hits.lessThan(0.5), () => {
+        col.assign(
+          captured
+            .greaterThan(0.5)
+            .select(vec3(0, 0, 0), vec3(0.02, 0.02, 0.04)),
+        )
+      })
+    })
+    If(mode.equal(float(6)), () => {
+      If(hits.greaterThan(0.5), () => {
+        const f = min(pow(max(dbgFlux, float(1e-4)), float(0.45)), float(1.2))
+        col.assign(vec3(f, f.mul(0.5), f.mul(0.15)))
+      })
+      If(hits.lessThan(0.5), () => {
+        col.assign(
+          captured
+            .greaterThan(0.5)
+            .select(vec3(0, 0, 0), vec3(0.02, 0.02, 0.04)),
+        )
+      })
+    })
+    If(mode.equal(float(7)), () => {
+      // Impact b / (6√3 M) — critical shadow ~1 at Schw
+      const bc = M.mul(float(5.1961524227))
+      const t = min(impactB.div(max(bc, float(1e-6))), float(2)).mul(0.5)
+      col.assign(vec3(t, float(1).sub(abs(t.mul(2).sub(1))), float(1).sub(t)))
+    })
+    // mode 8 sky-only: already skipped disk emit; capture stays black
+    If(mode.equal(float(8)).and(captured.greaterThan(0.5)).and(hits.lessThan(0.5)), () => {
+      col.assign(vec3(0, 0, 0))
+    })
+
     return vec4(col, 1)
   })()
 
@@ -603,6 +705,9 @@ export function createGeodesicTracer(): GeodesicTracer {
       uStarBright.value = s.starBrightness
       uNebula.value = s.nebula
       uMilky.value = s.milky
+    },
+    setDebugMode: (mode) => {
+      uDebugMode.value = mode
     },
     setMass: (m) => {
       uMass.value = m

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "bun test tests",
     "test:ref": "bun run scripts/cpu-ref-render.ts",
+    "test:ref:write": "bun run scripts/cpu-ref-render.ts -- --write",
     "test:all": "bun test tests && bun run scripts/cpu-ref-render.ts"
   },
   "devDependencies": {

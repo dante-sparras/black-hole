@@ -239,3 +239,108 @@ canvas {
 #error.visible {
   display: flex;
 }
+
+/* Debug panel */
+.ctrl-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 160px;
+  padding: 2px 4px;
+  border: 1px solid #3a3a42;
+  border-radius: 4px;
+  background: #141418;
+  color: #e8e8e8;
+  font-size: 11px;
+}
+
+.dbg-health {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #333;
+}
+
+.dbg-health.ok {
+  color: #8fd19e;
+  border-color: #2a4a32;
+  background: rgba(20, 40, 24, 0.5);
+}
+
+.dbg-health.warn {
+  color: #e0c36a;
+  border-color: #5a4a20;
+  background: rgba(50, 40, 10, 0.5);
+}
+
+.dbg-health.fail {
+  color: #f09090;
+  border-color: #5a2020;
+  background: rgba(50, 15, 15, 0.55);
+}
+
+.dbg-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.dbg-check {
+  color: #9aa0a8;
+}
+
+.dbg-check.ok b {
+  color: #8fd19e;
+}
+
+.dbg-check.warn b {
+  color: #e0c36a;
+}
+
+.dbg-check.fail b {
+  color: #f09090;
+}
+
+.dbg-probe {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(20, 24, 32, 0.6);
+  border: 1px solid #2a3040;
+  font-size: 10px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: #b8c0cc;
+}
+
+.dbg-probe-events {
+  margin-top: 4px;
+  color: #7aa2ff;
+  font-size: 9px;
+}
+
+.dbg-log {
+  margin-top: 4px;
+  max-height: 72px;
+  overflow-y: auto;
+  font-size: 9px;
+  color: #6a7078;
+}
+
+.dbg-log-line.warn {
+  color: #c9a84c;
+}
+
+.dbg-log-line.error {
+  color: #e07070;
+}
+
+#stats {
+  white-space: pre-wrap;
+}
+

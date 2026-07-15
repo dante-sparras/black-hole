@@ -1,0 +1,217 @@
+/**
+ * Debug HUD: mode select, health strip, probe log.
+ */
+import {
+  DEBUG_MODE_OPTIONS,
+  getDebug,
+  getDebugLog,
+  probeRay,
+  runHealthCheck,
+  setDebug,
+  subscribeDebug,
+  subscribeDebugLog,
+  type DebugState,
+  type HealthReport,
+  type ProbeResult,
+  debugLog,
+} from '../debug'
+import { getCamera } from '../state/camera'
+import { getDisk } from '../state/disk'
+import { getDerived, getParams } from '../state/params'
+
+export type DebugHudApi = {
+  /** Call periodically from main loop */
+  tickHealth: () => void
+  /** Screen pixel → NDC probe (aspect-corrected like tracer) */
+  probeAtClient: (
+    clientX: number,
+    clientY: number,
+    canvas: HTMLCanvasElement,
+  ) => ProbeResult
+  getLastHealth: () => HealthReport | null
+  getLastProbe: () => ProbeResult | null
+}
+
+export function mountDebugHud(root: HTMLElement): DebugHudApi {
+  root.innerHTML = `
+    <div class="ctrl-section">Debug</div>
+    <label class="ctrl">
+      <span class="ctrl-name">View mode</span>
+      <select id="dbg-mode" class="ctrl-select"></select>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Health</span>
+      <input type="checkbox" id="dbg-health" />
+      <span class="ctrl-val" data-val="dbgHealth"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Click probe</span>
+      <input type="checkbox" id="dbg-probe" />
+      <span class="ctrl-val" data-val="dbgProbe"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Console log</span>
+      <input type="checkbox" id="dbg-console" />
+      <span class="ctrl-val" data-val="dbgConsole"></span>
+    </label>
+    <div id="dbg-health-strip" class="dbg-health ok">health: …</div>
+    <div id="dbg-checks" class="dbg-checks"></div>
+    <div id="dbg-probe-out" class="dbg-probe">Click canvas (with probe on) to inspect a ray.</div>
+    <div id="dbg-log" class="dbg-log"></div>
+    <p class="ctrl-hint">Debug is global · not hair · not presets</p>
+  `
+
+  const modeSelect = root.querySelector<HTMLSelectElement>('#dbg-mode')
+  const healthCb = root.querySelector<HTMLInputElement>('#dbg-health')
+  const probeCb = root.querySelector<HTMLInputElement>('#dbg-probe')
+  const consoleCb = root.querySelector<HTMLInputElement>('#dbg-console')
+  const healthVal = root.querySelector<HTMLElement>('[data-val="dbgHealth"]')
+  const probeVal = root.querySelector<HTMLElement>('[data-val="dbgProbe"]')
+  const consoleVal = root.querySelector<HTMLElement>('[data-val="dbgConsole"]')
+  const healthStrip = root.querySelector<HTMLElement>('#dbg-health-strip')
+  const checksEl = root.querySelector<HTMLElement>('#dbg-checks')
+  const probeOut = root.querySelector<HTMLElement>('#dbg-probe-out')
+  const logEl = root.querySelector<HTMLElement>('#dbg-log')
+
+  if (modeSelect) {
+    for (const opt of DEBUG_MODE_OPTIONS) {
+      const o = document.createElement('option')
+      o.value = String(opt.id)
+      o.textContent = opt.label
+      modeSelect.appendChild(o)
+    }
+  }
+
+  let lastHealth: HealthReport | null = null
+  let lastProbe: ProbeResult | null = null
+  let healthAccum = 0
+
+  function syncInputs(s: DebugState): void {
+    if (modeSelect) modeSelect.value = String(s.mode)
+    if (healthCb) healthCb.checked = s.healthEnabled
+    if (probeCb) probeCb.checked = s.probeEnabled
+    if (consoleCb) consoleCb.checked = s.consoleMirror
+    if (healthVal) healthVal.textContent = s.healthEnabled ? 'on' : 'off'
+    if (probeVal) probeVal.textContent = s.probeEnabled ? 'on' : 'off'
+    if (consoleVal) consoleVal.textContent = s.consoleMirror ? 'on' : 'off'
+  }
+
+  function renderHealth(h: HealthReport): void {
+    lastHealth = h
+    if (healthStrip) {
+      healthStrip.className = `dbg-health ${h.level}`
+      healthStrip.textContent = h.summary
+    }
+    if (checksEl) {
+      checksEl.innerHTML = h.checks
+        .map(
+          (c) =>
+            `<div class="dbg-check ${c.level}"><b>${c.label}</b> ${c.detail}</div>`,
+        )
+        .join('')
+    }
+  }
+
+  function renderLog(): void {
+    if (!logEl) return
+    const entries = getDebugLog().slice(-8)
+    logEl.innerHTML = entries
+      .map(
+        (e) =>
+          `<div class="dbg-log-line ${e.level}">${e.level} · ${e.code}: ${e.message}</div>`,
+      )
+      .join('')
+  }
+
+  function renderProbe(p: ProbeResult): void {
+    lastProbe = p
+    if (!probeOut) return
+    const lastEvents = p.stepsLog
+      .filter((s) => s.event)
+      .slice(-6)
+      .map((s) => `#${s.i} ${s.event} r=${(s.r / getParams().mass).toFixed(2)}M`)
+      .join(' · ')
+    probeOut.innerHTML =
+      `<div><b>Probe</b> ndc=(${p.ndcX.toFixed(3)}, ${p.ndcY.toFixed(3)})</div>` +
+      `<div>${p.summary}</div>` +
+      (lastEvents ? `<div class="dbg-probe-events">${lastEvents}</div>` : '')
+  }
+
+  modeSelect?.addEventListener('change', () => {
+    setDebug({ mode: Number(modeSelect.value) as DebugState['mode'] })
+  })
+  healthCb?.addEventListener('change', () => {
+    setDebug({ healthEnabled: healthCb.checked })
+  })
+  probeCb?.addEventListener('change', () => {
+    setDebug({ probeEnabled: probeCb.checked })
+  })
+  consoleCb?.addEventListener('change', () => {
+    setDebug({ consoleMirror: consoleCb.checked })
+  })
+
+  subscribeDebug(syncInputs)
+  subscribeDebugLog(() => renderLog())
+  syncInputs(getDebug())
+  renderLog()
+
+  function tickHealth(): void {
+    const s = getDebug()
+    if (!s.healthEnabled) return
+    healthAccum++
+    // ~ every 45 frames at 60fps ≈ 0.75s; also first call
+    if (healthAccum > 1 && healthAccum % 45 !== 0) return
+    try {
+      const report = runHealthCheck({
+        params: getParams(),
+        derived: getDerived(),
+        disk: getDisk(),
+        camera: getCamera(),
+      })
+      renderHealth(report)
+    } catch (err) {
+      debugLog.error(
+        'health',
+        err instanceof Error ? err.message : String(err),
+      )
+    }
+  }
+
+  function probeAtClient(
+    clientX: number,
+    clientY: number,
+    canvas: HTMLCanvasElement,
+  ): ProbeResult {
+    const rect = canvas.getBoundingClientRect()
+    const u = (clientX - rect.left) / Math.max(rect.width, 1)
+    const v = (clientY - rect.top) / Math.max(rect.height, 1)
+    const aspect = rect.width / Math.max(rect.height, 1)
+    const ndcX = (u * 2 - 1) * aspect
+    const ndcY = -(v * 2 - 1)
+    const p = probeRay({
+      params: getParams(),
+      camera: getCamera(),
+      diskOuterM: getDisk().outerM,
+      ndcX,
+      ndcY,
+      logStride: 6,
+    })
+    renderProbe(p)
+    debugLog.info('probe', p.summary, {
+      fate: p.fate,
+      hits: p.hits,
+      steps: p.steps,
+    })
+    return p
+  }
+
+  // Initial health
+  tickHealth()
+
+  return {
+    tickHealth,
+    probeAtClient,
+    getLastHealth: () => lastHealth,
+    getLastProbe: () => lastProbe,
+  }
+}
