@@ -1,41 +1,30 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  DEFAULT_MDOT,
-  MAX_SPIN_STAR,
-  MDOT_MAX,
-  MDOT_MIN,
-} from '../../src/physics/constants'
+import { DEFAULT_MASS, DEFAULT_SPIN_STAR, MASS_MIN, MAX_SPIN_STAR } from '../../src/physics/constants'
 import { isExtremalOk, normalizeParams } from '../../src/physics/validate'
+import { DEFAULT_DISK, DISK_LIMITS, normalizeDisk } from '../../src/physics/diskParams'
 
-describe('normalizeParams', () => {
-  test('defaults to Schwarzschild unit mass + default ṁ', () => {
+describe('normalizeParams (no-hair only)', () => {
+  test('defaults to Schwarzschild unit mass', () => {
     const p = normalizeParams({})
-    expect(p.mass).toBe(1)
-    expect(p.spinStar).toBe(0)
+    expect(p.mass).toBe(DEFAULT_MASS)
+    expect(p.spinStar).toBe(DEFAULT_SPIN_STAR)
     expect(p.charge).toBe(0)
-    expect(p.mdot).toBe(DEFAULT_MDOT)
   })
 
   test('clamps spinStar to MAX_SPIN_STAR', () => {
-    const p = normalizeParams({ mass: 1, spinStar: 2, charge: 0 })
+    const p = normalizeParams({ spinStar: 2 })
     expect(p.spinStar).toBe(MAX_SPIN_STAR)
   })
 
   test('clamps charge so M² ≥ a² + Q²', () => {
-    const p = normalizeParams({ mass: 1, spinStar: 0.9, charge: 0.8 })
-    const a = p.spinStar * p.mass
-    expect(p.mass * p.mass).toBeGreaterThanOrEqual(a * a + p.charge * p.charge - 1e-12)
+    const p = normalizeParams({ mass: 1, spinStar: 0.9, charge: 10 })
+    expect(isExtremalOk(p)).toBe(true)
+    expect(Math.abs(p.charge)).toBeLessThanOrEqual(Math.sqrt(1 - 0.9 * 0.9) + 1e-9)
   })
 
   test('rejects non-positive mass by clamping to epsilon', () => {
-    const p = normalizeParams({ mass: 0, spinStar: 0, charge: 0 })
-    expect(p.mass).toBeGreaterThan(0)
-  })
-
-  test('clamps ṁ to [MDOT_MIN, MDOT_MAX]', () => {
-    expect(normalizeParams({ mdot: 1e-9 }).mdot).toBe(MDOT_MIN)
-    expect(normalizeParams({ mdot: 100 }).mdot).toBe(MDOT_MAX)
-    expect(normalizeParams({ mdot: 0.25 }).mdot).toBeCloseTo(0.25, 10)
+    const p = normalizeParams({ mass: -1 })
+    expect(p.mass).toBe(MASS_MIN)
   })
 })
 
@@ -45,6 +34,24 @@ describe('isExtremalOk', () => {
   })
 
   test('naked singularity not ok', () => {
-    expect(isExtremalOk({ mass: 1, spinStar: 1.1, charge: 0 })).toBe(false)
+    expect(isExtremalOk({ mass: 1, spinStar: 0.99, charge: 0.5 })).toBe(false)
+  })
+})
+
+describe('normalizeDisk (not hair)', () => {
+  test('defaults', () => {
+    const d = normalizeDisk({})
+    expect(d.mdot).toBe(DEFAULT_DISK.mdot)
+    expect(d.outerM).toBe(DEFAULT_DISK.outerM)
+  })
+
+  test('clamps ṁ', () => {
+    expect(normalizeDisk({ mdot: 1e-9 }).mdot).toBe(DISK_LIMITS.mdot.min)
+    expect(normalizeDisk({ mdot: 99 }).mdot).toBe(DISK_LIMITS.mdot.max)
+  })
+
+  test('clamps outer radius', () => {
+    expect(normalizeDisk({ outerM: 1 }).outerM).toBe(DISK_LIMITS.outerM.min)
+    expect(normalizeDisk({ outerM: 500 }).outerM).toBe(DISK_LIMITS.outerM.max)
   })
 })

@@ -4,7 +4,9 @@ import {
   mdotTemperatureScale,
   sliderFromMdot as sliderFromMdotRange,
 } from '../physics/disk'
+import { DISK_LIMITS } from '../physics/diskParams'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
+import type { DiskParams } from '../physics/diskParams'
 import {
   CAMERA_LIMITS,
   degToRad,
@@ -14,6 +16,7 @@ import {
   subscribeCamera,
   type CameraState,
 } from '../state/camera'
+import { getDisk, setDisk, subscribeDisk } from '../state/disk'
 import {
   getLook,
   LOOK_LIMITS,
@@ -59,7 +62,7 @@ export function mountControls(
     </div>
     <p class="ctrl-hint" id="preset-hint">One-click scene: physics + camera + look</p>
 
-    <div class="ctrl-section">Physics</div>
+    <div class="ctrl-section">Black hole (no-hair)</div>
     <label class="ctrl">
       <span class="ctrl-name">Mass M</span>
       <input type="range" id="p-mass" min="0.1" max="10" step="0.01" />
@@ -75,12 +78,20 @@ export function mountControls(
       <input type="range" id="p-charge" min="0" max="0.95" step="0.01" />
       <span class="ctrl-val" data-val="charge"></span>
     </label>
+    <p class="ctrl-hint">Only M, a★, Q characterize the stationary BH (no-hair)</p>
+
+    <div class="ctrl-section">Accretion disk (not hair)</div>
     <label class="ctrl">
       <span class="ctrl-name">ṁ / ṁ_Edd</span>
-      <input type="range" id="p-mdot" min="0" max="1000" step="1" />
+      <input type="range" id="d-mdot" min="0" max="1000" step="1" />
       <span class="ctrl-val" data-val="mdot"></span>
     </label>
-    <p class="ctrl-hint">ṁ = Eddington ratio (disk). T ∝ ṁ¼ · log slider · not hair</p>
+    <label class="ctrl">
+      <span class="ctrl-name">r_out / M</span>
+      <input type="range" id="d-outer" min="${DISK_LIMITS.outerM.min}" max="${DISK_LIMITS.outerM.max}" step="1" />
+      <span class="ctrl-val" data-val="outer"></span>
+    </label>
+    <p class="ctrl-hint">ṁ → NT flux &amp; T∝ṁ¼ · r_out = luminous outer edge · ISCO = derived inner edge</p>
 
     <div class="ctrl-section">Camera</div>
     <label class="ctrl">
@@ -137,11 +148,13 @@ export function mountControls(
   const massInput = root.querySelector<HTMLInputElement>('#p-mass')
   const spinInput = root.querySelector<HTMLInputElement>('#p-spin')
   const chargeInput = root.querySelector<HTMLInputElement>('#p-charge')
-  const mdotInput = root.querySelector<HTMLInputElement>('#p-mdot')
+  const mdotInput = root.querySelector<HTMLInputElement>('#d-mdot')
+  const outerInput = root.querySelector<HTMLInputElement>('#d-outer')
   const massVal = root.querySelector<HTMLElement>('[data-val="mass"]')
   const spinVal = root.querySelector<HTMLElement>('[data-val="spin"]')
   const chargeVal = root.querySelector<HTMLElement>('[data-val="charge"]')
   const mdotVal = root.querySelector<HTMLElement>('[data-val="mdot"]')
+  const outerVal = root.querySelector<HTMLElement>('[data-val="outer"]')
 
   const distInput = root.querySelector<HTMLInputElement>('#c-dist')
   const incInput = root.querySelector<HTMLInputElement>('#c-inc')
@@ -189,14 +202,19 @@ export function mountControls(
     if (massInput) massInput.value = String(p.mass)
     if (spinInput) spinInput.value = String(p.spinStar)
     if (chargeInput) chargeInput.value = String(p.charge)
-    if (mdotInput) mdotInput.value = String(sliderFromMdot(p.mdot))
     if (massVal) massVal.textContent = fmt(p.mass, 2)
     if (spinVal) spinVal.textContent = fmt(p.spinStar, 3)
     if (chargeVal) chargeVal.textContent = fmt(p.charge, 3)
+  }
+
+  function syncDiskInputs(d: DiskParams): void {
+    if (mdotInput) mdotInput.value = String(sliderFromMdot(d.mdot))
+    if (outerInput) outerInput.value = String(d.outerM)
     if (mdotVal) {
-      const tScale = mdotTemperatureScale(p.mdot)
-      mdotVal.textContent = `${fmtMdot(p.mdot)}  (T×${fmt(tScale, 2)})`
+      const tScale = mdotTemperatureScale(d.mdot)
+      mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
     }
+    if (outerVal) outerVal.textContent = `${fmt(d.outerM, 0)} M`
   }
 
   function syncCameraInputs(c: CameraState): void {
@@ -225,7 +243,7 @@ export function mountControls(
 
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
     if (!derivedRoot) return
-    renderDerivedHud(derivedRoot, p, d)
+    renderDerivedHud(derivedRoot, p, d, getDisk())
   }
 
   massInput?.addEventListener('input', () => {
@@ -242,7 +260,11 @@ export function mountControls(
   })
   mdotInput?.addEventListener('input', () => {
     onUserTweaked()
-    setParams({ mdot: mdotFromSlider(Number(mdotInput.value)) })
+    setDisk({ mdot: mdotFromSlider(Number(mdotInput.value)) })
+  })
+  outerInput?.addEventListener('input', () => {
+    onUserTweaked()
+    setDisk({ outerM: Number(outerInput.value) })
   })
 
   distInput?.addEventListener('input', () => {
@@ -297,6 +319,11 @@ export function mountControls(
     syncDerived(d, p)
   })
 
+  subscribeDisk((disk) => {
+    syncDiskInputs(disk)
+    syncDerived(getDerived(), getParams())
+  })
+
   subscribeCamera((c) => {
     syncCameraInputs(c)
   })
@@ -312,6 +339,7 @@ export function mountControls(
   })
 
   syncPhysicsInputs(getParams())
+  syncDiskInputs(getDisk())
   syncCameraInputs(getCamera())
   syncLookInputs(getLook())
   syncDerived(getDerived(), getParams())

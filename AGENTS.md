@@ -35,11 +35,17 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 | Mass \(M\) | `mass` | \(0.1\)–\(10\) (default \(1\)) | Primary scale |
 | Dimensionless spin \(a_\star = J/M^2\) | `spinStar` | \(0\)–\(0.998\) | Kerr length \(a = a_\star M\) — **affects rays** |
 | Charge \(Q\) | `charge` | default 0 | Affects rays (RN/KN) |
-| Eddington ratio \(\dot{m}\) | `mdot` | \(10^{-3}\)–\(3\) (default \(0.1\)) | **Not hair** — disk \(F\propto\dot{m}\), \(T\propto\dot{m}^{1/4}\) |
 
 **Extremality:** \(M^2 \ge a^2 + Q^2\). Prefer reducing \(Q\) so spin stays the visual lever.
 
-**Not hair:** camera, \(\dot{m}\), disk temperature map, jets, resolution.
+### Disk (not hair) — separate store `state/disk.ts`
+
+| Param | Code | Range | Notes |
+| ----- | ---- | ----- | ----- |
+| Eddington ratio \(\dot{m}\) | `mdot` | \(10^{-3}\)–\(3\) | \(F\propto\dot{m}\), \(T\propto\dot{m}^{1/4}\) |
+| Outer radius | `outerM` | \(8\)–\(80\,M\) | Luminous cutoff; **inner edge = family ISCO** (derived) |
+
+**Not free (realism):** inner edge (locked to ISCO), film palette as primary color.
 
 ## Physics layout
 

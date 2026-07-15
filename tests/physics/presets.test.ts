@@ -5,6 +5,7 @@ import {
 } from '../../src/physics/disk'
 import { normalizeParams } from '../../src/physics/validate'
 import { CAMERA_DEFAULTS, getCamera } from '../../src/state/camera'
+import { getDisk } from '../../src/state/disk'
 import { getLook, LOOK_DEFAULTS } from '../../src/state/look'
 import { getParams } from '../../src/state/params'
 import {
@@ -26,7 +27,7 @@ function peakT(preset: ScenePreset): number {
   const p = normalizeParams(preset.params)
   const rIsco = diskIsco(p)
   const rIscoOverM = rIsco / p.mass
-  return diskPeakTemperatureK(p.mdot, rIscoOverM, p.spinStar)
+  return diskPeakTemperatureK(preset.disk.mdot, rIscoOverM, p.spinStar)
 }
 
 describe('presets', () => {
@@ -40,12 +41,13 @@ describe('presets', () => {
     expect(getPresetById('interstellar')?.label).toBe('Interstellar')
   })
 
-  test('every preset declares full physics snapshot', () => {
+  test('every preset declares full no-hair + disk snapshot', () => {
     for (const p of ALL_PRESETS) {
       expect(p.params.mass).toBeGreaterThan(0)
       expect(p.params.spinStar).toBeGreaterThanOrEqual(0)
       expect(p.params.spinStar).toBeLessThanOrEqual(0.998)
-      expect(p.params.mdot).toBeGreaterThan(0)
+      expect(p.disk.mdot).toBeGreaterThan(0)
+      expect(p.disk.outerM).toBeGreaterThan(6)
       expect(Number.isFinite(p.params.charge)).toBe(true)
     }
   })
@@ -54,6 +56,7 @@ describe('presets', () => {
     applyPreset(PRESET_INTERSTELLAR)
     expect(getParams().spinStar).toBeCloseTo(0.998, 3)
     expect(getParams().charge).toBe(0)
+    expect(getDisk().mdot).toBeCloseTo(0.1, 5)
     expect(getLook().bloomEnabled).toBe(true)
     expect(getLook().exposure).toBeLessThan(1.1)
     expect(getLook().bloomStrength).toBeLessThan(0.5)
@@ -61,14 +64,14 @@ describe('presets', () => {
 
   test('apply hot raises ṁ without nuking the shadow with bloom', () => {
     applyPreset(PRESET_HOT)
-    expect(getParams().mdot).toBeGreaterThan(1)
+    expect(getDisk().mdot).toBeGreaterThan(1)
     expect(getLook().bloomStrength).toBeLessThan(0.5)
     expect(getLook().bloomThreshold).toBeGreaterThanOrEqual(0.7)
   })
 
   test('apply cool is low ṁ', () => {
     applyPreset(PRESET_COOL)
-    expect(getParams().mdot).toBeLessThan(0.05)
+    expect(getDisk().mdot).toBeLessThan(0.05)
     expect(getLook().bloomStrength).toBeLessThanOrEqual(0.25)
   })
 
@@ -125,7 +128,7 @@ describe('presets', () => {
       expect(phys.mass).toBeGreaterThan(0)
       expect(phys.spinStar).toBeGreaterThanOrEqual(0)
       expect(phys.spinStar).toBeLessThanOrEqual(0.998)
-      expect(phys.mdot).toBeGreaterThan(0)
+      expect(getDisk().mdot).toBeGreaterThan(0)
       const a = phys.spinStar * phys.mass
       expect(phys.mass * phys.mass).toBeGreaterThanOrEqual(
         a * a + phys.charge * phys.charge - 1e-9,
@@ -134,7 +137,6 @@ describe('presets', () => {
   })
 
   test('preset peak-T ladder is physical', () => {
-    // Coolest → hottest: Cool < Schw ≤ RN < Default < Interstellar < Extremal < Hot
     const cool = peakT(PRESET_COOL)
     const schw = peakT(PRESET_SCHWARZSCHILD)
     const rn = peakT(PRESET_RN)
@@ -144,7 +146,7 @@ describe('presets', () => {
     const hot = peakT(PRESET_HOT)
 
     expect(cool).toBeLessThan(schw)
-    expect(schw).toBeLessThanOrEqual(rn * 1.001) // RN ISCO slightly smaller → ≥ Schw
+    expect(schw).toBeLessThanOrEqual(rn * 1.001)
     expect(rn).toBeLessThan(def)
     expect(def).toBeLessThan(inter)
     expect(inter).toBeLessThan(ext)
@@ -176,6 +178,6 @@ describe('presets', () => {
     expect(getParams().spinStar).toBeCloseTo(0.998, 2)
     applyPreset(PRESET_COOL)
     expect(getParams().spinStar).toBeLessThan(0.3)
-    expect(getParams().mdot).toBeLessThan(0.05)
+    expect(getDisk().mdot).toBeLessThan(0.05)
   })
 })

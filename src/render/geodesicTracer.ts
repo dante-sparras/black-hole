@@ -49,6 +49,8 @@ export type SpacetimeTraceParams = {
   mdot: number
   /** r_ISCO / M from CPU diskIsco */
   rIscoOverM: number
+  /** Disk outer radius in units of M */
+  outerM: number
 }
 
 export type CameraTraceParams = {
@@ -408,6 +410,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       uCharge.value = p.charge
       uMdot.value = p.mdot
       uRIscoM.value = p.rIscoOverM
+      uRoutM.value = p.outerM
     },
     setCamera: (c) => {
       uCamDistM.value = c.distanceM
