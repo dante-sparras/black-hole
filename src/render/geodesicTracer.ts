@@ -378,16 +378,16 @@ export function createGeodesicTracer(): GeodesicTracer {
 
     If(escaped.greaterThan(0.5), () => {
       // ============================================================
-      // Deep-space backdrop (flat TSL — no nested Fn helpers)
-      // Direction = escape ray (GR-lensed background).
+      // Deep space: mostly black, soft circular stars, subtle nebulae.
+      // Escape-ray direction = GR-lensed background.
       // ============================================================
       const d = vel.normalize()
       const dx = d.x
       const dy = d.y
       const dz = d.z
 
-      // Value-noise octave A (scale 2.4)
-      const aS = float(2.4)
+      // --- Soft 2-octave fBm (nebula mask only) ---
+      const aS = float(2.2)
       const aix = floor(dx.mul(aS))
       const aiy = floor(dy.mul(aS))
       const aiz = floor(dz.mul(aS))
@@ -414,8 +414,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       const ay1 = ax01.mul(float(1).sub(auy)).add(ax11.mul(auy))
       const n1 = ay0.mul(float(1).sub(auz)).add(ay1.mul(auz))
 
-      // Octave B (scale 5.1)
-      const bS = float(5.1)
+      const bS = float(5.5)
       const bix = floor(dx.mul(bS))
       const biy = floor(dy.mul(bS))
       const biz = floor(dz.mul(bS))
@@ -442,142 +441,117 @@ export function createGeodesicTracer(): GeodesicTracer {
       const by1 = bx01.mul(float(1).sub(buy)).add(bx11.mul(buy))
       const n2 = by0.mul(float(1).sub(buz)).add(by1.mul(buz))
 
-      // Octave C (scale 11)
-      const cS = float(11.0)
-      const cix = floor(dx.mul(cS))
-      const ciy = floor(dy.mul(cS))
-      const ciz = floor(dz.mul(cS))
-      const cfx = dx.mul(cS).sub(cix)
-      const cfy = dy.mul(cS).sub(ciy)
-      const cfz = dz.mul(cS).sub(ciz)
-      const cux = cfx.mul(cfx).mul(float(3).sub(cfx.mul(2)))
-      const cuy = cfy.mul(cfy).mul(float(3).sub(cfy.mul(2)))
-      const cuz = cfz.mul(cfz).mul(float(3).sub(cfz.mul(2)))
-      const csd = float(9.3)
-      const cn000 = fract(sin(cix.mul(127.1).add(ciy.mul(311.7)).add(ciz.mul(74.7)).add(csd)).mul(43758.5453))
-      const cn100 = fract(sin(cix.add(1).mul(127.1).add(ciy.mul(311.7)).add(ciz.mul(74.7)).add(csd)).mul(43758.5453))
-      const cn010 = fract(sin(cix.mul(127.1).add(ciy.add(1).mul(311.7)).add(ciz.mul(74.7)).add(csd)).mul(43758.5453))
-      const cn110 = fract(sin(cix.add(1).mul(127.1).add(ciy.add(1).mul(311.7)).add(ciz.mul(74.7)).add(csd)).mul(43758.5453))
-      const cn001 = fract(sin(cix.mul(127.1).add(ciy.mul(311.7)).add(ciz.add(1).mul(74.7)).add(csd)).mul(43758.5453))
-      const cn101 = fract(sin(cix.add(1).mul(127.1).add(ciy.mul(311.7)).add(ciz.add(1).mul(74.7)).add(csd)).mul(43758.5453))
-      const cn011 = fract(sin(cix.mul(127.1).add(ciy.add(1).mul(311.7)).add(ciz.add(1).mul(74.7)).add(csd)).mul(43758.5453))
-      const cn111 = fract(sin(cix.add(1).mul(127.1).add(ciy.add(1).mul(311.7)).add(ciz.add(1).mul(74.7)).add(csd)).mul(43758.5453))
-      const cx00 = cn000.mul(float(1).sub(cux)).add(cn100.mul(cux))
-      const cx10 = cn010.mul(float(1).sub(cux)).add(cn110.mul(cux))
-      const cx01 = cn001.mul(float(1).sub(cux)).add(cn101.mul(cux))
-      const cx11 = cn011.mul(float(1).sub(cux)).add(cn111.mul(cux))
-      const cy0 = cx00.mul(float(1).sub(cuy)).add(cx10.mul(cuy))
-      const cy1 = cx01.mul(float(1).sub(cuy)).add(cx11.mul(cuy))
-      const n3 = cy0.mul(float(1).sub(cuz)).add(cy1.mul(cuz))
+      const fbm = n1.mul(0.65).add(n2.mul(0.35))
 
-      const fbm = n1.mul(0.55).add(n2.mul(0.3)).add(n3.mul(0.15))
-
-      // Extra noise fields for color variety (cheaper hashes on scaled dirs)
-      const nA = fract(sin(dx.mul(19.1).add(dy.mul(47.3)).add(dz.mul(91.7)).add(2.2)).mul(43758.5453))
-      const nB = fract(sin(dx.mul(41.2).add(dy.mul(13.9)).add(dz.mul(67.4)).add(6.6)).mul(43758.5453))
-      const nC = fract(sin(dx.mul(73.5).add(dy.mul(29.8)).add(dz.mul(11.2)).add(3.1)).mul(43758.5453))
-      // Blend coarse fbm with hashes for wisps
-      const ridge = float(1).sub(abs(fbm.mul(2).sub(1)))
-      const wisps = pow(max(ridge.mul(0.6).add(nB.mul(0.4)), float(0)), float(2.0))
-
-      // Milky Way band
-      const galN = vec3(0.22, 0.88, 0.42).normalize()
+      // Soft milky haze (desaturated, low gain)
+      const galN = vec3(0.18, 0.9, 0.35).normalize()
       const band = float(1).sub(abs(dot(d, galN)))
-      const milky = pow(max(band, float(0)), float(8.0))
-      const milkyDust = milky.mul(fbm.mul(0.65).add(0.35))
-      const milkyCore = pow(max(band, float(0)), float(18.0)).mul(pow(max(fbm, float(0)), float(1.4)))
+      const milky = pow(max(band, float(0)), float(10.0))
 
-      const voidCol = vec3(0.003, 0.004, 0.01)
-      const hemi = dy.mul(0.5).add(0.5)
-      const hemiTint = vec3(0.012, 0.014, 0.035)
-        .mul(float(1).sub(hemi).mul(0.45))
-        .add(vec3(0.01, 0.007, 0.016).mul(hemi.mul(0.4)))
+      // --- Mostly black void + faint cool dust (not rainbow) ---
+      const voidCol = vec3(0.0015, 0.0018, 0.0035)
+      // Desaturated blue-grey nebulae only
+      const dustMask = pow(max(fbm.sub(0.42), float(0)).mul(1.8), float(1.8))
+      const dust = vec3(0.04, 0.05, 0.08).mul(dustMask.mul(0.22))
+      const lane = vec3(0.05, 0.055, 0.07).mul(milky.mul(fbm.mul(0.5).add(0.25)).mul(0.18))
+      let sky = voidCol.add(dust).add(lane)
 
-      const nebBlue = vec3(0.06, 0.09, 0.26).mul(
-        pow(max(fbm.mul(0.75).add(nC.mul(0.25)), float(0)), float(1.5)).mul(0.7),
+      // ============================================================
+      // Circular stars: hash places a star in each cell; smooth disc
+      // falloff in cell UV → round points (not grid pixels).
+      // ============================================================
+
+      // Layer 1 — dense faint field
+      const s1 = float(95.0)
+      const p1x = dx.mul(s1)
+      const p1y = dy.mul(s1)
+      const p1z = dz.mul(s1)
+      const i1x = floor(p1x)
+      const i1y = floor(p1y)
+      const i1z = floor(p1z)
+      const f1x = p1x.sub(i1x)
+      const f1y = p1y.sub(i1y)
+      const f1z = p1z.sub(i1z)
+      const h1a = fract(sin(i1x.mul(127.1).add(i1y.mul(311.7)).add(i1z.mul(74.7)).add(11.1)).mul(43758.5453))
+      const h1b = fract(sin(i1x.mul(269.5).add(i1y.mul(183.3)).add(i1z.mul(419.2)).add(12.2)).mul(43758.5453))
+      const h1c = fract(sin(i1x.mul(419.2).add(i1y.mul(371.9)).add(i1z.mul(127.1)).add(13.3)).mul(43758.5453))
+      const h1d = fract(sin(i1x.mul(71.7).add(i1y.mul(113.5)).add(i1z.mul(271.9)).add(14.4)).mul(43758.5453))
+      // Only ~1.2% of cells spawn a star
+      const spawn1 = h1a.greaterThan(0.988).select(float(1), float(0))
+      const cx1 = h1b.mul(0.7).add(0.15)
+      const cy1 = h1c.mul(0.7).add(0.15)
+      const cz1 = h1d.mul(0.7).add(0.15)
+      const dist1 = sqrt(
+        f1x.sub(cx1).mul(f1x.sub(cx1)).add(f1y.sub(cy1).mul(f1y.sub(cy1))).add(f1z.sub(cz1).mul(f1z.sub(cz1))),
       )
-      const nebMag = vec3(0.26, 0.05, 0.2).mul(pow(max(wisps, float(0)), float(1.7)).mul(0.85))
-      const nebTeal = vec3(0.04, 0.16, 0.18).mul(
-        pow(max(n2.mul(n3).mul(2.0), float(0)), float(2.2)).mul(0.55),
+      const rad1 = float(0.028).add(h1b.mul(0.018))
+      const disc1 = exp(dist1.mul(dist1).div(rad1.mul(rad1).add(1e-8)).mul(-1))
+      const bright1 = spawn1.mul(disc1).mul(float(0.35).add(h1c.mul(0.45)))
+
+      // Layer 2 — medium stars
+      const s2 = float(42.0)
+      const p2x = dx.mul(s2)
+      const p2y = dy.mul(s2)
+      const p2z = dz.mul(s2)
+      const i2x = floor(p2x)
+      const i2y = floor(p2y)
+      const i2z = floor(p2z)
+      const f2x = p2x.sub(i2x)
+      const f2y = p2y.sub(i2y)
+      const f2z = p2z.sub(i2z)
+      const h2a = fract(sin(i2x.mul(127.1).add(i2y.mul(311.7)).add(i2z.mul(74.7)).add(21.1)).mul(43758.5453))
+      const h2b = fract(sin(i2x.mul(269.5).add(i2y.mul(183.3)).add(i2z.mul(419.2)).add(22.2)).mul(43758.5453))
+      const h2c = fract(sin(i2x.mul(419.2).add(i2y.mul(371.9)).add(i2z.mul(127.1)).add(23.3)).mul(43758.5453))
+      const h2d = fract(sin(i2x.mul(71.7).add(i2y.mul(113.5)).add(i2z.mul(271.9)).add(24.4)).mul(43758.5453))
+      const spawn2 = h2a.greaterThan(0.993).select(float(1), float(0))
+      const cx2 = h2b.mul(0.65).add(0.175)
+      const cy2 = h2c.mul(0.65).add(0.175)
+      const cz2 = h2d.mul(0.65).add(0.175)
+      const dist2 = sqrt(
+        f2x.sub(cx2).mul(f2x.sub(cx2)).add(f2y.sub(cy2).mul(f2y.sub(cy2))).add(f2z.sub(cz2).mul(f2z.sub(cz2))),
       )
-      const nebWarm = vec3(0.2, 0.1, 0.04).mul(milkyDust.mul(0.55))
-      const nebLane = vec3(0.14, 0.12, 0.18).mul(milky.mul(0.42))
-      const nebCore = vec3(0.4, 0.24, 0.12).mul(milkyCore.mul(0.65))
+      const rad2 = float(0.035).add(h2b.mul(0.025))
+      const disc2 = exp(dist2.mul(dist2).div(rad2.mul(rad2).add(1e-8)).mul(-1))
+      const bright2 = spawn2.mul(disc2).mul(float(0.7).add(h2c.mul(0.9)))
 
-      // Distant faint filaments (large scale)
-      const fil = pow(max(n1.mul(0.5).add(nA.mul(0.5)), float(0)), float(3.0))
-      const nebFil = vec3(0.08, 0.04, 0.14).mul(fil.mul(0.35))
-
-      let sky = voidCol
-        .add(hemiTint)
-        .add(nebBlue)
-        .add(nebMag)
-        .add(nebTeal)
-        .add(nebWarm)
-        .add(nebLane)
-        .add(nebCore)
-        .add(nebFil)
-
-      // Stars — three density layers
-      const s1 = fract(
-        sin(floor(dx.mul(200.0)).mul(127.1).add(floor(dy.mul(200.0)).mul(311.7)).add(floor(dz.mul(200.0)).mul(74.7)).add(11.1)).mul(
-          43758.5453,
-        ),
+      // Layer 3 — rare bright circular stars
+      const s3 = float(18.0)
+      const p3x = dx.mul(s3)
+      const p3y = dy.mul(s3)
+      const p3z = dz.mul(s3)
+      const i3x = floor(p3x)
+      const i3y = floor(p3y)
+      const i3z = floor(p3z)
+      const f3x = p3x.sub(i3x)
+      const f3y = p3y.sub(i3y)
+      const f3z = p3z.sub(i3z)
+      const h3a = fract(sin(i3x.mul(127.1).add(i3y.mul(311.7)).add(i3z.mul(74.7)).add(31.1)).mul(43758.5453))
+      const h3b = fract(sin(i3x.mul(269.5).add(i3y.mul(183.3)).add(i3z.mul(419.2)).add(32.2)).mul(43758.5453))
+      const h3c = fract(sin(i3x.mul(419.2).add(i3y.mul(371.9)).add(i3z.mul(127.1)).add(33.3)).mul(43758.5453))
+      const h3d = fract(sin(i3x.mul(71.7).add(i3y.mul(113.5)).add(i3z.mul(271.9)).add(34.4)).mul(43758.5453))
+      const spawn3 = h3a.greaterThan(0.9965).select(float(1), float(0))
+      const cx3 = h3b.mul(0.55).add(0.225)
+      const cy3 = h3c.mul(0.55).add(0.225)
+      const cz3 = h3d.mul(0.55).add(0.225)
+      const dist3 = sqrt(
+        f3x.sub(cx3).mul(f3x.sub(cx3)).add(f3y.sub(cy3).mul(f3y.sub(cy3))).add(f3z.sub(cz3).mul(f3z.sub(cz3))),
       )
-      const star1 = pow(max(s1.sub(0.984), float(0)).div(0.016), float(6.5))
-      const s2 = fract(
-        sin(floor(dx.mul(80.0)).mul(127.1).add(floor(dy.mul(80.0)).mul(311.7)).add(floor(dz.mul(80.0)).mul(74.7)).add(22.2)).mul(
-          43758.5453,
-        ),
-      )
-      const star2 = pow(max(s2.sub(0.991), float(0)).div(0.009), float(5.0))
-      const s3 = fract(
-        sin(floor(dx.mul(32.0)).mul(127.1).add(floor(dy.mul(32.0)).mul(311.7)).add(floor(dz.mul(32.0)).mul(74.7)).add(33.3)).mul(
-          43758.5453,
-        ),
-      )
-      const star3 = pow(max(s3.sub(0.9972), float(0)).div(0.0028), float(3.2))
+      const rad3 = float(0.045).add(h3b.mul(0.03))
+      const disc3 = exp(dist3.mul(dist3).div(rad3.mul(rad3).add(1e-8)).mul(-1))
+      // Soft halo for round glow
+      const halo3 = exp(dist3.mul(dist3).div(rad3.mul(rad3).mul(4.5).add(1e-8)).mul(-1)).mul(0.25)
+      const bright3 = spawn3.mul(disc3.add(halo3)).mul(float(1.4).add(h3c.mul(1.6)))
 
-      const cHash = fract(
-        sin(
-          floor(dx.mul(80.0).add(3.1))
-            .mul(127.1)
-            .add(floor(dy.mul(80.0).add(1.7)).mul(311.7))
-            .add(floor(dz.mul(80.0).add(5.9)).mul(74.7))
-            .add(44.4),
-        ).mul(43758.5453),
-      )
-      const starCool = vec3(0.7, 0.82, 1.0)
-      const starWhite = vec3(1.0, 0.98, 0.94)
-      const starWarm = vec3(1.0, 0.75, 0.5)
-      const starTint = cHash
-        .lessThan(0.32)
-        .select(starCool, cHash.lessThan(0.68).select(starWhite, starWarm))
+      // Nearly white stars with very mild temperature tint
+      const tintH = fract(sin(i2x.mul(91.7).add(i2y.mul(51.3)).add(i2z.mul(17.9)).add(44.4)).mul(43758.5453))
+      const starCol = tintH
+        .lessThan(0.25)
+        .select(vec3(0.85, 0.9, 1.0), tintH.lessThan(0.75).select(vec3(1.0, 0.98, 0.96), vec3(1.0, 0.92, 0.82)))
 
-      const stars = starTint
-        .mul(star1.mul(0.5).add(star2.mul(1.15)).add(star3.mul(3.0)))
-        .add(starTint.mul(star3.mul(1.4)).mul(vec3(0.55, 0.65, 1.0)))
+      const stars = starCol.mul(bright1.add(bright2).add(bright3))
 
-      // Dense band stars
-      const sBand = fract(
-        sin(floor(dx.mul(120.0)).mul(127.1).add(floor(dy.mul(120.0)).mul(311.7)).add(floor(dz.mul(120.0)).mul(74.7)).add(55.5)).mul(
-          43758.5453,
-        ),
-      )
-      const bandStars = pow(max(sBand.sub(0.987), float(0)).div(0.013), float(5.0)).mul(milky.mul(1.6))
-      const starsAll = stars.add(starWhite.mul(bandStars.mul(0.85)))
-
-      // A few ultra-bright "named" stars (very sparse)
-      const s4 = fract(
-        sin(floor(dx.mul(14.0)).mul(127.1).add(floor(dy.mul(14.0)).mul(311.7)).add(floor(dz.mul(14.0)).mul(74.7)).add(77.7)).mul(
-          43758.5453,
-        ),
-      )
-      const giant = pow(max(s4.sub(0.9988), float(0)).div(0.0012), float(2.5))
-      const giants = starWarm.mul(giant.mul(4.0)).add(starCool.mul(giant.mul(2.0)))
-
-      sky = sky.add(starsAll).add(giants)
-      sky = min(sky, vec3(2.2, 2.2, 2.5))
+      sky = sky.add(stars)
+      sky = min(sky, vec3(1.6, 1.6, 1.7))
 
       col.addAssign(sky.mul(transm))
     })
