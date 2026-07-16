@@ -1,227 +1,310 @@
 /**
- * Thin accretion disk parameters — NOT black-hole hair.
+ * Accretion disk parameters — NOT black-hole hair.
  *
- * No-hair = (M, a★, Q) only. The disk is matter outside the horizon:
- *   - ṁ sets accretion power (NT flux ∝ ṁ, T ∝ ṁ^{1/4})
- *   - outerM is the emission cutoff in units of M (model truncation)
- *   - prograde: orbital sense L ‖ J (co-rotating) vs counter-rotating
- *   - tiltRad / tiltNodeRad: midplane inclination vs BH spin (+Y)
- *   - jetPower: optional bipolar funnel (0 = off)
- *   - gamma / plasmaBeta: expert EOS + MRI dens proxy
- *   - structure knobs: gas/plasma/dust look (not hair)
- *   - inner edge is derived: family ISCO for that sense (not a free slider)
+ * Base torus / thin-disk free inputs (GRMHD-init style):
+ *   ρ₀, H/r, Γ, K, ℓ (specific ang. mom.), β₀, B geometry, r_in,
+ *   tilt, jet power, MAD/SANE, perturbation, ṁ, r_out, orbit.
  *
- * Geometric units G = c = 1.
+ * No-hair = (M, a★, Q) only. Geometric units G = c = 1.
  */
 import { DEFAULT_MDOT, MDOT_MAX, MDOT_MIN } from './constants'
 import { RT } from './geodesic/rtConstants'
 import { DISK_TEXTURE } from './diskTexture'
 
+/** Seed magnetic topology for dens / jet coupling (proxy, not full MHD). */
+export type MagGeometry = 'single-loop' | 'multi-loop' | 'vertical'
+
+/** High-level magnetization target. */
+export type MagnetState = 'sane' | 'mad'
+
 export type DiskParams = {
   /**
-   * Eddington ratio ṁ = Ṁ/Ṁ_Edd.
-   * Thin-disk: F ∝ ṁ, T_eff ∝ ṁ^{1/4}.
+   * Eddington ratio ṁ = Ṁ/Ṁ_Edd (accretion power).
+   * Thin-disk: F ∝ ṁ, T_eff ∝ ṁ^{1/4}. Also scales with ρ₀ for brightness.
    */
   readonly mdot: number
   /**
-   * Outer disk radius in units of M (emission cutoff).
-   * Physical disks extend far; this is the modeled luminous outer edge.
+   * Density normalization ρ₀ (relative). Scales optical depth & emission weight.
+   * 1 = reference; log-friendly range ~0.05…20.
    */
+  readonly rho0: number
+  /** Outer disk radius in units of M (emission cutoff). */
   readonly outerM: number
   /**
+   * Free inner radius in units of M (torus / disk inner edge).
+   * Clamped above horizon at apply time; default ~6 (Schw ISCO).
+   */
+  readonly rinM: number
+  /**
+   * true  = use free rinM
+   * false = lock inner edge to family ISCO (co/counter from prograde)
+   */
+  readonly rinFree: boolean
+  /**
    * Orbital sense relative to hole spin (+Y / a★ > 0):
-   * true  = prograde / co-rotating (default) — smaller ISCO, Ω > 0 form
-   * false = retrograde / counter-rotating — larger ISCO, flipped Doppler
+   * true = co-rotating; false = counter-rotating.
    */
   readonly prograde: boolean
   /**
-   * Master structure mix: 0 = smooth Novikov–Thorne only, 1 = full texture.
-   * Scales arms / clumps / dust together.
+   * Specific angular momentum parameter ℓ̃ = ℓ/(M c) (dimensionless proxy).
+   * FM-style: larger ℓ → rotation support farther out (affects dens peak radius).
+   * Typical thin-disk Keplerian at r~r_in: ℓ̃ ~ √(r_in/M).
    */
-  readonly structure: number
-  /** Spiral arm (gas filament) contrast 0–1 */
-  readonly arms: number
-  /** Plasma turbulence / clump contrast 0–1 */
-  readonly clumps: number
-  /** Outer dust-lane contrast 0–1 */
-  readonly dust: number
-  /** H/R scale-height for path-length thickness (edge-on look) */
+  readonly specificL: number
+  /** Free disk aspect ratio H/r (geometric thickness). */
   readonly scaleHeight: number
-  /** Pattern shear rate (visual Keplerian wind of structure) */
-  readonly shearRate: number
-  /** Animate structure with differential rotation */
-  readonly animate: boolean
-  /** Disk midplane tilt vs BH spin axis (radians, main free param) */
-  readonly tiltRad: number
-  /** Line-of-nodes azimuth for tilt (radians, about +Y) */
-  readonly tiltNodeRad: number
-  /** Optional jet power 0…1 (0 = off) */
-  readonly jetPower: number
-  /**
-   * Adiabatic index Γ (expert). Drives derived thin-disk H/R.
-   * Typical: 5/3 (non-rel gas) or 4/3 (radiation-dominated).
-   */
+  /** Adiabatic index Γ (EOS). 4/3 radiation … 5/3 gas. */
   readonly gamma: number
   /**
-   * Plasma β = P_gas/P_mag proxy (expert). Lower β → stronger MRI dens variance.
+   * Polytropic constant K in p = K ρ^Γ (relative).
+   * Scales pressure / temperature proxy at fixed ρ.
    */
+  readonly polyK: number
+  /** Initial plasma β₀ = p_gas / p_mag. Low β → MAD-like dens variance / jets. */
   readonly plasmaBeta: number
+  /** Magnetic seed geometry. */
+  readonly magGeometry: MagGeometry
+  /** SANE vs MAD magnetization target (sets β floor coupling + jet boost). */
+  readonly magnetState: MagnetState
+  /** MRI / turbulence seed amplitude 0…1. */
+  readonly perturbAmp: number
+  /** Disk midplane tilt vs BH spin (rad). */
+  readonly tiltRad: number
+  /** Line of nodes about +Y (rad). */
+  readonly tiltNodeRad: number
+  /** Optional jet power 0…1 (0 = off). */
+  readonly jetPower: number
+  /** Master structure mix 0–1 (texture). */
+  readonly structure: number
+  readonly arms: number
+  readonly clumps: number
+  readonly dust: number
+  readonly shearRate: number
+  readonly animate: boolean
 }
 
 export const DEFAULT_DISK: DiskParams = {
   mdot: DEFAULT_MDOT,
+  rho0: 1,
   outerM: RT.diskOuterM,
+  rinM: 6,
+  rinFree: false,
   prograde: true,
+  specificL: Math.sqrt(6), // ~ Keplerian ℓ at r=6M
+  scaleHeight: DISK_TEXTURE.scaleHeight,
+  gamma: 5 / 3,
+  polyK: 1,
+  plasmaBeta: 100, // SANE-ish default
+  magGeometry: 'single-loop',
+  magnetState: 'sane',
+  perturbAmp: 0.35,
+  tiltRad: 0,
+  tiltNodeRad: 0,
+  jetPower: 0,
   structure: 1,
   arms: DISK_TEXTURE.armContrast,
   clumps: DISK_TEXTURE.turbContrast,
   dust: DISK_TEXTURE.dustContrast,
-  scaleHeight: DISK_TEXTURE.scaleHeight,
   shearRate: DISK_TEXTURE.shearRate,
   animate: true,
-  tiltRad: 0,
-  tiltNodeRad: 0,
-  jetPower: 0,
-  gamma: 5 / 3,
-  plasmaBeta: 10,
 }
 
 export const DISK_LIMITS = {
   mdot: { min: MDOT_MIN, max: MDOT_MAX },
-  /** Keep outside typical ISCO (≲6M) and inside wide-field camera */
+  rho0: { min: 0.05, max: 20 },
   outerM: { min: 8, max: 80 },
+  rinM: { min: 1.5, max: 30 },
+  specificL: { min: 1.5, max: 12 },
+  scaleHeight: { min: 0.01, max: 0.3 },
+  gamma: { min: 4 / 3, max: 5 / 3 },
+  polyK: { min: 0.1, max: 10 },
+  plasmaBeta: { min: 0.3, max: 1000 },
+  perturbAmp: { min: 0, max: 1 },
+  tiltRad: { min: 0, max: (40 * Math.PI) / 180 },
+  tiltNodeRad: { min: 0, max: Math.PI * 2 },
+  jetPower: { min: 0, max: 1 },
   structure: { min: 0, max: 1 },
   arms: { min: 0, max: 1 },
   clumps: { min: 0, max: 1 },
   dust: { min: 0, max: 1 },
-  scaleHeight: { min: 0.02, max: 0.18 },
   shearRate: { min: 0, max: 4 },
-  /** Tilt up to ~40° — dramatic but still thin-disk-ish */
-  tiltRad: { min: 0, max: (40 * Math.PI) / 180 },
-  tiltNodeRad: { min: 0, max: Math.PI * 2 },
-  jetPower: { min: 0, max: 1 },
-  gamma: { min: 4 / 3, max: 5 / 3 },
-  /** Log-friendly range: strongly magnetized → weakly magnetized */
-  plasmaBeta: { min: 0.1, max: 100 },
 } as const
 
 export type DiskInput = Partial<DiskParams>
 
+const MAG_GEOMS: readonly MagGeometry[] = ['single-loop', 'multi-loop', 'vertical']
+const MAG_STATES: readonly MagnetState[] = ['sane', 'mad']
+
 export function normalizeDisk(input: DiskInput = {}): DiskParams {
   const mdot = clamp(
-    Number.isFinite(input.mdot as number)
-      ? (input.mdot as number)
-      : DEFAULT_DISK.mdot,
+    num(input.mdot, DEFAULT_DISK.mdot),
     DISK_LIMITS.mdot.min,
     DISK_LIMITS.mdot.max,
   )
+  const rho0 = clamp(
+    num(input.rho0, DEFAULT_DISK.rho0),
+    DISK_LIMITS.rho0.min,
+    DISK_LIMITS.rho0.max,
+  )
   const outerM = clamp(
-    Number.isFinite(input.outerM as number)
-      ? (input.outerM as number)
-      : DEFAULT_DISK.outerM,
+    num(input.outerM, DEFAULT_DISK.outerM),
     DISK_LIMITS.outerM.min,
     DISK_LIMITS.outerM.max,
   )
+  const rinM = clamp(
+    num(input.rinM, DEFAULT_DISK.rinM),
+    DISK_LIMITS.rinM.min,
+    DISK_LIMITS.rinM.max,
+  )
+  const rinFree =
+    typeof input.rinFree === 'boolean' ? input.rinFree : DEFAULT_DISK.rinFree
   const prograde =
     typeof input.prograde === 'boolean' ? input.prograde : DEFAULT_DISK.prograde
-  const structure = clamp(
-    Number.isFinite(input.structure as number)
-      ? (input.structure as number)
-      : DEFAULT_DISK.structure,
-    DISK_LIMITS.structure.min,
-    DISK_LIMITS.structure.max,
-  )
-  const arms = clamp(
-    Number.isFinite(input.arms as number) ? (input.arms as number) : DEFAULT_DISK.arms,
-    DISK_LIMITS.arms.min,
-    DISK_LIMITS.arms.max,
-  )
-  const clumps = clamp(
-    Number.isFinite(input.clumps as number)
-      ? (input.clumps as number)
-      : DEFAULT_DISK.clumps,
-    DISK_LIMITS.clumps.min,
-    DISK_LIMITS.clumps.max,
-  )
-  const dust = clamp(
-    Number.isFinite(input.dust as number) ? (input.dust as number) : DEFAULT_DISK.dust,
-    DISK_LIMITS.dust.min,
-    DISK_LIMITS.dust.max,
+  const specificL = clamp(
+    num(input.specificL, DEFAULT_DISK.specificL),
+    DISK_LIMITS.specificL.min,
+    DISK_LIMITS.specificL.max,
   )
   const scaleHeight = clamp(
-    Number.isFinite(input.scaleHeight as number)
-      ? (input.scaleHeight as number)
-      : DEFAULT_DISK.scaleHeight,
+    num(input.scaleHeight, DEFAULT_DISK.scaleHeight),
     DISK_LIMITS.scaleHeight.min,
     DISK_LIMITS.scaleHeight.max,
   )
+  const gamma = clamp(
+    num(input.gamma, DEFAULT_DISK.gamma),
+    DISK_LIMITS.gamma.min,
+    DISK_LIMITS.gamma.max,
+  )
+  const polyK = clamp(
+    num(input.polyK, DEFAULT_DISK.polyK),
+    DISK_LIMITS.polyK.min,
+    DISK_LIMITS.polyK.max,
+  )
+  let plasmaBeta = clamp(
+    num(input.plasmaBeta, DEFAULT_DISK.plasmaBeta),
+    DISK_LIMITS.plasmaBeta.min,
+    DISK_LIMITS.plasmaBeta.max,
+  )
+  const magGeometry = parseMagGeom(input.magGeometry)
+  const magnetState = parseMagState(input.magnetState)
+  // If switching to MAD without explicit β, seed a MAD-like low β
+  if (
+    magnetState === 'mad' &&
+    input.plasmaBeta === undefined &&
+    input.magnetState === 'mad'
+  ) {
+    plasmaBeta = Math.min(plasmaBeta, 3)
+  }
+  const perturbAmp = clamp(
+    num(input.perturbAmp, DEFAULT_DISK.perturbAmp),
+    DISK_LIMITS.perturbAmp.min,
+    DISK_LIMITS.perturbAmp.max,
+  )
+  const tiltRad = clamp(
+    num(input.tiltRad, DEFAULT_DISK.tiltRad),
+    DISK_LIMITS.tiltRad.min,
+    DISK_LIMITS.tiltRad.max,
+  )
+  let tiltNodeRad = num(input.tiltNodeRad, DEFAULT_DISK.tiltNodeRad)
+  const twoPi = Math.PI * 2
+  tiltNodeRad = ((tiltNodeRad % twoPi) + twoPi) % twoPi
+  const jetPower = clamp(
+    num(input.jetPower, DEFAULT_DISK.jetPower),
+    DISK_LIMITS.jetPower.min,
+    DISK_LIMITS.jetPower.max,
+  )
+  const structure = clamp(
+    num(input.structure, DEFAULT_DISK.structure),
+    DISK_LIMITS.structure.min,
+    DISK_LIMITS.structure.max,
+  )
+  const arms = clamp(num(input.arms, DEFAULT_DISK.arms), DISK_LIMITS.arms.min, DISK_LIMITS.arms.max)
+  const clumps = clamp(
+    num(input.clumps, DEFAULT_DISK.clumps),
+    DISK_LIMITS.clumps.min,
+    DISK_LIMITS.clumps.max,
+  )
+  const dust = clamp(num(input.dust, DEFAULT_DISK.dust), DISK_LIMITS.dust.min, DISK_LIMITS.dust.max)
   const shearRate = clamp(
-    Number.isFinite(input.shearRate as number)
-      ? (input.shearRate as number)
-      : DEFAULT_DISK.shearRate,
+    num(input.shearRate, DEFAULT_DISK.shearRate),
     DISK_LIMITS.shearRate.min,
     DISK_LIMITS.shearRate.max,
   )
   const animate =
     typeof input.animate === 'boolean' ? input.animate : DEFAULT_DISK.animate
-  const tiltRad = clamp(
-    Number.isFinite(input.tiltRad as number)
-      ? (input.tiltRad as number)
-      : DEFAULT_DISK.tiltRad,
-    DISK_LIMITS.tiltRad.min,
-    DISK_LIMITS.tiltRad.max,
-  )
-  let tiltNodeRad = Number.isFinite(input.tiltNodeRad as number)
-    ? (input.tiltNodeRad as number)
-    : DEFAULT_DISK.tiltNodeRad
-  // wrap to [0, 2π)
-  const twoPi = Math.PI * 2
-  tiltNodeRad = ((tiltNodeRad % twoPi) + twoPi) % twoPi
-  const jetPower = clamp(
-    Number.isFinite(input.jetPower as number)
-      ? (input.jetPower as number)
-      : DEFAULT_DISK.jetPower,
-    DISK_LIMITS.jetPower.min,
-    DISK_LIMITS.jetPower.max,
-  )
-  const gamma = clamp(
-    Number.isFinite(input.gamma as number)
-      ? (input.gamma as number)
-      : DEFAULT_DISK.gamma,
-    DISK_LIMITS.gamma.min,
-    DISK_LIMITS.gamma.max,
-  )
-  const plasmaBeta = clamp(
-    Number.isFinite(input.plasmaBeta as number)
-      ? (input.plasmaBeta as number)
-      : DEFAULT_DISK.plasmaBeta,
-    DISK_LIMITS.plasmaBeta.min,
-    DISK_LIMITS.plasmaBeta.max,
-  )
+
+  // Keep rin ≤ outer − small margin
+  const rinClamped = Math.min(rinM, outerM - 1)
+
   return {
     mdot,
+    rho0,
     outerM,
+    rinM: rinClamped,
+    rinFree,
     prograde,
+    specificL,
+    scaleHeight,
+    gamma,
+    polyK,
+    plasmaBeta,
+    magGeometry,
+    magnetState,
+    perturbAmp,
+    tiltRad,
+    tiltNodeRad,
+    jetPower,
     structure,
     arms,
     clumps,
     dust,
-    scaleHeight,
     shearRate,
     animate,
-    tiltRad,
-    tiltNodeRad,
-    jetPower,
-    gamma,
-    plasmaBeta,
   }
 }
 
 /**
- * Effective texture contrasts after master structure mix.
- * structure=0 → smooth; structure=1 → full arms/clumps/dust settings.
- * plasmaBeta scales turb contrast (low β → more MRI dens variance).
+ * Effective MRI dens variance scale from β₀ and MAD/SANE.
+ * β=100 → ~1; lower β → higher turbulence (capped); MAD boosts further.
  */
+export function plasmaBetaToMriScale(
+  plasmaBeta: number,
+  magnetState: MagnetState = 'sane',
+): number {
+  const b = Math.max(plasmaBeta, 0.2)
+  // √(β_ref / β) with β_ref=100 (SANE-ish)
+  const s = Math.sqrt(100 / b)
+  const base = Math.min(2.8, Math.max(0.35, s))
+  return magnetState === 'mad' ? Math.min(3.2, base * 1.35) : base
+}
+
+/** Mag geometry → dens modulation code 0,1,2 for GPU. */
+export function magGeometryCode(g: MagGeometry): number {
+  if (g === 'multi-loop') return 1
+  if (g === 'vertical') return 2
+  return 0
+}
+
+/**
+ * Temperature proxy scale from polytrope: T ∝ K ρ^{Γ−1}.
+ * At ρ=ρ₀ reference, T_scale = K * ρ₀^{Γ−1} (relative to K=1,ρ=1,Γ=5/3).
+ */
+export function polyTemperatureScale(polyK: number, rho0: number, gamma: number): number {
+  const g = Math.min(5 / 3, Math.max(4 / 3, gamma))
+  const r = Math.max(rho0, 0.05)
+  const t = polyK * Math.pow(r, g - 1)
+  return Math.min(8, Math.max(0.15, t))
+}
+
+/**
+ * Fishbone–Moncrief-ish dens peak radius from specific ℓ̃ (units of M).
+ * r_peak / M ≈ ℓ̃² (Newtonian circular). Clamped to disk annulus.
+ */
+export function densPeakRadiusM(specificL: number, rinM: number, outerM: number): number {
+  const r = specificL * specificL
+  return Math.min(outerM * 0.85, Math.max(rinM * 1.05, r))
+}
+
 export function effectiveDiskStructure(d: DiskParams): {
   armContrast: number
   turbContrast: number
@@ -232,10 +315,11 @@ export function effectiveDiskStructure(d: DiskParams): {
   mriTurbScale: number
 } {
   const s = d.structure
-  const mriTurbScale = plasmaBetaToMriScale(d.plasmaBeta)
+  const mriTurbScale = plasmaBetaToMriScale(d.plasmaBeta, d.magnetState)
+  const p = 0.35 + 0.65 * d.perturbAmp
   return {
-    armContrast: s * d.arms,
-    turbContrast: s * d.clumps * mriTurbScale,
+    armContrast: s * d.arms * p,
+    turbContrast: s * d.clumps * mriTurbScale * p,
     dustContrast: s * d.dust,
     scaleHeight: d.scaleHeight,
     shearRate: d.animate ? d.shearRate : 0,
@@ -244,17 +328,24 @@ export function effectiveDiskStructure(d: DiskParams): {
   }
 }
 
-/**
- * Map plasma β → MRI dens variance scale.
- * β=10 (default) → 1; lower β (stronger B) → up to ~2.2; high β → down to ~0.45.
- */
-export function plasmaBetaToMriScale(plasmaBeta: number): number {
-  const b = Math.max(plasmaBeta, 0.05)
-  // ∝ 1/√(β/10) clipped
-  const s = Math.sqrt(10 / b)
-  return Math.min(2.2, Math.max(0.45, s))
+function num(v: number | undefined, fallback: number): number {
+  return Number.isFinite(v as number) ? (v as number) : fallback
 }
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v))
+}
+
+function parseMagGeom(v: unknown): MagGeometry {
+  if (typeof v === 'string' && (MAG_GEOMS as readonly string[]).includes(v)) {
+    return v as MagGeometry
+  }
+  return DEFAULT_DISK.magGeometry
+}
+
+function parseMagState(v: unknown): MagnetState {
+  if (typeof v === 'string' && (MAG_STATES as readonly string[]).includes(v)) {
+    return v as MagnetState
+  }
+  return DEFAULT_DISK.magnetState
 }

@@ -95,6 +95,12 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uJetPower = uniform(0)
   /** MRI dens variance scale from plasma β */
   const uMriTurb = uniform(1)
+  const uRho0 = uniform(1)
+  const uPolyT = uniform(1)
+  const uRPeakM = uniform(12)
+  const uMagGeom = uniform(0)
+  const uMadBoost = uniform(0)
+  const uPerturb = uniform(0.35)
   const uStarDensity = uniform(SKY_DEFAULTS.starDensity)
   const uStarBright = uniform(SKY_DEFAULTS.starBrightness)
   const uNebula = uniform(SKY_DEFAULTS.nebula)
@@ -729,7 +735,25 @@ export function createGeodesicTracer(): GeodesicTracer {
       // Thin photosphere densZ² — gate only (look is singularity noise/α)
       const densZPhot = densZ.mul(densZ)
       const densEnv = densZ.mul(radialGate).mul(densZPhot)
-      const dens = densEnv.mul(float(1.2).add(uGrmhdMix.mul(densCube.mul(0.4))))
+      // Torus dens peak from ℓ̃ (rPeak) — Gaussian envelope in log-r
+      const rPeak = max(uRPeakM.mul(M), rin.mul(1.05))
+      const lnPeak = log(max(rhoV.div(rPeak), float(1e-4)))
+      const peakEnv = exp(lnPeak.mul(lnPeak).mul(-1.1))
+      // Mag geometry dens modulation (proxy topology)
+      const magMod = uMagGeom
+        .lessThan(0.5)
+        .select(
+          float(1),
+          uMagGeom
+            .lessThan(1.5)
+            .select(float(0.88).add(c2.mul(0.18)), float(0.9).add(abs(diskY).div(max(Hloc, M.mul(0.05))).mul(0.12))),
+        )
+      const dens = densEnv
+        .mul(float(1.2).add(uGrmhdMix.mul(densCube.mul(0.4))))
+        .mul(uRho0)
+        .mul(float(0.55).add(peakEnv.mul(0.7)))
+        .mul(magMod)
+        .mul(float(0.7).add(uPerturb.mul(0.6)))
       const sphR = pos.length()
 
       // Singularity look path (noise dens + dual edge + gold ramp + α)
@@ -742,7 +766,7 @@ export function createGeodesicTracer(): GeodesicTracer {
           const dsH = min(ds.div(max(Hloc, M.mul(0.05))), float(0.5))
           // Path weight: thin band + soft beer (not milky stack)
           const beer = exp(diskTau.mul(float(-0.55)))
-          const w = dens.mul(dsH).mul(beer).mul(float(1.4))
+          const w = dens.mul(dsH).mul(beer).mul(float(1.4)).mul(sqrt(max(uPolyT, float(0.2))))
           If(w.greaterThan(0.004), () => {
             singularityDiskComposite({
               pos: diskPos,
@@ -827,7 +851,11 @@ export function createGeodesicTracer(): GeodesicTracer {
           const polar = max(float(0), muJet.sub(0.45).div(0.55))
           const away = min(float(1), abs(pos.y).div(max(M.mul(1.5), float(1e-5))))
           const a2 = min(float(1), aStar.mul(aStar))
-          const jEff = uJetPower.mul(a2).mul(pow(max(mdot, float(0.01)).div(0.1), float(0.4)))
+          const jEff = uJetPower
+            .mul(a2)
+            .mul(pow(max(mdot, float(0.01)).div(0.1), float(0.4)))
+            .mul(float(1).add(uMadBoost.mul(0.85)))
+            .mul(sqrt(max(uRho0, float(0.2))))
           const jw = radial.mul(polar).mul(polar).mul(away).mul(jEff).mul(0.12).mul(ds.div(max(M, float(0.1))))
           If(
             jw.greaterThan(0.002).and(rLab.greaterThan(rCapture.mul(1.08))),
@@ -962,6 +990,12 @@ export function createGeodesicTracer(): GeodesicTracer {
       uTiltNode.value = p.tiltNodeRad
       uJetPower.value = p.jetPower
       uMriTurb.value = p.mriTurbScale
+      uRho0.value = p.rho0
+      uPolyT.value = p.polyTScale
+      uRPeakM.value = p.rPeakOverM
+      uMagGeom.value = p.magGeom
+      uMadBoost.value = p.madBoost
+      uPerturb.value = p.perturbAmp
     },
     setCamera: (c) => {
       uCamDistM.value = c.distanceM

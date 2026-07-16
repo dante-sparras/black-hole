@@ -1,29 +1,26 @@
 # Controls ↔ physics map
 
-Maps goal wording to code fields in this real-time WebGPU sim.
+| Goal wording | Code | UI | Effect |
+|--------------|------|-----|--------|
+| Mass \(M\) | `params.mass` | BH | Scale |
+| Spin \(a_★\) | `params.spinStar` | BH signed ±0.998 | Rays, ISCO, jets |
+| Charge \(Q\) | `params.charge` | BH | RN/KN |
+| \(\dot m\) | `disk.mdot` | Disk | NT power / T |
+| Density \(\rho_0\) | `disk.rho0` | Disk | Dens weight + OD |
+| Aspect \(H/r\) | `disk.scaleHeight` | Disk **free** | Volume thickness |
+| \(\Gamma\) | `disk.gamma` | Disk | EOS; thin H/r ref + poly T |
+| \(K\) polytrope | `disk.polyK` | Disk | \(T\propto K\rho^{\Gamma-1}\) proxy |
+| \(\ell\) ang. mom. | `disk.specificL` | Disk | Dens peak radius (FM-like) |
+| \(\beta_0\) | `disk.plasmaBeta` | Disk | MRI dens variance |
+| B geometry | `disk.magGeometry` | Disk | single/multi/vertical dens mod |
+| Magnetization | `disk.magnetState` | Disk | SANE / MAD |
+| \(r_\mathrm{in}\) | `disk.rinM` + `rinFree` | Disk | Free or ISCO-locked |
+| \(r_\mathrm{out}\) | `disk.outerM` | Disk | Outer luminous edge |
+| Orbit | `disk.prograde` | Disk | Co/counter-rot |
+| Tilt | `disk.tiltRad`, `tiltNodeRad` | Disk | Midplane vs spin |
+| Perturb | `disk.perturbAmp` | Disk | Turbulence seed |
+| Jets | `disk.jetPower` | Disk | Funnel \(\propto a_★^2\dot m\) |
 
-| Goal wording | Code | Free in UI? | Notes |
-|--------------|------|-------------|-------|
-| Mass \(M\) | `params.mass` | Yes | Scale; scale-free cam keeps angular size |
-| Spin \(a\) (−1…+1) | `params.spinStar` | Yes signed \(\pm0.998\) | Default **+0.9** |
-| Charge \(Q\) | `params.charge` | Yes | RN/KN on rays |
-| Density \(\rho_0\) | via `disk.mdot` | Via ṁ | \(F\propto\dot m\), dens OD scales with ṁ |
-| \(H/r\) | derived `thinDiskScaleHeight` | No (derived) | From ṁ + \(r_\mathrm{ISCO}/M\) + expert \(\Gamma\) |
-| \(\Gamma\) | `disk.gamma` | Expert | 4/3 or 5/3 → H/R |
-| Plasma \(\beta\) | `disk.plasmaBeta` | Expert | MRI dens variance scale |
-| Inner radius | family ISCO | No (derived) | `diskIsco` + orbit sense |
-| Disk tilt | `disk.tiltRad`, `tiltNodeRad` | Yes | Midplane vs spin (+Y) |
-| Jets | `disk.jetPower` | Yes optional | \(\propto a_★^2 \dot m^{0.4}\) funnel |
-| Orbit sense | `disk.prograde` | Yes secondary | Co-rot vs counter-rot L |
+All disk base properties live in **one** Accretion disk panel (no expert submenu).
 
-## Defaults
-
-- \(M=1\), \(a_★=+0.9\), \(Q=0\), \(\dot m=0.1\), tilt=0, jet=0, \(\Gamma=5/3\), \(\beta=10\)
-
-## Pipeline
-
-UI → `setParams` / `setDisk` → `sceneBridge.applyPhysics` → `tracer.setSpacetime` → TSL RT
-
-## Approximations
-
-See [limitations.md](./limitations.md).
+Approximations: [limitations.md](./limitations.md).

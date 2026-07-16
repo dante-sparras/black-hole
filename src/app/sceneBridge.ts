@@ -4,10 +4,15 @@
  * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
-import { diskIsco, thinDiskScaleHeight, autoExposureFromPhysics } from '../physics/disk'
-import { plasmaBetaToMriScale } from '../physics/diskParams'
+import { autoExposureFromPhysics } from '../physics/disk'
+import {
+  magGeometryCode,
+  plasmaBetaToMriScale,
+  polyTemperatureScale,
+} from '../physics/diskParams'
+import { effectiveDiskGeom } from '../physics/diskGeometry'
 import { resolveCameraDistance } from '../physics/observer'
-import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
+import { realtimeModeTag } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
 import type { GeodesicTracer } from '../render/geodesicTracerTypes'
 import { getCamera, subscribeCamera } from '../state/camera'
@@ -72,11 +77,13 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   function applyPhysics(): void {
     const p = getParams()
     const disk = getDisk()
-    const rIsco = diskIsco(p, disk.prograde)
-    const rinM = rIscoOverM(rIsco, p.mass)
-    // H/R from thin-disk scaling + expert Γ (not a free look knob)
-    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM, disk.gamma)
-    const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta)
+    const geom = effectiveDiskGeom(p, disk)
+    const rinM = geom.rinOverM
+    // Free H/r from disk store (base torus param)
+    const scaleHeight = disk.scaleHeight
+    const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta, disk.magnetState)
+    const polyTScale = polyTemperatureScale(disk.polyK, disk.rho0, disk.gamma)
+    const madBoost = disk.magnetState === 'mad' ? 1 : 0
     tracer.setSpacetime({
       mass: p.mass,
       spinStar: p.spinStar,
@@ -96,10 +103,19 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       tiltNodeRad: disk.tiltNodeRad,
       jetPower: disk.jetPower,
       mriTurbScale,
+      rho0: disk.rho0,
+      polyTScale,
+      rPeakOverM: geom.rPeakOverM,
+      magGeom: magGeometryCode(disk.magGeometry),
+      madBoost,
+      perturbAmp: disk.perturbAmp,
     })
-    // Exposure from η·ṁ (physics), not a film slider
     setLook({
-      exposure: autoExposureFromPhysics(p.spinStar, disk.mdot, disk.prograde),
+      exposure: autoExposureFromPhysics(
+        p.spinStar,
+        disk.mdot * Math.sqrt(disk.rho0),
+        disk.prograde,
+      ),
     })
   }
 

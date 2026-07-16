@@ -12,6 +12,7 @@ import {
 import {
   normalizeDisk,
   plasmaBetaToMriScale,
+  DISK_LIMITS,
 } from '../../src/physics/diskParams'
 import { thinDiskScaleHeight } from '../../src/physics/disk'
 import { normalizeParams } from '../../src/physics/validate'
@@ -93,8 +94,8 @@ describe('expert Γ / β', () => {
   })
 
   test('low β → higher MRI scale', () => {
-    expect(plasmaBetaToMriScale(1)).toBeGreaterThan(plasmaBetaToMriScale(10))
-    expect(plasmaBetaToMriScale(10)).toBeCloseTo(1, 5)
+    expect(plasmaBetaToMriScale(1)).toBeGreaterThan(plasmaBetaToMriScale(100))
+    expect(plasmaBetaToMriScale(100)).toBeCloseTo(1, 5)
   })
 
   test('normalizeDisk clamps tilt/jet/gamma/beta', () => {
@@ -107,6 +108,6 @@ describe('expert Γ / β', () => {
     expect(d.tiltRad).toBeLessThanOrEqual((40 * Math.PI) / 180 + 1e-9)
     expect(d.jetPower).toBe(1)
     expect(d.gamma).toBeCloseTo(5 / 3, 5)
-    expect(d.plasmaBeta).toBeCloseTo(0.1, 5)
+    expect(d.plasmaBeta).toBeCloseTo(DISK_LIMITS.plasmaBeta.min, 5)
   })
 })

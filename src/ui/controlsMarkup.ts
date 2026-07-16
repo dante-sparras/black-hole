@@ -4,16 +4,8 @@ import { CAMERA_LIMITS, radToDeg } from '../state/camera'
 import { ALL_PRESETS } from '../state/presets'
 
 /**
- * Controls = free base parameters + optional jets + expert disk EOS/mag.
- *
- * Black hole (no-hair): M, signed a★, Q
- * Disk (matter, not hair): ṁ, r_out/M, orbit sense, tilt
- * Jets (optional): jetPower
- * Expert: Γ, plasma β
- * Observer: distance, inclination, azimuth, FOV
- *
- * NOT free (derived or fixed): ISCO/rin, T(r), H/R (from ṁ+Γ), structure defaults,
- * I∝g³, integrator (RT), bloom/sky/look knobs
+ * All free base physics in main panels — no expert submenu.
+ * Disk torus / GRMHD-init style params live under one Accretion disk section.
  */
 export function buildControlsHtml(): string {
   const distLim = CAMERA_LIMITS.distanceM
@@ -30,7 +22,7 @@ export function buildControlsHtml(): string {
           `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
       ).join('')}
     </div>
-    <p class="ctrl-hint" id="preset-hint">Base-parameter scenes only</p>
+    <p class="ctrl-hint" id="preset-hint">Base-parameter scenes</p>
 
     <div class="ctrl-section">Black hole (no-hair)</div>
     <label class="ctrl">
@@ -48,13 +40,76 @@ export function buildControlsHtml(): string {
       <input type="range" id="p-charge" min="0" max="0.95" step="0.01" />
       <span class="ctrl-val" data-val="charge"></span>
     </label>
-    <p class="ctrl-hint">a★ ∈ [−0.998, +0.998] · default +0.9 · horizon / ISCO / photon sphere derived</p>
+    <p class="ctrl-hint">a★ ∈ [−0.998, +0.998] · default +0.9</p>
 
-    <div class="ctrl-section">Accretion disk (matter)</div>
+    <div class="ctrl-section">Accretion disk (base)</div>
     <label class="ctrl">
       <span class="ctrl-name">ṁ / ṁ_Edd</span>
       <input type="range" id="d-mdot" min="0" max="1000" step="1" />
       <span class="ctrl-val" data-val="mdot"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">ρ₀ dens</span>
+      <input type="range" id="d-rho0" min="0" max="1000" step="1" />
+      <span class="ctrl-val" data-val="rho0"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">H/r</span>
+      <input type="range" id="d-hr" min="${DISK_LIMITS.scaleHeight.min}" max="${DISK_LIMITS.scaleHeight.max}" step="0.005" />
+      <span class="ctrl-val" data-val="hr"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Γ (EOS)</span>
+      <select id="d-gamma" style="flex:1;min-width:0">
+        <option value="1.6667">5/3 gas</option>
+        <option value="1.3333">4/3 radiation</option>
+      </select>
+      <span class="ctrl-val" data-val="gamma"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">K (poly)</span>
+      <input type="range" id="d-polyk" min="0" max="1000" step="1" />
+      <span class="ctrl-val" data-val="polyk"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">ℓ̃ (ang mom)</span>
+      <input type="range" id="d-ell" min="${DISK_LIMITS.specificL.min}" max="${DISK_LIMITS.specificL.max}" step="0.05" />
+      <span class="ctrl-val" data-val="ell"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">β₀ plasma</span>
+      <input type="range" id="d-beta" min="0" max="1000" step="1" />
+      <span class="ctrl-val" data-val="beta"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">B geometry</span>
+      <select id="d-maggeom" style="flex:1;min-width:0">
+        <option value="single-loop">Single loop</option>
+        <option value="multi-loop">Multi loop</option>
+        <option value="vertical">Vertical</option>
+      </select>
+      <span class="ctrl-val" data-val="maggeom"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Magnetization</span>
+      <select id="d-mad" style="flex:1;min-width:0">
+        <option value="sane">SANE</option>
+        <option value="mad">MAD</option>
+      </select>
+      <span class="ctrl-val" data-val="mad"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">r_in mode</span>
+      <select id="d-rinmode" style="flex:1;min-width:0">
+        <option value="isco">ISCO (derived)</option>
+        <option value="free">Free r_in</option>
+      </select>
+      <span class="ctrl-val" data-val="rinmode"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">r_in / M</span>
+      <input type="range" id="d-rin" min="${DISK_LIMITS.rinM.min}" max="${DISK_LIMITS.rinM.max}" step="0.1" />
+      <span class="ctrl-val" data-val="rin"></span>
     </label>
     <label class="ctrl">
       <span class="ctrl-name">r_out / M</span>
@@ -79,15 +134,17 @@ export function buildControlsHtml(): string {
       <input type="range" id="d-tilt-node" min="0" max="360" step="1" />
       <span class="ctrl-val" data-val="tiltNode"></span>
     </label>
-    <p class="ctrl-hint">ṁ sets NT power · r_in = ISCO · tilt vs spin (+Y) · H/R from ṁ+Γ</p>
-
-    <div class="ctrl-section">Jets (optional)</div>
+    <label class="ctrl">
+      <span class="ctrl-name">Perturb</span>
+      <input type="range" id="d-perturb" min="0" max="1" step="0.01" />
+      <span class="ctrl-val" data-val="perturb"></span>
+    </label>
     <label class="ctrl">
       <span class="ctrl-name">Jet power</span>
       <input type="range" id="d-jet" min="0" max="1" step="0.01" />
       <span class="ctrl-val" data-val="jet"></span>
     </label>
-    <p class="ctrl-hint">0 = off · strength ∝ a★² · ṁ^0.4 · weaker at low |a★|</p>
+    <p class="ctrl-hint">Torus-style base: ρ₀ · H/r · Γ · K · ℓ · β₀ · B · r_in · tilt · jets · MAD/SANE</p>
 
     <div class="ctrl-section">Observer</div>
     <label class="ctrl">
@@ -110,25 +167,7 @@ export function buildControlsHtml(): string {
       <input type="range" id="c-fov" min="${fovLim.min}" max="${fovLim.max}" step="0.01" />
       <span class="ctrl-val" data-val="fov"></span>
     </label>
-    <p class="ctrl-hint">Scale-free D = d·M (fixed on) · drag on canvas to orbit</p>
-
-    <details class="ctrl-expert">
-      <summary class="ctrl-section" style="cursor:pointer">Expert disk (Γ / β)</summary>
-      <label class="ctrl">
-        <span class="ctrl-name">Γ (EOS)</span>
-        <select id="d-gamma" style="flex:1;min-width:0">
-          <option value="1.6667">5/3 (gas)</option>
-          <option value="1.3333">4/3 (radiation)</option>
-        </select>
-        <span class="ctrl-val" data-val="gamma"></span>
-      </label>
-      <label class="ctrl">
-        <span class="ctrl-name">Plasma β</span>
-        <input type="range" id="d-beta" min="0" max="1000" step="1" />
-        <span class="ctrl-val" data-val="beta"></span>
-      </label>
-      <p class="ctrl-hint">Γ → derived H/R · β → MRI dens variance (low β = stronger B) · log β slider</p>
-    </details>
+    <p class="ctrl-hint">Scale-free D = d·M · drag canvas to orbit</p>
 
     <div class="ctrl-section">Numerics (not physics)</div>
     <label class="ctrl">
@@ -148,6 +187,5 @@ export function buildControlsHtml(): string {
       </select>
       <span class="ctrl-val" data-val="grmhd"></span>
     </label>
-    <p class="ctrl-hint">Analytic = sech² model · GRMHD cube = 3D dens (.bhcm R8) · toggle if image ok</p>
   `
 }

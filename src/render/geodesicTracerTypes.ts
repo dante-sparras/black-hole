@@ -7,29 +7,34 @@ export type SpacetimeTraceParams = {
   spinStar: number
   charge: number
   mdot: number
-  /** r_ISCO / M from CPU diskIsco (matches orbital sense) */
+  /** Effective r_in / M (ISCO or free) */
   rIscoOverM: number
-  /** Disk outer radius in units of M */
   outerM: number
-  /** true = prograde/co-rotating Ω; false = retrograde */
   prograde: boolean
-  /** Master structure 0–1 */
   structure: number
   arms: number
   clumps: number
   dust: number
+  /** Free H/r */
   scaleHeight: number
   shearRate: number
-  /** 1 = animate shear with time */
   animate: boolean
-  /** Disk midplane tilt (rad) vs BH spin (+Y) */
   tiltRad: number
-  /** Line of nodes (rad) about +Y */
   tiltNodeRad: number
-  /** Optional jet power 0…1 */
   jetPower: number
-  /** MRI dens variance scale from plasma β (1 = default) */
   mriTurbScale: number
+  /** Density normalization ρ₀ */
+  rho0: number
+  /** Polytropic T scale K ρ^{Γ−1} */
+  polyTScale: number
+  /** Dens peak radius / M from ℓ̃ */
+  rPeakOverM: number
+  /** Mag geometry code: 0 single-loop, 1 multi, 2 vertical */
+  magGeom: number
+  /** MAD boost on jets 0…1 */
+  madBoost: number
+  /** Perturbation amplitude */
+  perturbAmp: number
 }
 
 export type CameraTraceParams = {
@@ -39,10 +44,6 @@ export type CameraTraceParams = {
   fov: number
 }
 
-/**
- * Full-screen geodesic material + uniform upload surface.
- * Prefer batch setters (setSpacetime / setCamera / setSky); no per-field setters.
- */
 export type GeodesicTracer = {
   material: MeshBasicNodeMaterial
   mesh: Mesh
@@ -50,20 +51,11 @@ export type GeodesicTracer = {
   setCamera: (c: CameraTraceParams) => void
   setSky: (s: SkyState) => void
   setDebugMode: (mode: number) => void
-  /** 0 = real-time Cartesian (default), 1 = Boyer–Lindquist Mino */
   setIntegratorMode: (mode: 0 | 1) => void
-  /** true = D = distanceM · M; false = fixed geometric D */
   setScaleFree: (on: boolean) => void
-  /** true = ideal I ∝ g³; false = soft display I ∝ g² */
   setIdealBeam: (on: boolean) => void
-  /** Animation time (seconds) for Keplerian disk shear */
   setTime: (seconds: number) => void
-  /** Numerical quality only (steps / stride / base step) */
   setQuality: (q: { maxSteps: number; volumeStride: number; baseStepM: number }) => void
-  /**
-   * GRMHD dens cube on GPU. mix 0 = analytic only, 1 = pure cube.
-   * Pass null gpu to disable (mix forced 0).
-   */
   setGrmhdCube: (
     gpu: {
       texture: import('three').Data3DTexture

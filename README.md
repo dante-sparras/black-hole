@@ -30,13 +30,12 @@ bun run build
 | Section | Controls |
 |---------|----------|
 | Black hole | \(M\), signed \(a_★\), \(Q\) |
-| Disk | \(\dot m\), \(r_\mathrm{out}/M\), orbit, **tilt** + node |
-| Jets | power 0…1 (off by default; \(\propto a_★^2 \dot m\)) |
-| Expert | \(\Gamma\) (4/3 \| 5/3), plasma \(\beta\) |
+| **Accretion disk (all together)** | \(\dot m\), \(
+ho_0\), \(H/r\), \(\Gamma\), \(K\), \(\ell\), \(\beta_0\), B geometry, SANE/MAD, \(r_\mathrm{in}\) mode+value, \(r_\mathrm{out}\), orbit, tilt, perturb, jet power |
 | Observer | distance/\(M\), incl, azim, FOV |
 | Numerics | Quality, Density source |
 
-Derived HUD: \(r_+\), \(r_\mathrm{ph}\), ISCO, \(\eta_\mathrm{NT}\), H/R, \(b_c^\pm\), …
+Derived HUD: \(r_+\), ISCO, effective \(r_\mathrm{in}\), \(r_\mathrm{peak}(\ell)\), \(\eta\), free vs thin \(H/r\), …
 
 See [docs/controls-physics-map.md](docs/controls-physics-map.md) and [docs/limitations.md](docs/limitations.md).
 
