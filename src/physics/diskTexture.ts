@@ -121,15 +121,15 @@ export const DISK_TEXTURE = {
   dustContrast: 0.48,
   phase0: 0.35,
   /**
-   * UI shear multiplier (default ~1). Combined with shearGain for visible wind.
-   * At r≈10M, Ω≈0.032; gain×rate×Ω ≈ 0.5 rad/s → noticeable in ~1s.
+   * UI shear multiplier (default ~1.2). Combined with shearGain for visible wind.
+   * Phase uses dimensionless Ω̃=(M/r)^{3/2} so rate is stable under mass changes.
    */
-  shearRate: 1.0,
+  shearRate: 1.2,
   /**
-   * Visual gain so Keplerian advection is visible (physics Ω is tiny in UI seconds).
-   * Not a free “film” knob — keeps real Ω∝r^{-3/2} differential, just time-scaled.
+   * Visual gain: wall-clock seconds → pattern phase.
+   * Uses Ω̃=(M/r)^{3/2} (not geometric Ω∝1/M) so scale-free mass does not freeze the disk.
    */
-  shearGain: 14,
+  shearGain: 28,
   texMin: 0.18,
   texMax: 2.35,
   /** Mild T jitter from clumping */
@@ -193,10 +193,12 @@ export function diskTextureFactor(
   const sphi = hz * invR
   const lnR = Math.log(Math.max(rho / M, 1e-4))
 
-  // Visible Keplerian shear: gain × rate × Ω_K × t  (Ω ∝ r^{-3/2})
-  const OmegaK = Math.sqrt(M) / Math.pow(Math.max(rho, 1e-6), 1.5)
+  // Dimensionless Keplerian: Ω̃ = (M/r)^{3/2}
+  // Geometric Ω∝1/M at fixed r/M freezes the pattern when mass↑.
+  const rhoM = Math.max(rho / M, 1e-4)
+  const OmegaDim = Math.pow(rhoM, -1.5)
   const sense = prograde ? 1 : -1
-  const shear = sense * shearRate * T.shearGain * OmegaK * time
+  const shear = sense * shearRate * T.shearGain * OmegaDim * time
 
   // Advect material frame: rotate (c,s) by shear (differential with r)
   const csh = Math.cos(shear)
@@ -283,9 +285,10 @@ export function diskTemperatureJitter(
   const invR = 1 / rho
   const lnR = Math.log(Math.max(rho / M, 1e-4))
   const sense = (opts.prograde ?? true) ? 1 : -1
-  const OmegaK = Math.sqrt(M) / Math.pow(Math.max(rho, 1e-6), 1.5)
+  const rhoM = Math.max(rho / M, 1e-4)
+  const OmegaDim = Math.pow(rhoM, -1.5)
   const shearRate = opts.shearRate ?? T.shearRate
-  const shear = sense * shearRate * T.shearGain * OmegaK * (opts.time ?? 0)
+  const shear = sense * shearRate * T.shearGain * OmegaDim * (opts.time ?? 0)
   const cphi = hx * invR
   const sphi = hz * invR
   const csh = Math.cos(shear)

@@ -98,7 +98,7 @@ export function buildControlsHtml(): string {
       <span class="ctrl-val" data-val="anim"></span>
     </label>
     <button type="button" class="preset-btn" id="d-struct-reset" style="margin-top:6px;width:100%">Reset structure defaults</button>
-    <p class="ctrl-hint">Structure 0 = smooth NT · arms/clumps/dust · H/R edge-on path · shear winds spirals (gain×Ω so motion is visible)</p>
+    <p class="ctrl-hint">Structure 0 = smooth NT · arms/clumps/dust · H/R edge-on · shear uses (M/r)^{3/2} so mass does not freeze motion</p>
 
     <div class="ctrl-section">Camera</div>
     <label class="ctrl">

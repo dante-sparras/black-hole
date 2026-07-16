@@ -140,14 +140,16 @@ export function accumulateDiskHit(p) {
   )
 
   // --- Structured surface: advected spirals + flow filaments + plasma + dust ---
-  // Visible Keplerian: shearGain × rate × Ω_K × t (Ω alone is too slow for UI seconds)
+  // Visible Keplerian: shearGain × rate × Ω̃ × t
+  // Ω̃ = (M/r)^{3/2} — independent of M at fixed r/M (scale-free safe)
   const lnR = log(max(hitR.div(M), float(1e-4)))
-  const OmegaK = sqrt(max(M, float(1e-8))).div(pow(max(hitR, float(1e-5)), float(1.5)))
+  const rhoM = max(hitR.div(M), float(1e-4))
+  const OmegaDim = pow(rhoM, float(-1.5))
   const sense = uPrograde.greaterThan(0.5).select(float(1), float(-1))
   const shear = sense
     .mul(shearRateLive)
     .mul(float(TX.shearGain))
-    .mul(OmegaK)
+    .mul(OmegaDim)
     .mul(uTime)
 
   // Rotate (cφ,sφ) into material frame — pattern advects with gas

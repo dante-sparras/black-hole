@@ -83,14 +83,13 @@ describe('diskTextureFactor', () => {
 
   test('Keplerian shear changes pattern over time at fixed point', () => {
     const f0 = diskTextureFactor(12, 3, 1, { time: 0 })
-    const f1 = diskTextureFactor(12, 3, 1, { time: 3 })
-    // With shearGain, motion is visible within a few seconds
+    const f1 = diskTextureFactor(12, 3, 1, { time: 1.5 })
     expect(Math.abs(f1 - f0)).toBeGreaterThan(0.02)
   })
 
   test('inner radius shears faster than outer (differential rotation)', () => {
-    // Phase advance ∝ Ω ∝ r^{-3/2}: same Δt moves pattern more at small r
-    const dt = 1.5
+    // Phase advance ∝ (r/M)^{-3/2}: same Δt moves pattern more at small r
+    const dt = 1.0
     const dInner = Math.abs(
       diskTextureFactor(6, 0, 1, { time: dt }) - diskTextureFactor(6, 0, 1, { time: 0 }),
     )
@@ -98,6 +97,21 @@ describe('diskTextureFactor', () => {
       diskTextureFactor(20, 0, 1, { time: dt }) - diskTextureFactor(20, 0, 1, { time: 0 }),
     )
     expect(dInner).toBeGreaterThan(dOuter * 0.9)
+  })
+
+  test('animation rate at fixed r/M is independent of mass', () => {
+    // Bug: geometric Ω∝1/M froze the disk at high mass. Dimless Ω̃ fixes it.
+    const opts = { time: 1.2, shearRate: 1.2 }
+    // Same Cartesian (x,z) scaled with M so r/M matches
+    const d1 = Math.abs(
+      diskTextureFactor(10, 2, 1, opts) - diskTextureFactor(10, 2, 1, { ...opts, time: 0 }),
+    )
+    const d10 = Math.abs(
+      diskTextureFactor(100, 20, 10, opts) - diskTextureFactor(100, 20, 10, { ...opts, time: 0 }),
+    )
+    // Same fractional radii → similar |Δf| (allow noise variance)
+    expect(d10).toBeGreaterThan(d1 * 0.35)
+    expect(d1).toBeGreaterThan(d10 * 0.35)
   })
 })
 
