@@ -220,9 +220,11 @@ export function accumulateDiskHit(p) {
     .mul(spinFac)
   const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
-  // Physical T: NT + g-redshift; mild outer dust cooling only (no fake plasma heat)
-  const tZone = float(1).sub(dustZone.mul(0.12).mul(dustContrast.add(0.25)))
-  const tAtm = float(0.75).add(dVert.mul(0.25))
+  // Physical T: NT + g-redshift; outer dust cooler, inner plasma slightly hotter
+  const tZone = float(1)
+    .sub(dustZone.mul(0.18).mul(dustContrast.add(0.3)))
+    .add(plasmaZone.mul(0.08).mul(turbContrast.add(0.2)))
+  const tAtm = float(0.72).add(dVert.mul(0.28))
   let TK = max(
     float(E.tColorMinK),
     min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tZone).mul(tAtm)),
@@ -263,40 +265,51 @@ export function accumulateDiskHit(p) {
   const armWave = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))),
   )
-  const armsBright = pow(max(armWave, float(1e-4)), float(1.55))
+  const armsBright = pow(max(armWave, float(1e-4)), float(1.7))
   const armFac = float(1)
     .sub(armContrast)
-    .add(armContrast.mul(float(0.16).add(armsBright.mul(1.1))))
+    .add(armContrast.mul(float(0.1).add(armsBright.mul(1.25))))
 
-  // m=2 + m=4 filaments
+  // m=2 + m=4 + m=8 filaments (flow-aligned, GRMHD-like)
   const c4a = c2a.mul(c2a).sub(s2a.mul(s2a))
   const s4a = c2a.mul(s2a).mul(2)
+  const c8a = c4a.mul(c4a).sub(s4a.mul(s4a))
+  const s8a = c4a.mul(s4a).mul(2)
   const zPhase = float(1).sub(dVert).mul(1.8)
-  const a2s = float(-0.44)
+  const a2s = float(-0.5)
     .mul(lnR)
     .add(float(TX.phase0).mul(0.7))
     .add(zPhase.mul(0.4))
     .add(drag.mul(0.5))
-  const a4s = float(-0.72)
+  const a4s = float(-0.8)
     .mul(lnR)
     .add(float(TX.phase0).mul(1.1))
     .add(zPhase.mul(0.85))
     .add(drag.mul(0.8))
+  const a8s = float(-1.1)
+    .mul(lnR)
+    .add(float(TX.phase0).mul(1.4))
+    .add(zPhase.mul(1.1))
+    .add(drag.mul(0.95))
   const stream2 = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(a2s)).add(s2a.mul(sin(a2s)))),
   )
   const stream4 = float(0.5).add(
     float(0.5).mul(c4a.mul(cos(a4s)).add(s4a.mul(sin(a4s)))),
   )
+  const stream8 = float(0.5).add(
+    float(0.5).mul(c8a.mul(cos(a8s)).add(s8a.mul(sin(a8s)))),
+  )
   const streams = stream2
-    .mul(float(1).sub(float(TX.streamHarmonic)))
-    .add(pow(max(stream4, float(1e-4)), float(1.6)).mul(float(TX.streamHarmonic)))
+    .mul(float(0.35))
+    .add(pow(max(stream4, float(1e-4)), float(1.55)).mul(0.35))
+    .add(pow(max(stream8, float(1e-4)), float(2.1)).mul(float(TX.streamHarmonic)))
   const streamStr = float(TX.streamContrast)
     .mul(uStructure)
-    .mul(float(0.85).add(dVert.mul(0.5)))
+    .mul(float(0.85).add(dVert.mul(0.55)))
   const streamFac = float(1)
     .sub(streamStr)
-    .add(streamStr.mul(float(0.15).add(streams.mul(1.15))))
+    .add(streamStr.mul(float(0.1).add(streams.mul(1.25))))
 
   // Turbulence in advected frame — z-slice so atmosphere ≠ extruded midplane
   const turbDomainZ = lnR.add(shearTot.mul(0.04)).add(zPhase.mul(0.25))

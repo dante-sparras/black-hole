@@ -111,49 +111,58 @@ export function turbulence2(x: number, y: number): number {
  */
 export const DISK_TEXTURE = {
   arms: 2,
-  /** Log-spiral pitch (tighter = more wound) */
-  pitch: 0.72,
-  /** Arm vs inter-arm contrast (gas filaments) */
-  armContrast: 0.82,
+  /** Log-spiral pitch (tighter = more wound, GRMHD-like) */
+  pitch: 0.82,
+  /** Arm vs inter-arm contrast (gas filaments) — high for reference-still look */
+  armContrast: 0.9,
   /** Multi-scale plasma / eddy contrast */
-  turbContrast: 0.72,
-  /** Outer dusty lanes */
-  dustContrast: 0.48,
+  turbContrast: 0.78,
+  /** Outer dusty lanes — cooler, darker annuli */
+  dustContrast: 0.58,
   phase0: 0.35,
   /**
-   * UI shear multiplier (default ~1.2). Combined with shearGain for visible wind.
+   * UI shear multiplier (default ~1.25). Combined with shearGain for visible wind.
    * Phase uses dimensionless Ω̃=(M/r)^{3/2} so rate is stable under mass changes.
    */
-  shearRate: 1.2,
+  shearRate: 1.25,
   /**
    * Visual gain: wall-clock seconds → pattern phase.
    * Uses Ω̃=(M/r)^{3/2} (not geometric Ω∝1/M) so scale-free mass does not freeze the disk.
    */
-  shearGain: 28,
-  texMin: 0.18,
-  texMax: 2.35,
+  shearGain: 32,
+  texMin: 0.14,
+  texMax: 2.55,
   /** Mild T jitter from clumping */
-  tempJitterAmp: 0.18,
+  tempJitterAmp: 0.22,
   /** H/R scale-height used for path-length thickness (edge-on look) */
-  scaleHeight: 0.085,
+  scaleHeight: 0.09,
   /** Fine flow-aligned filament strength (reference streamlines) */
-  streamContrast: 0.55,
+  streamContrast: 0.72,
   /** Secondary streamline harmonic weight */
-  streamHarmonic: 0.45,
+  streamHarmonic: 0.55,
   /**
    * Kerr frame-drag spiral wind (dimensionless).
    * Phase add: dragGain · a★ · (M/r) — arms twist more near the hole for high spin.
    */
-  frameDragGain: 1.85,
+  frameDragGain: 2.1,
   /**
    * Log-normal MRI dens variance σ (unit-mean: exp(σ·ξ − σ²/2), ξ∈[-1,1] from noise).
    */
-  mriSigma: 0.55,
+  mriSigma: 0.68,
   /**
    * Photon-ring silk: multi-wrap intensity boost near r~r_ph.
    * 0 = honest (only true multi-hit accumulation); >0 is display boost.
    */
   photonRingBoost: 0,
+  /**
+   * Mild midplane warp amplitude as fraction of local H (m=2).
+   * Real disks warp under LT + MRI channels — not a free look knob.
+   */
+  warpAmp: 0.1,
+  /**
+   * Outer rim raggedness: fractional radius modulation (irregular truncation).
+   */
+  rimRagged: 0.16,
 } as const
 
 /**
@@ -285,13 +294,13 @@ export function diskTextureFactor(
   const s4 = 2 * c2 * s2
   const c8 = c4 * c4 - s4 * s4
   const s8 = 2 * c4 * s4
-  const a2 = -2 * 0.22 * lnR + phase0 * 0.7 + drag * 0.5
-  const a8 = -8 * 0.12 * lnR + phase0 * 1.3 + drag * 0.8
+  const a2 = -2 * 0.28 * lnR + phase0 * 0.7 + drag * 0.5
+  const a8 = -8 * 0.14 * lnR + phase0 * 1.3 + drag * 0.9
   const stream2 = 0.5 + 0.5 * (c2 * Math.cos(a2) + s2 * Math.sin(a2))
   const stream8 = 0.5 + 0.5 * (c8 * Math.cos(a8) + s8 * Math.sin(a8))
   const streams =
     stream2 * (1 - T.streamHarmonic) +
-    Math.pow(Math.max(stream8, 1e-4), 1.8) * T.streamHarmonic
+    Math.pow(Math.max(stream8, 1e-4), 2.0) * T.streamHarmonic
 
   // Multi-scale turbulence in *advected* frame (moves with gas)
   const turb = turbulenceSeamless(cx * 1.65, sx * 1.65, lnR + 0.05 * shearTot, 4)
@@ -302,30 +311,36 @@ export function diskTextureFactor(
 
   // Radial dust lanes / rings (φ-independent → seamless)
   const dustWave = 0.5 + 0.5 * Math.sin(lnR * 5.4 + 0.4 + 0.15 * shearTot)
-  const dustOuter = Math.min(1, Math.max(0, (lnR - 0.65) / 2.0))
-  const dust = 1 - dustContrast * dustOuter * (0.5 + 0.5 * dustWave)
+  const dustOuter = Math.min(1, Math.max(0, (lnR - 0.55) / 1.9))
+  const dust = 1 - dustContrast * dustOuter * (0.45 + 0.55 * dustWave)
 
   // Fine radial ripple (settling rings)
-  const ripple = 0.5 + 0.5 * Math.sin(lnR * 4.8 + 0.3 * shearTot)
+  const ripple = 0.5 + 0.5 * Math.sin(lnR * 5.2 + 0.3 * shearTot)
+
+  // Irregular outer rim modulation (not a perfect circle)
+  const c3 = cphi * cphi * cphi - 3 * cphi * sphi * sphi
+  const s3 = 3 * cphi * cphi * sphi - sphi * sphi * sphi
+  const rimN = hash2(cphi * 7.1, sphi * 5.3)
+  const rim = 0.5 + 0.5 * (0.55 * c3 + 0.25 * s3 + 0.4 * rimN - 0.2)
+  const edgeOut = Math.min(1, Math.max(0, (3.55 - lnR + T.rimRagged * (rim - 0.5)) / 1.55))
+  const edgeOutS = edgeOut * edgeOut * (3 - 2 * edgeOut)
 
   // Soft radial edges
   const softIn = Math.min(1, Math.max(0, (rho / M - 5.5) / 2.5))
-  const softOut = Math.min(1, Math.max(0, (3.4 - lnR) / 1.6))
   const edgeIn = softIn * softIn * (3 - 2 * softIn)
-  const edgeOut = softOut * softOut * (3 - 2 * softOut)
 
   let f = 1
-  f *= 1 - armContrast + armContrast * (0.16 + 1.1 * armsBright)
-  f *= 1 - streamContrast + streamContrast * (0.25 + 0.95 * streams)
+  f *= 1 - armContrast + armContrast * (0.12 + 1.2 * armsBright)
+  f *= 1 - streamContrast + streamContrast * (0.18 + 1.05 * streams)
   f *=
     1 -
     turbContrast +
-    turbContrast * (0.18 + 0.5 * turb + 0.25 * clump + 0.15 * fine + 0.35 * (mri - 0.5))
+    turbContrast * (0.14 + 0.48 * turb + 0.28 * clump + 0.18 * fine + 0.4 * (mri - 0.5))
   f *= dust
-  f *= 0.86 + 0.28 * ripple
-  f *= 0.82 + 0.18 * edgeIn * edgeOut
+  f *= 0.84 + 0.32 * ripple
+  f *= 0.78 + 0.22 * edgeIn * edgeOutS
   // Mild log-normal dens imprint on brightness
-  f *= 0.82 + 0.18 * mri
+  f *= 0.78 + 0.22 * mri
 
   return Math.min(T.texMax, Math.max(T.texMin, f))
 }

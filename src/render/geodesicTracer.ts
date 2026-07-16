@@ -531,13 +531,13 @@ export function createGeodesicTracer(): GeodesicTracer {
       const span = max(rout.sub(rin), M.mul(4))
       const xRad = min(float(1), max(float(0), rhoV.sub(rin).div(span)))
       // Zone weights from radial structure (physical annuli)
-      const plasmaW = exp(xRad.mul(-4.2)) // hot inner
-      const dustW = pow(max(xRad.sub(float(0.28)), float(0)).div(0.72), float(1.4))
+      const plasmaW = exp(xRad.mul(-4.5)) // hot inner
+      const dustW = pow(max(xRad.sub(float(0.24)), float(0)).div(0.76), float(1.35))
       const gasW = max(float(0), float(1).sub(plasmaW.mul(0.85)).sub(dustW.mul(0.55)))
       const hOverR = uScaleH.mul(
-        float(0.16)
-          .add(pow(xRad.add(0.05), float(1.1)).mul(1.6))
-          .add(dustW.mul(0.85)),
+        float(0.14)
+          .add(pow(xRad.add(0.05), float(1.15)).mul(1.75))
+          .add(dustW.mul(0.95)),
       )
       const invRhoV = float(1).div(max(rhoV, float(1e-5)))
       const cphiV = hxV.mul(invRhoV)
@@ -550,12 +550,12 @@ export function createGeodesicTracer(): GeodesicTracer {
       const shear = sense
         .mul(uShearRate)
         .mul(uAnim)
-        .mul(float(28))
+        .mul(float(32))
         .mul(OmegaDim)
         .mul(uTime)
       // Kerr frame-drag + Lense–Thirring dens wind
-      const drag = aStar.mul(float(1.85)).div(max(rhoM, float(1.05)))
-      const ltWind = aStar.mul(float(2.4)).div(max(rhoM.mul(rhoM).mul(rhoM), float(1.2)))
+      const drag = aStar.mul(float(2.1)).div(max(rhoM, float(1.05)))
+      const ltWind = aStar.mul(float(2.8)).div(max(rhoM.mul(rhoM).mul(rhoM), float(1.2)))
       const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12)))).add(ltWind)
       const csh = cos(shearTot)
       const ssh = sin(shearTot)
@@ -564,19 +564,25 @@ export function createGeodesicTracer(): GeodesicTracer {
       const c2 = cx.mul(cx).sub(sx.mul(sx))
       const s2 = cx.mul(sx).mul(2)
       const lnR = log(rhoM)
-      // m=2 log spiral density wave (gas arms) + frame-drag twist
-      const pitch = float(0.55)
+      // m=2 log spiral density wave (gas arms) + frame-drag twist — high contrast
+      const pitch = float(0.72)
       const armPh = float(-2).mul(pitch).mul(lnR).add(float(0.35)).add(drag)
       const armWave = float(0.5).add(
         float(0.5).mul(c2.mul(cos(armPh)).add(s2.mul(sin(armPh)))),
       )
-      const spiralDens = float(0.55).add(pow(max(armWave, float(1e-4)), float(1.45)).mul(0.9))
-      // Flow-aligned filaments (m=4 in material frame)
+      const spiralDens = float(0.38).add(pow(max(armWave, float(1e-4)), float(1.7)).mul(1.2))
+      // Flow-aligned filaments m=4 + m=8 (material frame)
       const c4 = c2.mul(c2).sub(s2.mul(s2))
       const s4 = c2.mul(s2).mul(2)
-      const filPh = float(-0.85).mul(lnR).add(float(1.1)).add(drag.mul(0.6))
+      const c8 = c4.mul(c4).sub(s4.mul(s4))
+      const s8 = c4.mul(s4).mul(2)
+      const filPh = float(-0.9).mul(lnR).add(float(1.1)).add(drag.mul(0.6))
       const fil = float(0.5).add(float(0.5).mul(c4.mul(cos(filPh)).add(s4.mul(sin(filPh)))))
-      const filDens = float(0.72).add(pow(max(fil, float(1e-4)), float(1.7)).mul(0.55))
+      const fil8Ph = float(-1.15).mul(lnR).add(float(1.4)).add(drag.mul(0.9))
+      const fil8 = float(0.5).add(float(0.5).mul(c8.mul(cos(fil8Ph)).add(s8.mul(sin(fil8Ph)))))
+      const filDens = float(0.58)
+        .add(pow(max(fil, float(1e-4)), float(1.75)).mul(0.5))
+        .add(pow(max(fil8, float(1e-4)), float(2.2)).mul(0.35))
       // GRMHD-like multi-scale dens: 2 octaves → log-normal MRI
       const nA = fract(
         sin(cx.mul(5.7).add(sx.mul(4.1)).add(lnR.mul(1.9))).mul(43758.5453),
@@ -585,29 +591,34 @@ export function createGeodesicTracer(): GeodesicTracer {
         sin(cx.mul(11.3).add(sx.mul(9.7)).add(lnR.mul(3.1)).add(19.1)).mul(43758.5453),
       )
       const nMix = nA.mul(0.58).add(nB.mul(0.42))
-      const sigmaM = float(0.55).mul(float(0.5).add(uClumps.mul(0.55)).add(uStructure.mul(0.2)))
+      const sigmaM = float(0.68).mul(float(0.45).add(uClumps.mul(0.55)).add(uStructure.mul(0.25)))
       const xiM = nMix.mul(2).sub(1)
       const mriDens = exp(xiM.mul(sigmaM).sub(sigmaM.mul(sigmaM).mul(0.5)))
       // Vertical MRI channel (z-corrugation modulated)
-      const chan = float(0.85).add(
-        float(0.15).mul(sin(sx.mul(3.5).add(lnR.mul(1.2)).add(drag))),
+      const chan = float(0.82).add(
+        float(0.18).mul(sin(sx.mul(3.5).add(lnR.mul(1.2)).add(drag))),
       )
-      // Irregular outer rim (m=3 lab frame — fixed relative to inertial)
+      // Irregular outer rim: m=3 + high-freq noise (not a perfect circle)
       const c3 = cphiV.mul(cphiV.mul(cphiV).sub(sphiV.mul(sphiV).mul(3)))
       const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
-      const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
-      const routEff = rout.mul(float(0.9).add(rimWobble.mul(0.12)))
-      const fadeW = max(span.mul(0.22), M.mul(1.8))
+      const rimN = fract(sin(cphiV.mul(12.7).add(sphiV.mul(9.3)).add(3.1)).mul(43758.5453))
+      const rimWobble = float(0.5).add(
+        float(0.5).mul(c3.mul(0.5).add(s3.mul(0.22)).add(rimN.mul(0.55)).sub(0.15)),
+      )
+      const routEff = rout.mul(float(0.84).add(rimWobble.mul(0.2)))
+      const fadeW = max(span.mul(0.26), M.mul(2.0))
       const outerLin = min(float(1), max(float(0), routEff.sub(rhoV).div(fadeW)))
-      const outerSoft = pow(outerLin, float(1.75))
-      const fadeIn = max(rin.mul(0.22), M.mul(0.35))
+      const outerSoft = pow(outerLin, float(1.55))
+      const fadeIn = max(rin.mul(0.18), M.mul(0.3))
       const innerLin = min(float(1), max(float(0), rhoV.sub(rin).div(fadeIn)))
-      const innerSoft = pow(innerLin, float(0.85))
+      const innerSoft = pow(innerLin, float(0.9))
       const radialGate = outerSoft.mul(innerSoft)
       const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.02))
-      // Mild vertical corrugation (MRI-ish z-wobble), shear-advected
-      const zWob = sx.mul(0.12).add(cx.mul(0.06)).mul(Hloc)
-      const zNorm = abs(absY.sub(zWob)).div(Hloc.mul(float(1.05).add(dustW.mul(0.3))))
+      // Mild m=2 midplane warp (LT/MRI) + vertical corrugation — uses signed y
+      const warpAmp = Hloc.mul(float(0.1)).mul(uStructure.add(0.35))
+      const midY = s2.mul(warpAmp).add(c2.mul(warpAmp.mul(0.35)))
+      const zWob = sx.mul(0.14).add(cx.mul(0.07)).mul(Hloc)
+      const zNorm = abs(pos.y.sub(midY).sub(zWob)).div(Hloc.mul(float(1.05).add(dustW.mul(0.35))))
       const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
       const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
       // Plasma: hot clumpy inner (advected)
@@ -615,27 +626,31 @@ export function createGeodesicTracer(): GeodesicTracer {
         sin(cx.mul(9.3).add(sx.mul(6.1)).add(lnR.mul(2.4))).mul(43758.5453),
       )
       const densPlasma = float(1).add(
-        plasmaW.mul(uClumps.add(0.35)).mul(clumpN.mul(1.35).sub(0.35)),
+        plasmaW.mul(uClumps.add(0.45)).mul(clumpN.mul(1.55).sub(0.4)),
       )
       // Dust lanes: cool outer, darker in density (advected)
       const dustLane = float(0.5).add(
-        float(0.5).mul(sin(lnR.mul(3.2).add(cx.mul(2.8)).add(sx.mul(1.4)))),
+        float(0.5).mul(sin(lnR.mul(3.4).add(cx.mul(2.8)).add(sx.mul(1.4)))),
       )
       const densDust = float(1).sub(
-        dustW.mul(uDust.add(0.4)).mul(float(0.3).add(dustLane.mul(0.7))).mul(0.7),
+        dustW.mul(uDust.add(0.5)).mul(float(0.28).add(dustLane.mul(0.75))).mul(0.78),
       )
-      // Gas: spiral + filament modulation (structure master)
+      // Gas: spiral + filament modulation (structure master) — high contrast
       const struct = uStructure
       const densGas = float(1)
-        .sub(struct.mul(0.55))
-        .add(struct.mul(spiralDens.mul(gasW.add(0.35)).mul(0.55).add(filDens.mul(0.45))))
+        .sub(struct.mul(0.65))
+        .add(
+          struct.mul(
+            spiralDens.mul(gasW.add(0.4)).mul(0.62).add(filDens.mul(0.52)),
+          ),
+        )
       // Combine: sech² × radial × zones × GRMHD-like MRI dens
       const dens = densZ
         .mul(radialGate)
         .mul(densPlasma)
         .mul(densDust)
         .mul(densGas)
-        .mul(float(0.72).add(mriDens.mul(0.4)))
+        .mul(float(0.65).add(mriDens.mul(0.5)))
         .mul(chan)
       const sphR = pos.length()
 
