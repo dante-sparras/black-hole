@@ -9,6 +9,7 @@ import {
   cos,
   cross,
   dot,
+  exp,
   float,
   int,
   max,
@@ -34,7 +35,7 @@ import type { GeodesicTracer } from './geodesicTracerTypes'
 import { applyDebugFalseColor } from './tsl/debugFalseColor'
 import { sampleDeepSpaceSky } from './tsl/deepSpaceSky'
 import { accumulateDiskHit } from './tsl/diskHitEmission'
-import { processDiskLayerHit } from './tsl/diskLayerHit'
+import { processDiskVolumeSample } from './tsl/diskLayerHit'
 import { knNullAccelTsl } from './tsl/knNullAccelTsl'
 
 export type {
@@ -148,6 +149,8 @@ export function createGeodesicTracer(): GeodesicTracer {
     const captured = float(0).toVar()
     const minR = camD.toVar()
     const hits = float(0).toVar()
+    /** Disk volume optical depth (Beer's law) — caps edge-on stacking */
+    const diskTau = float(0).toVar()
     const stepCount = float(0).toVar()
     const dbgG = float(0).toVar()
     const dbgT = float(0).toVar()
@@ -404,102 +407,71 @@ export function createGeodesicTracer(): GeodesicTracer {
       const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
       vel.assign(vec3(vx, vel.y, vz))
 
-      // 3D thin-disk slab: midplane + upper/lower skin planes at ±H.
-      // Plane crossings only (no per-step volume) — avoids shadow midplane slash.
-      // H ≈ (H/R) * ρ_char with ρ_char ~ 10M (mid-disk); scales with uScaleH.
-      const Hslab = max(uScaleH.mul(M).mul(10), M.mul(0.06))
-      const nRay = vel.normalize()
-      const layerCtx = {
-        M,
-        a,
-        aStar,
-        Q,
-        rs,
-        mdot,
-        rin,
-        rout,
-        uRIscoM,
-        hits,
-        col,
-        transm,
-        dbgG,
-        dbgT,
-        dbgFlux,
-        uDebugMode,
-        uIdealBeam,
-        uTime,
-        uPrograde,
-        uStructure,
-        uArms,
-        uClumps,
-        uDust,
-        uScaleH,
-        uShearRate,
-        uAnim,
-        nRay,
-      }
+      // Continuous 3D thin-disk volume: Gaussian vertical structure
+      // dens = exp(−(y/H)²), H=(H/R)·ρ. Beer's law τ stops edge-on slash.
+      // No discrete stacked planes — smooth slab of gas.
+      const hxV = pos.x
+      const hzV = pos.z
+      const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
+      const Hloc = max(uScaleH.mul(max(rhoV, M.mul(2))), M.mul(0.04))
+      const yOverH = abs(pos.y).div(Hloc)
+      const dens = exp(yOverH.mul(yOverH).mul(-1))
+      const sphR = pos.length()
 
-      // Midplane y = 0 (primary)
       If(
-        prevY
-          .mul(pos.y)
-          .lessThan(0)
-          .and(transm.greaterThan(0.02))
-          .and(hits.lessThan(10))
-          .and(abs(prevY).add(abs(pos.y)).greaterThan(M.mul(1e-4))),
+        dens
+          .greaterThan(0.04)
+          .and(rhoV.greaterThanEqual(rin))
+          .and(rhoV.lessThanEqual(rout.mul(1.04)))
+          .and(sphR.greaterThan(rCapture.mul(1.12)))
+          .and(diskTau.lessThan(2.8))
+          .and(transm.greaterThan(0.04))
+          .and(hits.lessThan(14))
+          // stride: every 2nd step — enough samples for smooth volume, not a wall
+          .and(stepCount.mod(int(2)).equal(int(0))),
         () => {
-          const t = prevY.div(prevY.sub(pos.y))
-          const hx = p0x.add(pos.x.sub(p0x).mul(t))
-          const hz = p0z.add(pos.z.sub(p0z).mul(t))
-          processDiskLayerHit({
-            ...layerCtx,
-            hx,
-            hz,
-            layerWeight: float(1),
-          })
-        },
-      )
-
-      // Upper skin y = +Hslab
-      If(
-        prevY
-          .sub(Hslab)
-          .mul(pos.y.sub(Hslab))
-          .lessThan(0)
-          .and(transm.greaterThan(0.03))
-          .and(hits.lessThan(12))
-          .and(abs(prevY.sub(Hslab)).add(abs(pos.y.sub(Hslab))).greaterThan(M.mul(1e-4))),
-        () => {
-          const t = prevY.sub(Hslab).div(prevY.sub(pos.y))
-          const hx = p0x.add(pos.x.sub(p0x).mul(t))
-          const hz = p0z.add(pos.z.sub(p0z).mul(t))
-          processDiskLayerHit({
-            ...layerCtx,
-            hx,
-            hz,
-            layerWeight: float(0.38),
-          })
-        },
-      )
-
-      // Lower skin y = −Hslab
-      If(
-        prevY
-          .add(Hslab)
-          .mul(pos.y.add(Hslab))
-          .lessThan(0)
-          .and(transm.greaterThan(0.03))
-          .and(hits.lessThan(12))
-          .and(abs(prevY.add(Hslab)).add(abs(pos.y.add(Hslab))).greaterThan(M.mul(1e-4))),
-        () => {
-          const t = prevY.add(Hslab).div(prevY.sub(pos.y))
-          const hx = p0x.add(pos.x.sub(p0x).mul(t))
-          const hz = p0z.add(pos.z.sub(p0z).mul(t))
-          processDiskLayerHit({
-            ...layerCtx,
-            hx,
-            hz,
-            layerWeight: float(0.38),
+          // Path element in scale-height units (cap so one step can't dominate)
+          const dsH = min(ds.div(Hloc), float(1.1))
+          const dTau = dens.mul(dsH).mul(0.62)
+          // e^{−τ} before this sample — Beer's law (saturates long equatorial paths)
+          const beer = exp(diskTau.mul(-1))
+          const w = dens.mul(dsH).mul(beer).mul(1.05)
+          If(w.greaterThan(0.02), () => {
+            processDiskVolumeSample({
+              hx: hxV,
+              hz: hzV,
+              weight: w,
+              M,
+              a,
+              aStar,
+              Q,
+              rs,
+              mdot,
+              rin,
+              rout,
+              uRIscoM,
+              hits,
+              col,
+              transm,
+              dbgG,
+              dbgT,
+              dbgFlux,
+              uDebugMode,
+              uIdealBeam,
+              uTime,
+              uPrograde,
+              uStructure,
+              uArms,
+              uClumps,
+              uDust,
+              uScaleH,
+              uShearRate,
+              uAnim,
+              nRay: vel.normalize(),
+            })
+            // fractional hit count — bounce stays mild for volume
+            hits.addAssign(0.18)
+            diskTau.addAssign(dTau)
           })
         },
       )

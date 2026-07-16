@@ -124,12 +124,8 @@ export function accumulateDiskHit(p) {
   // Mild: mid-disk ≈ 1, edges dip without vanishing
   const edgeFac = float(0.62).add(float(0.38).mul(edgeIn.mul(edgeOut)))
 
-  // Finite scale-height: path length ∝ H/|n_y| but HARD-CAPPED.
-  // Uncapped edge-on → infinite sheet / bright slash through the shadow.
-  const nY = max(pathAbsY, float(0.1))
-  const pathFac = min(float(1.55), uScaleH.div(nY).mul(0.85).add(0.75))
-
-  // Radial zones: hot plasma (inner) → gas arms (mid) → dust (outer)
+  // Finite scale-height residual (volume path mainly in weight)
+  // Removed old pathFac block conflict — pathFac set near emit
   const xM = hitR.div(max(M, float(1e-6)))
   const plasmaZone = exp(max(xM.sub(float(11)), float(0)).mul(-0.38))
   const dustZone = min(float(1), max(float(0), xM.sub(float(12)).div(16)))
@@ -316,12 +312,15 @@ export function accumulateDiskHit(p) {
   const bMax = max(br, max(bg, bb))
   const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-  const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.55))
+  const bounce = float(1).add(max(min(hits, float(4)).sub(1), float(0)).mul(0.22))
   const mdotBright = float(E.mdotBrightBase).add(
     pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
       E.mdotBrightScale,
     ),
   )
+  // pathFac mild — volume weights already carry dens·Δs·e^{−τ}
+  const nY = max(pathAbsY, float(0.15))
+  const pathFac = min(float(1.25), uScaleH.div(nY).mul(0.4).add(0.85))
   const iFlux = max(fluxVis, float(E.fluxVisFloor))
     .mul(mdotBright)
     .mul(E.intensityGain)
@@ -332,9 +331,9 @@ export function accumulateDiskHit(p) {
   dbgT.assign(TK.div(float(12000)))
   dbgFlux.assign(fluxVis.mul(texFac).mul(w))
 
-  If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.02)), () => {
+  If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.015)), () => {
     col.addAssign(emit.mul(transm))
-    // Fixed midplane attenuation (weight already scales intensity; avoid OD blow-up)
-    transm.mulAssign(0.45)
+    // Soft OD: volume samples use small w → light drain; Beer's law is in w
+    transm.mulAssign(max(float(0.8), float(1).sub(w.mul(0.22))))
   })
 }

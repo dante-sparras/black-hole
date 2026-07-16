@@ -135,7 +135,7 @@ export const DISK_TEXTURE = {
   /** Mild T jitter from clumping */
   tempJitterAmp: 0.18,
   /** H/R scale-height used for path-length thickness (edge-on look) */
-  scaleHeight: 0.07,
+  scaleHeight: 0.085,
   /** Fine flow-aligned filament strength (reference streamlines) */
   streamContrast: 0.55,
   /** Secondary m=8 streamline harmonic weight */
