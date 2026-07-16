@@ -46,6 +46,13 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 | Eddington ratio \(\dot{m}\) | `mdot` | \(10^{-3}\)–\(3\) | \(F\propto\dot{m}\), \(T\propto\dot{m}^{1/4}\) |
 | Outer radius | `outerM` | \(8\)–\(80\,M\) | Luminous cutoff; **inner edge = family ISCO** (derived) |
 | Orbit sense | `prograde` | pro / ret | Co-rotating (default) vs counter-rotating ISCO + Doppler |
+| Structure | `structure` | \(0\)–\(1\) | Master mix: 0 = smooth NT, 1 = full texture |
+| Gas arms | `arms` | \(0\)–\(1\) | Spiral filament contrast (× structure) |
+| Plasma clumps | `clumps` | \(0\)–\(1\) | Turbulence contrast |
+| Dust lanes | `dust` | \(0\)–\(1\) | Outer dust contrast + cooler outer T |
+| H/R | `scaleHeight` | \(0.02\)–\(0.18\) | Path-length thickness (edge-on) |
+| Shear speed | `shearRate` | \(0\)–\(1.2\) | Keplerian pattern wind |
+| Animate | `animate` | on/off | Differential rotation animation |
 
 **Not free (realism):** inner edge (locked to ISCO), film palette as primary color.
 

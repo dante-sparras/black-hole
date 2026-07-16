@@ -61,6 +61,45 @@ export function buildControlsHtml(): string {
     </label>
     <p class="ctrl-hint">ṁ → NT flux &amp; T∝ṁ¼ · ISCO from orbit sense · Doppler L/R flips with retrograde</p>
 
+    <div class="ctrl-section">Disk structure (realism)</div>
+    <label class="ctrl">
+      <span class="ctrl-name">Structure</span>
+      <input type="range" id="d-struct" min="${DISK_LIMITS.structure.min}" max="${DISK_LIMITS.structure.max}" step="0.01" />
+      <span class="ctrl-val" data-val="struct"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Gas arms</span>
+      <input type="range" id="d-arms" min="${DISK_LIMITS.arms.min}" max="${DISK_LIMITS.arms.max}" step="0.01" />
+      <span class="ctrl-val" data-val="arms"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Plasma clumps</span>
+      <input type="range" id="d-clumps" min="${DISK_LIMITS.clumps.min}" max="${DISK_LIMITS.clumps.max}" step="0.01" />
+      <span class="ctrl-val" data-val="clumps"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Dust lanes</span>
+      <input type="range" id="d-dust" min="${DISK_LIMITS.dust.min}" max="${DISK_LIMITS.dust.max}" step="0.01" />
+      <span class="ctrl-val" data-val="dust"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">H/R thickness</span>
+      <input type="range" id="d-h" min="${DISK_LIMITS.scaleHeight.min}" max="${DISK_LIMITS.scaleHeight.max}" step="0.005" />
+      <span class="ctrl-val" data-val="h"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Shear speed</span>
+      <input type="range" id="d-shear" min="${DISK_LIMITS.shearRate.min}" max="${DISK_LIMITS.shearRate.max}" step="0.01" />
+      <span class="ctrl-val" data-val="shear"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name">Animate</span>
+      <input type="checkbox" id="d-anim" checked />
+      <span class="ctrl-val" data-val="anim"></span>
+    </label>
+    <button type="button" class="preset-btn" id="d-struct-reset" style="margin-top:6px;width:100%">Reset structure defaults</button>
+    <p class="ctrl-hint">Structure 0 = smooth NT · arms/clumps/dust · H/R edge-on path · shear winds spirals</p>
+
     <div class="ctrl-section">Camera</div>
     <label class="ctrl">
       <span class="ctrl-name">Scale-free</span>

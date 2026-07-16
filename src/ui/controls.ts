@@ -7,6 +7,7 @@ import {
 import { convertDistanceOnScaleFreeToggle } from '../physics/observer'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import type { DiskParams } from '../physics/diskParams'
+import { DEFAULT_DISK } from '../physics/diskParams'
 import { withBatch } from '../state/batch'
 import {
   degToRad,
@@ -75,12 +76,27 @@ export function mountControls(
   const mdotInput = qs<HTMLInputElement>(root, '#d-mdot')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
   const orbitSelect = qs<HTMLSelectElement>(root, '#d-orbit')
+  const structInput = qs<HTMLInputElement>(root, '#d-struct')
+  const armsInput = qs<HTMLInputElement>(root, '#d-arms')
+  const clumpsInput = qs<HTMLInputElement>(root, '#d-clumps')
+  const dustInput = qs<HTMLInputElement>(root, '#d-dust')
+  const hInput = qs<HTMLInputElement>(root, '#d-h')
+  const shearInput = qs<HTMLInputElement>(root, '#d-shear')
+  const animInput = qs<HTMLInputElement>(root, '#d-anim')
+  const structResetBtn = qs<HTMLButtonElement>(root, '#d-struct-reset')
   const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
   const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
   const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
   const mdotVal = qs<HTMLElement>(root, '[data-val="mdot"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
   const orbitVal = qs<HTMLElement>(root, '[data-val="orbit"]')
+  const structVal = qs<HTMLElement>(root, '[data-val="struct"]')
+  const armsVal = qs<HTMLElement>(root, '[data-val="arms"]')
+  const clumpsVal = qs<HTMLElement>(root, '[data-val="clumps"]')
+  const dustVal = qs<HTMLElement>(root, '[data-val="dust"]')
+  const hVal = qs<HTMLElement>(root, '[data-val="h"]')
+  const shearVal = qs<HTMLElement>(root, '[data-val="shear"]')
+  const animVal = qs<HTMLElement>(root, '[data-val="anim"]')
 
   const distInput = qs<HTMLInputElement>(root, '#c-dist')
   const distName = qs<HTMLElement>(root, '#c-dist-name')
@@ -156,12 +172,26 @@ export function mountControls(
     setRangeValue(mdotInput, sliderFromMdot(d.mdot))
     setRangeValue(outerInput, d.outerM)
     if (orbitSelect) orbitSelect.value = d.prograde ? 'pro' : 'ret'
+    setRangeValue(structInput, d.structure)
+    setRangeValue(armsInput, d.arms)
+    setRangeValue(clumpsInput, d.clumps)
+    setRangeValue(dustInput, d.dust)
+    setRangeValue(hInput, d.scaleHeight)
+    setRangeValue(shearInput, d.shearRate)
+    if (animInput) animInput.checked = d.animate
     if (mdotVal) {
       const tScale = mdotTemperatureScale(d.mdot)
       mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
     }
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
     setText(orbitVal, d.prograde ? 'pro' : 'ret')
+    setText(structVal, fmt(d.structure, 2))
+    setText(armsVal, fmt(d.arms, 2))
+    setText(clumpsVal, fmt(d.clumps, 2))
+    setText(dustVal, fmt(d.dust, 2))
+    setText(hVal, fmt(d.scaleHeight, 3))
+    setText(shearVal, fmt(d.shearRate, 2))
+    setText(animVal, d.animate ? 'on' : 'off')
   }
 
   function syncCameraInputs(c: CameraState): void {
@@ -255,6 +285,46 @@ export function mountControls(
   bindSelect(orbitSelect, (v) => {
     onUserTweaked()
     setDisk({ prograde: v !== 'ret' })
+  })
+  bindRange(structInput, (v) => {
+    onUserTweaked()
+    setDisk({ structure: v })
+  })
+  bindRange(armsInput, (v) => {
+    onUserTweaked()
+    setDisk({ arms: v })
+  })
+  bindRange(clumpsInput, (v) => {
+    onUserTweaked()
+    setDisk({ clumps: v })
+  })
+  bindRange(dustInput, (v) => {
+    onUserTweaked()
+    setDisk({ dust: v })
+  })
+  bindRange(hInput, (v) => {
+    onUserTweaked()
+    setDisk({ scaleHeight: v })
+  })
+  bindRange(shearInput, (v) => {
+    onUserTweaked()
+    setDisk({ shearRate: v })
+  })
+  bindCheckbox(animInput, (checked) => {
+    onUserTweaked()
+    setDisk({ animate: checked })
+  })
+  structResetBtn?.addEventListener('click', () => {
+    onUserTweaked()
+    setDisk({
+      structure: DEFAULT_DISK.structure,
+      arms: DEFAULT_DISK.arms,
+      clumps: DEFAULT_DISK.clumps,
+      dust: DEFAULT_DISK.dust,
+      scaleHeight: DEFAULT_DISK.scaleHeight,
+      shearRate: DEFAULT_DISK.shearRate,
+      animate: DEFAULT_DISK.animate,
+    })
   })
 
   bindRange(distInput, (v) => {

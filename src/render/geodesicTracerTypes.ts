@@ -13,6 +13,15 @@ export type SpacetimeTraceParams = {
   outerM: number
   /** true = prograde/co-rotating Ω; false = retrograde */
   prograde: boolean
+  /** Master structure 0–1 */
+  structure: number
+  arms: number
+  clumps: number
+  dust: number
+  scaleHeight: number
+  shearRate: number
+  /** 1 = animate shear with time */
+  animate: boolean
 }
 
 export type CameraTraceParams = {

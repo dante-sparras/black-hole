@@ -66,8 +66,21 @@ export function accumulateDiskHit(p) {
     uIdealBeam,
     uTime,
     uPrograde,
+    uStructure,
+    uArms,
+    uClumps,
+    uDust,
+    uScaleH,
+    uShearRate,
+    uAnim,
     pathAbsY,
   } = p
+
+  // Effective contrasts: master structure × per-channel knobs
+  const armContrast = uStructure.mul(uArms)
+  const turbContrast = uStructure.mul(uClumps)
+  const dustContrast = uStructure.mul(uDust)
+  const shearRateLive = uAnim.greaterThan(0.5).select(uShearRate, float(0))
 
   // Intensity beam: display g² vs ideal g³
   const beamExp = uIdealBeam
@@ -90,26 +103,25 @@ export function accumulateDiskHit(p) {
   // Soft radial edges: plasma fades at ISCO; dust fades at outer rim
   const softIn = min(
     float(1),
-    max(float(0), hitR.sub(rin).div(max(rin.mul(0.35), M.mul(0.4)))),
+    max(float(0), hitR.sub(rin).div(max(rin.mul(0.4), M.mul(0.45)))),
   )
   const softOut = min(
     float(1),
-    max(float(0), rout.sub(hitR).div(max(rout.sub(rin).mul(0.22), M.mul(0.8)))),
+    max(float(0), rout.sub(hitR).div(max(rout.sub(rin).mul(0.28), M.mul(1.0)))),
   )
   const edgeIn = softIn.mul(softIn).mul(float(3).sub(softIn.mul(2)))
   const edgeOut = softOut.mul(softOut).mul(float(3).sub(softOut.mul(2)))
   // Mild: mid-disk ≈ 1, edges dip without vanishing
-  const edgeFac = float(0.72).add(float(0.28).mul(edgeIn.mul(edgeOut)))
+  const edgeFac = float(0.68).add(float(0.32).mul(edgeIn.mul(edgeOut)))
 
   // Finite scale-height look: longer path when ray is edge-on (small |v_y|)
-  // H/R ~ 0.05–0.08 thin disk; path ∝ H / |n·ẑ|
-  const nY = max(pathAbsY, float(0.06))
-  const pathFac = min(float(2.8), float(TX.scaleHeight).div(nY).add(0.55))
+  const nY = max(pathAbsY, float(0.055))
+  const pathFac = min(float(3.2), uScaleH.div(nY).add(0.5))
 
   // Radial zones: hot plasma (inner) → gas arms (mid) → dust (outer)
   const xM = hitR.div(max(M, float(1e-6)))
-  const plasmaZone = exp(max(xM.sub(float(12)), float(0)).mul(-0.35)) // strong near ISCO
-  const dustZone = min(float(1), max(float(0), xM.sub(float(14)).div(18)))
+  const plasmaZone = exp(max(xM.sub(float(11)), float(0)).mul(-0.38))
+  const dustZone = min(float(1), max(float(0), xM.sub(float(12)).div(16)))
 
   const rIscoM = max(uRIscoM, float(1.05))
   const iscoHot = pow(float(R_ISCO_SCHW_OVER_M).div(rIscoM), float(E.iscoHotPower))
@@ -120,31 +132,36 @@ export function accumulateDiskHit(p) {
     .mul(spinFac)
   const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
-  let TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), tRestK.mul(gColor)))
+  // Cooler outer dust floor (still blackbody)
+  const tCoolOuter = float(1).sub(dustZone.mul(0.12).mul(dustContrast.add(0.25)))
+  let TK = max(
+    float(E.tColorMinK),
+    min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tCoolOuter)),
+  )
 
   // --- Structured surface: spirals + plasma + dust ---
   const lnR = log(max(hitR.div(M), float(1e-4)))
   const OmegaK = sqrt(max(M, float(1e-8))).div(pow(max(hitR, float(1e-5)), float(1.5)))
   const sense = uPrograde.greaterThan(0.5).select(float(1), float(-1))
-  const shear = sense.mul(float(TX.shearRate)).mul(OmegaK).mul(uTime)
+  const shear = sense.mul(shearRateLive).mul(OmegaK).mul(uTime)
 
   // m=2 log spiral from (c,s) — seamless at ±π
   const c2a = cphi.mul(cphi).sub(sphi.mul(sphi))
   const s2a = cphi.mul(sphi).mul(2)
-  const arms = float(TX.arms)
-  const alpha = arms
+  const armsN = float(TX.arms)
+  const alpha = armsN
     .mul(float(-TX.pitch))
     .mul(lnR)
     .add(float(TX.phase0))
-    .add(arms.mul(shear))
+    .add(armsN.mul(shear))
   const armWave = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))),
   )
   // Filamentary arms (gas)
-  const armsBright = pow(max(armWave, float(1e-4)), float(1.55))
+  const armsBright = pow(max(armWave, float(1e-4)), float(1.6))
   const armFac = float(1)
-    .sub(float(TX.armContrast))
-    .add(float(TX.armContrast).mul(float(0.22).add(armsBright.mul(1.05))))
+    .sub(armContrast)
+    .add(armContrast.mul(float(0.18).add(armsBright.mul(1.12))))
 
   // Turbulence octave 1 (large gas eddies)
   const turbDomainZ = lnR.add(shear.mul(0.18))
@@ -214,35 +231,33 @@ export function accumulateDiskHit(p) {
 
   // Outer dust lanes (radial-only → seamless)
   const dustWave = float(0.5).add(float(0.5).mul(sin(lnR.mul(5.4).add(0.55))))
-  const dustOuter = min(float(1), max(float(0), lnR.sub(0.65).div(2.0)))
+  const dustOuter = min(float(1), max(float(0), lnR.sub(0.55).div(1.9)))
   const dust = float(1).sub(
-    float(TX.dustContrast)
+    dustContrast
       .mul(dustOuter)
-      .mul(float(0.5).add(dustWave.mul(0.5)))
-      .mul(float(0.65).add(dustZone.mul(0.55))),
+      .mul(float(0.48).add(dustWave.mul(0.52)))
+      .mul(float(0.6).add(dustZone.mul(0.6))),
   )
   // Settling rings
   const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.6).add(shear.mul(0.4)))))
 
   const turbFac = float(1)
-    .sub(float(TX.turbContrast))
+    .sub(turbContrast)
     .add(
-      float(TX.turbContrast).mul(
-        float(0.28).add(turb.mul(0.85)).add(plasmaClump.mul(0.55)),
-      ),
+      turbContrast.mul(float(0.26).add(turb.mul(0.88)).add(plasmaClump.mul(0.6))),
     )
   let texFac = armFac
     .mul(turbFac)
     .mul(dust)
-    .mul(float(0.88).add(ripple.mul(0.24)))
+    .mul(float(0.86).add(ripple.mul(0.28)))
     .mul(edgeFac)
   texFac = max(float(TX.texMin), min(float(TX.texMax), texFac))
 
   // Plasma hotspots / cooler dust: T jitter (still blackbody)
   const tJitter = float(1)
-    .add(float(TX.tempJitterAmp).mul(turb.mul(2).sub(1)))
-    .add(plasmaZone.mul(0.08))
-    .sub(dustZone.mul(0.06))
+    .add(float(TX.tempJitterAmp).mul(turbContrast.add(0.35)).mul(turb.mul(2).sub(1)))
+    .add(plasmaZone.mul(0.1).mul(turbContrast.add(0.4)))
+    .sub(dustZone.mul(0.07).mul(dustContrast.add(0.3)))
   TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), TK.mul(tJitter)))
 
   // Max-norm Planck chroma

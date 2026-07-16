@@ -73,6 +73,13 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       rIscoOverM: rIscoOverM(rIsco, p.mass),
       outerM: disk.outerM,
       prograde: disk.prograde,
+      structure: disk.structure,
+      arms: disk.arms,
+      clumps: disk.clumps,
+      dust: disk.dust,
+      scaleHeight: disk.scaleHeight,
+      shearRate: disk.shearRate,
+      animate: disk.animate,
     })
   }
 

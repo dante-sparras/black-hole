@@ -25,6 +25,7 @@ import {
 } from 'three/tsl'
 import { DEFAULT_MDOT } from '../physics/constants'
 import { R_ISCO_SCHW_OVER_M } from '../physics/disk'
+import { DEFAULT_DISK } from '../physics/diskParams'
 import { RT } from '../physics/geodesic/rtConstants'
 import { OBSERVER_DEFAULTS } from '../physics/observer'
 import { DEBUG_DEFAULTS } from '../debug/state'
@@ -68,6 +69,14 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uRoutM = uniform(RT.diskOuterM)
   /** 1 = prograde disk Ω; 0 = retrograde */
   const uPrograde = uniform(1)
+  /** Disk structure realism (not hair) */
+  const uStructure = uniform(DEFAULT_DISK.structure)
+  const uArms = uniform(DEFAULT_DISK.arms)
+  const uClumps = uniform(DEFAULT_DISK.clumps)
+  const uDust = uniform(DEFAULT_DISK.dust)
+  const uScaleH = uniform(DEFAULT_DISK.scaleHeight)
+  const uShearRate = uniform(DEFAULT_DISK.shearRate)
+  const uAnim = uniform(DEFAULT_DISK.animate ? 1 : 0)
   const uStarDensity = uniform(SKY_DEFAULTS.starDensity)
   const uStarBright = uniform(SKY_DEFAULTS.starBrightness)
   const uNebula = uniform(SKY_DEFAULTS.nebula)
@@ -335,6 +344,13 @@ export function createGeodesicTracer(): GeodesicTracer {
                   uIdealBeam,
                   uTime,
                   uPrograde,
+                  uStructure,
+                  uArms,
+                  uClumps,
+                  uDust,
+                  uScaleH,
+                  uShearRate,
+                  uAnim,
                   // BL equator: moderate path (no easy |v_y|)
                   pathAbsY: float(0.35),
                 })
@@ -453,6 +469,13 @@ export function createGeodesicTracer(): GeodesicTracer {
               uIdealBeam,
               uTime,
               uPrograde,
+              uStructure,
+              uArms,
+              uClumps,
+              uDust,
+              uScaleH,
+              uShearRate,
+              uAnim,
               pathAbsY: abs(nRay.y),
             })
           })
@@ -554,6 +577,13 @@ export function createGeodesicTracer(): GeodesicTracer {
       uRIscoM.value = p.rIscoOverM
       uRoutM.value = p.outerM
       uPrograde.value = p.prograde ? 1 : 0
+      uStructure.value = p.structure
+      uArms.value = p.arms
+      uClumps.value = p.clumps
+      uDust.value = p.dust
+      uScaleH.value = p.scaleHeight
+      uShearRate.value = p.shearRate
+      uAnim.value = p.animate ? 1 : 0
     },
     setCamera: (c) => {
       uCamDistM.value = c.distanceM
