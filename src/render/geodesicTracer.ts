@@ -408,62 +408,94 @@ export function createGeodesicTracer(): GeodesicTracer {
       const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
       vel.assign(vec3(vx, vel.y, vz))
 
-      // Continuous 3D volume — keep optically thinner so color/structure survive.
-      // dens ∝ sech²(y/H) × radial fade; Beer's law; NO stride banding (sample every step).
+      // 3D volume: distinct plasma (inner thin hot) / gas (mid) / dust (outer thick cool).
+      // Strong H(r) flare — not constant thickness. Soft power-law outer fade (no capsule tips).
       const hxV = pos.x
       const hzV = pos.z
       const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
-      const rRef = M.mul(10)
-      const flare = float(0.28)
-      const hOverR = uScaleH.mul(pow(max(rhoV.div(rRef), float(0.4)), flare))
-      const fadeW = max(rout.sub(rin).mul(0.16), M.mul(1.4))
+      const span = max(rout.sub(rin), M.mul(4))
+      // Radial coordinate 0 at ISCO → 1 at outer
+      const xRad = min(float(1), max(float(0), rhoV.sub(rin).div(span)))
+      // Zone weights (sum not required = 1; used as blends)
+      const plasmaW = exp(xRad.mul(-5.0)) // hot inner plasma
+      const dustW = pow(max(xRad.sub(float(0.32)), float(0)).div(0.68), float(1.35)) // outer dust
+      // Strong flare: thin near ISCO, much thicker outer dust
+      // H/R ≈ h0 · (0.18 + 1.6 x^1.05 + 0.7 dust)
+      const hOverR = uScaleH.mul(
+        float(0.18)
+          .add(pow(xRad.add(0.04), float(1.05)).mul(1.55))
+          .add(dustW.mul(0.75)),
+      )
       const invRhoV = float(1).div(max(rhoV, float(1e-5)))
       const cphiV = hxV.mul(invRhoV)
       const sphiV = hzV.mul(invRhoV)
       const c3 = cphiV.mul(cphiV.mul(cphiV).sub(sphiV.mul(sphiV).mul(3)))
       const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
-      const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.65).add(s3.mul(0.35))))
-      const routEff = rout.mul(float(0.88).add(rimWobble.mul(0.14)))
-      const outerX = routEff.sub(rhoV).div(fadeW)
-      const outerClamped = min(float(1), max(float(0), outerX))
-      const outerSoft = outerClamped.mul(outerClamped).mul(float(3).sub(outerClamped.mul(2)))
-      const fadeIn = max(rin.mul(0.35), M.mul(0.5))
-      const innerX = rhoV.sub(rin).div(fadeIn)
-      const innerClamped = min(float(1), max(float(0), innerX))
-      const innerSoft = innerClamped.mul(innerClamped).mul(float(3).sub(innerClamped.mul(2)))
+      const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
+      const routEff = rout.mul(float(0.9).add(rimWobble.mul(0.12)))
+      // Power-law outer fade (long dusty tail) — avoids bullet/capsule tips
+      const fadeW = max(span.mul(0.22), M.mul(1.8))
+      const outerLin = min(float(1), max(float(0), routEff.sub(rhoV).div(fadeW)))
+      const outerSoft = pow(outerLin, float(1.75))
+      // Sharper plasma inner edge (hot truncation near ISCO)
+      const fadeIn = max(rin.mul(0.22), M.mul(0.35))
+      const innerLin = min(float(1), max(float(0), rhoV.sub(rin).div(fadeIn)))
+      const innerSoft = pow(innerLin, float(0.85))
       const radialGate = outerSoft.mul(innerSoft)
-      const Hloc = max(
-        hOverR.mul(max(rhoV, M.mul(2))).mul(float(0.3).add(outerSoft.mul(0.7))),
-        M.mul(0.025),
-      )
-      const zNorm = abs(pos.y).div(Hloc.mul(1.2))
+      const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.02))
+      // sech² vertical; plasma thinner vertically (use smaller H already)
+      const zNorm = abs(pos.y).div(Hloc.mul(float(1.05).add(dustW.mul(0.25))))
       const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
       const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
-      // Clumpy density (not smooth milk tube): mild seamless modulation
+      // Plasma clumps (hot) vs dusty lanes (cool outer)
       const clumpN = fract(
-        sin(cphiV.mul(6.2).add(sphiV.mul(4.1)).add(rhoV.div(M).mul(0.35))).mul(43758.5453),
+        sin(cphiV.mul(7.1).add(sphiV.mul(5.3)).add(rhoV.div(M).mul(0.42))).mul(43758.5453),
       )
-      const densClump = float(0.72).add(clumpN.mul(0.55))
-      const dens = densZ.mul(radialGate).mul(densClump)
+      const dustLane = float(0.5).add(
+        float(0.5).mul(sin(rhoV.div(M).mul(2.8).add(cphiV.mul(3.0)).add(sphiV.mul(1.2)))),
+      )
+      const densPlasma = float(1).add(plasmaW.mul(clumpN.mul(1.1).sub(0.25)))
+      const densDust = float(1).sub(dustW.mul(0.55).mul(float(0.35).add(dustLane.mul(0.65))))
+      // Gas mid: spiral-ish density modulation
+      const gasSpiral = float(0.5).add(
+        float(0.5).mul(
+          cphiV
+            .mul(cphiV)
+            .sub(sphiV.mul(sphiV))
+            .mul(cos(rhoV.div(M).mul(-0.9)))
+            .add(cphiV.mul(sphiV).mul(2).mul(sin(rhoV.div(M).mul(-0.9)))),
+        ),
+      )
+      const densGas = float(0.82).add(gasSpiral.mul(0.35).mul(float(1).sub(plasmaW).sub(dustW.mul(0.5))))
+      const dens = densZ
+        .mul(radialGate)
+        .mul(densPlasma)
+        .mul(densDust)
+        .mul(densGas)
       const sphR = pos.length()
 
       If(
         dens
-          .greaterThan(0.025)
-          .and(rhoV.greaterThan(rin.mul(0.85)))
-          .and(rhoV.lessThan(rout.mul(1.12)))
+          .greaterThan(0.02)
+          .and(rhoV.greaterThan(rin.mul(0.8)))
+          .and(rhoV.lessThan(rout.mul(1.15)))
           .and(sphR.greaterThan(rCapture.mul(1.15)))
-          .and(diskTau.lessThan(1.65))
+          .and(diskTau.lessThan(1.7))
           .and(transm.greaterThan(0.05))
           .and(hits.lessThan(12)),
         () => {
-          const dsH = min(ds.div(Hloc), float(0.85))
-          // Thinner volume: preserve blackbody color + filaments (anti milk-glass)
-          const kappa = float(0.22).add(densZ.mul(0.28))
+          const dsH = min(ds.div(Hloc), float(0.8))
+          // Plasma denser opacity; dust more translucent but extended
+          const kappa = float(0.18)
+            .add(plasmaW.mul(0.35))
+            .add(densZ.mul(0.22))
+            .add(dustW.mul(0.08))
           const dTau = dens.mul(dsH).mul(kappa)
           const beer = exp(diskTau.mul(-1))
-          const w = dens.mul(dsH).mul(beer).mul(0.55)
-          If(w.greaterThan(0.012), () => {
+          // Brightness: plasma hotter path weight; dust dimmer
+          const zoneBright = float(0.45).add(plasmaW.mul(0.55)).sub(dustW.mul(0.12))
+          const w = dens.mul(dsH).mul(beer).mul(zoneBright)
+          If(w.greaterThan(0.01), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,

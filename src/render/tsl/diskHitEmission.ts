@@ -107,31 +107,30 @@ export function accumulateDiskHit(p) {
   const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
   const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
 
-  // Soft radial edges: plasma fades at ISCO; soft outer limb (not a hard cylinder wall)
+  // Soft radial edges — sharper ISCO plasma edge; long dusty outer power-law fade
   const softIn = min(
     float(1),
-    max(float(0), hitR.sub(rin).div(max(rin.mul(0.4), M.mul(0.45)))),
+    max(float(0), hitR.sub(rin).div(max(rin.mul(0.25), M.mul(0.35)))),
   )
-  // Azimuthal rim irregularity (seamless m=3)
   const c3 = cphi.mul(cphi.mul(cphi).sub(sphi.mul(sphi).mul(3)))
   const s3 = sphi.mul(cphi.mul(cphi).mul(3).sub(sphi.mul(sphi)))
-  const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.65).add(s3.mul(0.35))))
-  const routEff = rout.mul(float(0.88).add(rimWobble.mul(0.14)))
-  // Wider outer fade so edge-on tips round off instead of flat ends
-  const softOut = min(
+  const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
+  const routEff = rout.mul(float(0.9).add(rimWobble.mul(0.12)))
+  // Power-law outer (not bullet smoothstep)
+  const outerLin = min(
     float(1),
-    max(float(0), routEff.sub(hitR).div(max(rout.sub(rin).mul(0.16), M.mul(1.4)))),
+    max(float(0), routEff.sub(hitR).div(max(rout.sub(rin).mul(0.22), M.mul(1.6)))),
   )
-  const edgeIn = softIn.mul(softIn).mul(float(3).sub(softIn.mul(2)))
-  const edgeOut = softOut.mul(softOut).mul(float(3).sub(softOut.mul(2)))
-  // Stronger outer limb fade
-  const edgeFac = float(0.45).add(float(0.55).mul(edgeIn.mul(edgeOut)))
+  const softOut = pow(outerLin, float(1.7))
+  const edgeIn = pow(softIn, float(0.9))
+  const edgeFac = float(0.4).add(float(0.6).mul(edgeIn.mul(softOut)))
 
-  // Finite scale-height residual (volume path mainly in weight)
-  // Removed old pathFac block conflict — pathFac set near emit
-  const xM = hitR.div(max(M, float(1e-6)))
-  const plasmaZone = exp(max(xM.sub(float(11)), float(0)).mul(-0.38))
-  const dustZone = min(float(1), max(float(0), xM.sub(float(12)).div(16)))
+  // Zones relative to ISCO–outer (clear plasma / gas / dust)
+  const spanR = max(rout.sub(rin), M.mul(4))
+  const xRad = min(float(1), max(float(0), hitR.sub(rin).div(spanR)))
+  const plasmaZone = exp(xRad.mul(-5.0))
+  const dustZone = pow(max(xRad.sub(float(0.32)), float(0)).div(0.68), float(1.35))
+  const gasZone = max(float(0), float(1).sub(plasmaZone).sub(dustZone.mul(0.7)))
 
   const rIscoM = max(uRIscoM, float(1.05))
   const iscoHot = pow(float(R_ISCO_SCHW_OVER_M).div(rIscoM), float(E.iscoHotPower))
@@ -142,13 +141,15 @@ export function accumulateDiskHit(p) {
     .mul(spinFac)
   const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
-  // Cooler outer dust floor (still blackbody)
-  const tCoolOuter = float(1).sub(dustZone.mul(0.12).mul(dustContrast.add(0.25)))
-  // Vertical atmosphere: high-|z| gas cooler than midplane photosphere
-  const tAtm = float(0.7).add(dVert.mul(0.3))
+  // Plasma hotter, dust much cooler (still blackbody path)
+  const tZone = float(1)
+    .add(plasmaZone.mul(0.35))
+    .sub(dustZone.mul(0.28).mul(dustContrast.add(0.4)))
+    .sub(gasZone.mul(0.04))
+  const tAtm = float(0.68).add(dVert.mul(0.32))
   let TK = max(
     float(E.tColorMinK),
-    min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tCoolOuter).mul(tAtm)),
+    min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tZone).mul(tAtm)),
   )
 
   // --- Structured surface: advected spirals + flow filaments + plasma + dust ---
@@ -271,25 +272,29 @@ export function accumulateDiskHit(p) {
   const turb = turb1.mul(0.48).add(turb2.mul(0.32)).add(turb3.mul(0.2))
   const plasmaClump = pow(max(turb2, float(1e-4)), float(1.75)).mul(plasmaZone)
 
-  // Outer dust lanes
-  const dustWave = float(0.5).add(
-    float(0.5).mul(sin(lnR.mul(5.4).add(0.55).add(shear.mul(0.12)))),
-  )
-  const dustOuter = min(float(1), max(float(0), lnR.sub(0.55).div(1.9)))
-  const dust = float(1).sub(
-    dustContrast
-      .mul(dustOuter)
-      .mul(float(0.48).add(dustWave.mul(0.52)))
-      .mul(float(0.6).add(dustZone.mul(0.6))),
-  )
-  const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.8).add(shear.mul(0.25)))))
-
   const turbFac = float(1)
     .sub(turbContrast)
     .add(
-      turbContrast.mul(float(0.2).add(turb.mul(0.85)).add(plasmaClump.mul(0.65))),
+      turbContrast.mul(
+        float(0.18).add(turb.mul(0.85)).add(plasmaClump.mul(0.75).mul(plasmaZone.add(0.35))),
+      ),
     )
+  const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.8).add(shear.mul(0.25)))))
+
+  // Outer dust lanes stronger in dust zone
+  const dustWave = float(0.5).add(
+    float(0.5).mul(sin(lnR.mul(5.4).add(0.55).add(shear.mul(0.12)))),
+  )
+  const dust = float(1).sub(
+    dustContrast
+      .mul(dustZone)
+      .mul(float(0.4).add(dustWave.mul(0.6)))
+      .mul(float(0.55).add(uStructure.mul(0.45))),
+  )
+  // Plasma: boost clump contrast; dust: mute arms a bit
+  const armZone = float(1).sub(dustZone.mul(0.35)).add(plasmaZone.mul(0.15))
   let texFac = armFac
+    .mul(armZone)
     .mul(streamFac)
     .mul(turbFac)
     .mul(dust)
