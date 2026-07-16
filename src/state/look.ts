@@ -18,13 +18,16 @@ export type LookState = {
   exposure: number
 }
 
-/** Subtle film glow — disk edges, not a white-out of the hole. */
+/** Subtle film glow — disk edges, not a white-out of the hole.
+ * Inspired by MisterPrada/singularity soft bloom (str~0.22, r~0), but with
+ * a mid threshold so the pure-black shadow stays readable.
+ */
 export const LOOK_DEFAULTS: LookState = {
-  /** Off by default for FPS; enable in Look for glow */
-  bloomEnabled: false,
-  bloomStrength: 0.28,
-  bloomRadius: 0.4,
-  bloomThreshold: 0.7,
+  /** Soft default glow (singularity-style cinematic without crushing physics) */
+  bloomEnabled: true,
+  bloomStrength: 0.22,
+  bloomRadius: 0.08,
+  bloomThreshold: 0.42,
   exposure: 0.95,
 }
 

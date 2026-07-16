@@ -166,6 +166,14 @@ export function createGeodesicTracer(): GeodesicTracer {
 
     const pos = camPos.toVar()
     const vel = dir0.toVar()
+    // Singularity-inspired: per-pixel ray origin jitter kills volume banding (onion rings)
+    // Static in time so the image is stable; hash from screen coords only.
+    const pix = ndc.mul(screenSize.xy)
+    const nJ = fract(
+      sin(dot(pix, vec2(12.9898, 78.233))).mul(43758.5453),
+    )
+    pos.addAssign(vel.mul(nJ.sub(0.5).mul(M.mul(float(RT.baseStepM).mul(0.9)))))
+
     const col = vec3(0, 0, 0).toVar()
     const transm = float(1).toVar()
     const prevY = camPos.y.toVar()
@@ -687,11 +695,19 @@ export function createGeodesicTracer(): GeodesicTracer {
       const boxMask = mx.mul(my).mul(mz)
       // Peak dens ~1 in cube; scale for volume RT weight parity with analytic
       const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.85))
-      const densCube = max(cubeRaw, float(0)).mul(boxMask)
+      // Dual sample (singularity noise-normal trick): gradient → filament edges
+      const uvwN = uvw.add(vec3(0.004, 0.002, 0.003))
+      const cubeN = cubeTexNode.sample(uvwN).r.mul(uCubeScale).mul(float(1.85))
+      const densEdge = abs(cubeRaw.sub(cubeN)).mul(float(4.5))
+      const densCube = max(cubeRaw, float(0))
+        .mul(boxMask)
+        .mul(float(0.72).add(min(densEdge, float(1.4)).mul(0.55)))
       // Cube-led dens with residual analytic filaments for fine structure
       const densBase = densAnalytic
-        .mul(float(1).sub(uGrmhdMix.mul(0.72)))
+        .mul(float(1).sub(uGrmhdMix.mul(0.68)))
         .add(densCube.mul(uGrmhdMix))
+        // Analytic gradient boost when mix low
+        .mul(float(1).add(struct.mul(0.18)))
       // High-ṁ photosphere: suppress deep midplane column (edge-on white bar)
       // mdotPhot→1 for ṁ≳1.2; dens *= 1 − k·densZ so surface layers carry light
       const mdotPhot = min(mdot.div(float(1.15)), float(1))
