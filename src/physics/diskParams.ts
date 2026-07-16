@@ -132,8 +132,6 @@ export const DISK_LIMITS = {
 
 export type DiskInput = Partial<DiskParams>
 
-const MAG_GEOMS: readonly MagGeometry[] = ['single-loop', 'multi-loop', 'vertical']
-const MAG_STATES: readonly MagnetState[] = ['sane', 'mad']
 
 export function normalizeDisk(input: DiskInput = {}): DiskParams {
   const mdot = clamp(
@@ -304,19 +302,7 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v))
 }
 
-function parseMagGeom(v: unknown): MagGeometry {
-  if (typeof v === 'string' && (MAG_GEOMS as readonly string[]).includes(v)) {
-    return v as MagGeometry
-  }
-  return DEFAULT_DISK.magGeometry
-}
 
-function parseMagState(v: unknown): MagnetState {
-  if (typeof v === 'string' && (MAG_STATES as readonly string[]).includes(v)) {
-    return v as MagnetState
-  }
-  return DEFAULT_DISK.magnetState
-}
 
 /** SANE vs MAD class from plasma β₀ (info only). */
 export function magnetClassFromBeta(plasmaBeta: number): MagnetState {
