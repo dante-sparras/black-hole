@@ -21,6 +21,7 @@ import {
   log,
   max,
   min,
+  mix,
   pow,
   sin,
   sqrt,
@@ -462,8 +463,19 @@ export function accumulateDiskHit(p) {
   const bb5 = b490.mul(0.35).add(b440.mul(0.65))
   const bMax5 = max(br5, max(bg5, bb5))
   const chroma5 = vec3(br5, bg5, bb5).div(max(bMax5, float(1e-20)))
-  // Intensity × unit chroma → color survives tone map
-  const emit = chroma5.mul(softI)
+  // Film grade (singularity-inspired warm ramp) mixed with physical blackbody
+  const rampT = min(
+    float(1),
+    max(float(0), float(1).sub(xRad).mul(0.75).add(fluxVis.mul(0.45)).add(beam.mul(0.12))),
+  )
+  const filmWarm = vec3(float(E.filmWarmR), float(E.filmWarmG), float(E.filmWarmB))
+  const filmMid = vec3(float(E.filmMidR), float(E.filmMidG), float(E.filmMidB))
+  const filmDark = vec3(float(E.filmDarkR), float(E.filmDarkG), float(E.filmDarkB))
+  const filmCol = mix(filmDark, mix(filmMid, filmWarm, rampT), min(float(1), rampT.mul(1.1)))
+  // Preserve Doppler: boost blue on approaching side via beam
+  const filmTint = mix(filmCol, chroma5, min(float(0.35), beam.mul(0.2)))
+  const chroma = mix(chroma5, filmTint, float(E.filmGrade))
+  const emit = chroma.mul(softI)
 
   dbgG.assign(freq)
   dbgT.assign(TK.div(float(12000)))

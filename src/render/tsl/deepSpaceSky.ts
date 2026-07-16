@@ -179,6 +179,6 @@ export function sampleDeepSpaceSky(d, uStarDensity, uStarBright, uNebula, uMilky
 
   const stars = starCol.mul(bright1.add(bright2).add(bright3))
   sky = sky.add(stars)
-  sky = min(sky, vec3(1.6, 1.6, 1.7))
+  sky = min(sky, vec3(2.4, 2.35, 2.5))
   return sky
 }

@@ -26,10 +26,10 @@ export const RT = {
   diskOuterM: 24,
   iscoHorizonMargin: 1.05,
   volumeStride: 2,
-  beerSoft: 0.78,
-  tauSampleMax: 2.6,
+  beerSoft: 0.88,
+  tauSampleMax: 2.0,
   /** Allow more multi-wrap disk samples (secondary images) */
-  maxDiskHits: 18,
+  maxDiskHits: 16,
 } as const
 
 /** Adaptive step size in geometric units (CPU twin). */

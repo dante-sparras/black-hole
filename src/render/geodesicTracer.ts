@@ -15,11 +15,13 @@ import {
   int,
   log,
   max,
+  mix,
   min,
   pow,
   screenSize,
   sin,
   sqrt,
+  texture,
   texture3D,
   uniform,
   uv,
@@ -28,8 +30,9 @@ import {
   vec4,
 } from 'three/tsl'
 import { DEFAULT_MDOT } from '../physics/constants'
-import { R_ISCO_SCHW_OVER_M } from '../physics/disk'
+import { DISK_EMISSION, R_ISCO_SCHW_OVER_M } from '../physics/disk'
 import { DEFAULT_DISK } from '../physics/diskParams'
+import { DISK_TEXTURE } from '../physics/diskTexture'
 import { createEmptyCube } from '../physics/grmhdCube'
 import { RT } from '../physics/geodesic/rtConstants'
 import { OBSERVER_DEFAULTS } from '../physics/observer'
@@ -116,6 +119,15 @@ export function createGeodesicTracer(): GeodesicTracer {
   const stubTex = gpuGrmhd.texture
   // Official TSL API: texture3D(tex).sample(uvw) — see TextureHelperGPU
   const cubeTexNode = texture3D(stubTex)
+
+  // Singularity-style deep noise dens layer (2D, spiral UV)
+  const noiseDeepMap = new THREE.TextureLoader().load('/noise_deep.png')
+  noiseDeepMap.wrapS = THREE.RepeatWrapping
+  noiseDeepMap.wrapT = THREE.RepeatWrapping
+  noiseDeepMap.minFilter = THREE.LinearFilter
+  noiseDeepMap.magFilter = THREE.LinearFilter
+  noiseDeepMap.colorSpace = THREE.NoColorSpace
+  noiseDeepMap.generateMipmaps = false
 
   const STEPS = RT.maxSteps
 
@@ -696,23 +708,40 @@ export function createGeodesicTracer(): GeodesicTracer {
       // Peak dens ~1 in cube; scale for volume RT weight parity with analytic
       const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.85))
       // Dual sample (singularity noise-normal trick): gradient → filament edges
-      const uvwN = uvw.add(vec3(0.004, 0.002, 0.003))
+      const uvwN = uvw.add(vec3(0.0035, 0.0015, 0.0025))
       const cubeN = cubeTexNode.sample(uvwN).r.mul(uCubeScale).mul(float(1.85))
-      const densEdge = abs(cubeRaw.sub(cubeN)).mul(float(4.5))
+      const densEdge = abs(cubeRaw.sub(cubeN)).mul(float(7.5))
       const densCube = max(cubeRaw, float(0))
         .mul(boxMask)
-        .mul(float(0.72).add(min(densEdge, float(1.4)).mul(0.55)))
-      // Cube-led dens with residual analytic filaments for fine structure
+        .mul(float(0.65).add(min(densEdge, float(1.8)).mul(0.7)))
+      // Thin photosphere vertical: densZ² concentrates near midplane skin, less fog
+      const densZPhot = densZ.mul(densZ).mul(float(1.55))
+      // Spiral deep-noise dens (singularity UV wind) — high-freq filaments
+      const rotP = rhoV.mul(4.27).sub(uTime.mul(0.11))
+      const cR = cos(rotP)
+      const sR = sin(rotP)
+      const uxN = cx.mul(cR).sub(sx.mul(sR)).mul(0.22).add(rhoV.mul(0.035))
+      const uzN = cx.mul(sR).add(sx.mul(cR)).mul(0.22).add(pos.y.div(max(M, float(1e-8))).mul(0.35))
+      const nUv = vec2(uxN, uzN).mul(0.55).add(0.5)
+      const nDeep = texture(noiseDeepMap, nUv)
+      const nDeep2 = texture(noiseDeepMap, nUv.add(vec2(0.0022, 0.0011)))
+      const nEdge = abs(nDeep.r.sub(nDeep2.r)).mul(float(DISK_TEXTURE.noiseEdgeBoost))
+      const nStruct = min(
+        float(1.6),
+        nDeep.r.mul(0.55).add(nDeep.g.mul(0.25)).add(nEdge.mul(0.55)),
+      )
+      const noiseMix = float(DISK_TEXTURE.noiseDensMix).mul(float(0.55).add(struct.mul(0.45)))
+      // Cube-led dens with residual analytic filaments + noise photosphere
       const densBase = densAnalytic
-        .mul(float(1).sub(uGrmhdMix.mul(0.68)))
+        .mul(float(1).sub(uGrmhdMix.mul(0.62)))
         .add(densCube.mul(uGrmhdMix))
-        // Analytic gradient boost when mix low
-        .mul(float(1).add(struct.mul(0.18)))
+        .mul(float(1).add(struct.mul(0.22)))
+        .mul(float(1).sub(noiseMix).add(nStruct.mul(noiseMix)))
+        .mul(densZPhot.div(max(densZ, float(1e-4)))) // apply thin vertical relative to densZ already in analytic
       // High-ṁ photosphere: suppress deep midplane column (edge-on white bar)
-      // mdotPhot→1 for ṁ≳1.2; dens *= 1 − k·densZ so surface layers carry light
       const mdotPhot = min(mdot.div(float(1.15)), float(1))
       const dens = densBase.mul(
-        float(1).sub(mdotPhot.mul(float(0.62)).mul(densZ)),
+        float(1).sub(mdotPhot.mul(float(0.7)).mul(densZ)),
       )
       const sphR = pos.length()
 
@@ -722,48 +751,48 @@ export function createGeodesicTracer(): GeodesicTracer {
           .greaterThan(0.018)
           .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01)))),
         () => {
-          const dsH = min(ds.div(Hloc), float(0.55))
+          const dsH = min(ds.div(Hloc), float(0.4))
           // Opacity: electron scattering (inner/hot) vs Kramers-like (outer/cool)
           const fEs = min(
             float(1),
             plasmaW.mul(0.75).add(gasW.mul(0.4)).add(float(0.12)),
           )
-          const kappaEs = float(0.28).mul(float(0.65).add(densZ.mul(0.55)))
-          const kappaKr = float(0.08)
+          const kappaEs = float(0.32).mul(float(0.65).add(densZ.mul(0.55)))
+          const kappaKr = float(0.1)
             .add(dustW.mul(0.42))
             .add(pow(xRad.add(0.08), float(1.1)).mul(0.28))
           const kappa = kappaEs
             .mul(fEs)
             .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
-            .mul(float(0.8).add(struct.mul(0.25)))
+            .mul(float(0.85).add(struct.mul(0.3)))
             // High ṁ → photosphere: τ rises fast (saturate, less fog stack)
-            .mul(float(1).add(mdot.mul(float(0.95))))
-          const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(uVolumeStride))
+            .mul(float(1).add(mdot.mul(float(1.05))))
+          const strideF = absY.lessThan(Hloc.mul(0.9)).select(float(1.05), float(uVolumeStride))
           // Multi-image: when outside dense slab after a hit, decay τ so secondary survives
-          const outSlab = absY.greaterThan(Hloc.mul(1.8))
+          const outSlab = absY.greaterThan(Hloc.mul(1.5))
           If(outSlab.and(hits.greaterThan(0.5)), () => {
-            diskTau.mulAssign(0.9)
+            diskTau.mulAssign(0.88)
           })
           // Harder Beer at high ṁ (eye sees surface, not deep volume)
-          const beerA = float(RT.beerSoft).add(mdotPhot.mul(0.22))
+          const beerA = float(RT.beerSoft).add(mdotPhot.mul(0.28))
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
           const beer = exp(diskTau.mul(beerA.mul(-1)))
           // Edge-on path penalty: long midplane chords contribute less (photosphere)
           const nYabs = abs(vel.y)
           const pathKill = nYabs
-            .div(nYabs.add(float(0.18).add(mdotPhot.mul(0.22))))
-            .mul(float(0.35).add(mdotPhot.mul(0.55)))
-            .add(float(1).sub(mdotPhot).mul(0.65).add(0.35))
-          const sec = hits.greaterThan(1.2).select(float(1.1), float(1))
-          const mdotW = float(1).div(float(1).add(mdot.mul(float(0.55))))
+            .div(nYabs.add(float(0.22).add(mdotPhot.mul(0.28))))
+            .mul(float(0.4).add(mdotPhot.mul(0.5)))
+            .add(float(1).sub(mdotPhot).mul(0.55).add(0.4))
+          const sec = hits.greaterThan(1.2).select(float(1.12), float(1))
+          const mdotW = float(1).div(float(1).add(mdot.mul(float(0.6))))
           const w = dens
             .mul(dsH)
             .mul(beer)
-            .mul(strideF.mul(0.88))
+            .mul(strideF.mul(0.85))
             .mul(sec)
             .mul(mdotW)
-            .mul(min(pathKill, float(1.15)))
-          If(w.greaterThan(0.01), () => {
+            .mul(min(pathKill, float(1.1)))
+          If(w.greaterThan(0.008), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,
@@ -910,15 +939,18 @@ export function createGeodesicTracer(): GeodesicTracer {
       col.assign(vec3(0, 0, 0))
     })
 
-    // Human-eye adaptation: Reinhard on luminance, keep chromaticity + mild sat.
+    // Human-eye + cinematic mid-contrast tonemap (lift mids, compress peaks)
     const luma = dot(col, vec3(0.2126, 0.7152, 0.0722))
-    const knee = float(0.4)
-    const toned = luma.div(float(1).add(luma.mul(knee)))
+    const tmMid = float(DISK_EMISSION.tonemapMid)
+    const tmHigh = float(DISK_EMISSION.tonemapHigh)
+    const toned = luma
+      .mul(float(1).add(luma.mul(tmMid)))
+      .div(float(1).add(luma.mul(tmHigh)))
     const eyeScale = toned.div(max(luma, float(1e-5)))
     const hasLight = luma.greaterThan(1e-6)
     const colT = col.mul(eyeScale)
-    // Mild saturation restore (Doppler / outer red after compress)
-    const sat = float(1.12)
+    // Saturation restore so film/blackbody color survives compress
+    const sat = float(DISK_EMISSION.tonemapSat)
     const colSat = colT.mul(sat).sub(vec3(toned).mul(sat.sub(1)))
     col.assign(hasLight.select(max(colSat, vec3(0)), col))
 

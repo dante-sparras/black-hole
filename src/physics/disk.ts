@@ -246,6 +246,25 @@ export const DISK_EMISSION = {
   structureBoostMdot: 0.45,
   /** Outer dust cooling (rest-frame T) — keep red outer limb under hot ṁ */
   outerDustCool: 0.32,
+  /**
+   * Cinematic film-grade mix on top of blackbody chroma (0 = pure physics,
+   * 1 = full warm singularity-style ramp). Default hybrid keeps T(r)/g readable.
+   */
+  filmGrade: 0.52,
+  /** Warm ramp colors (linear RGB) — gold / brown / near-black */
+  filmWarmR: 0.95,
+  filmWarmG: 0.72,
+  filmWarmB: 0.42,
+  filmMidR: 0.32,
+  filmMidG: 0.11,
+  filmMidB: 0.04,
+  filmDarkR: 0.02,
+  filmDarkG: 0.01,
+  filmDarkB: 0.008,
+  /** Mid-contrast tonemap: lift mids (a), compress highs (b) */
+  tonemapMid: 0.18,
+  tonemapHigh: 0.48,
+  tonemapSat: 1.22,
   /** NT peak radius ≈ (49/36) r_in */
   ntPeakOverRin: 49 / 36,
 } as const

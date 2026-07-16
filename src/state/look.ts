@@ -25,10 +25,10 @@ export type LookState = {
 export const LOOK_DEFAULTS: LookState = {
   /** Soft default glow (singularity-style cinematic without crushing physics) */
   bloomEnabled: true,
-  bloomStrength: 0.22,
-  bloomRadius: 0.08,
-  bloomThreshold: 0.42,
-  exposure: 0.95,
+  bloomStrength: 0.3,
+  bloomRadius: 0.12,
+  bloomThreshold: 0.36,
+  exposure: 0.98,
 }
 
 export const LOOK_LIMITS = {

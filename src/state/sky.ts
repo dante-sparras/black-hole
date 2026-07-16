@@ -16,10 +16,10 @@ export type SkyState = {
 }
 
 export const SKY_DEFAULTS: SkyState = {
-  starDensity: 1.25,
-  starBrightness: 1.05,
-  nebula: 0.85,
-  milky: 0.9,
+  starDensity: 1.85,
+  starBrightness: 1.4,
+  nebula: 0.55,
+  milky: 0.7,
 }
 
 export const SKY_LIMITS = {

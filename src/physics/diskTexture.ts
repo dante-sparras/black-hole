@@ -134,21 +134,22 @@ export const DISK_TEXTURE = {
   texMax: 2.7,
   /** Mild T jitter from clumping */
   tempJitterAmp: 0.14,
-  /** H/R scale-height used for path-length thickness (edge-on look) */
-  scaleHeight: 0.09,
+  /** H/R scale-height used for path-length thickness (edge-on look).
+   * Thin like singularity photosphere (~surface), not milk-glass volume. */
+  scaleHeight: 0.055,
   /** Fine flow-aligned filament strength (reference streamlines) */
-  streamContrast: 0.82,
+  streamContrast: 0.88,
   /** Secondary streamline harmonic weight */
-  streamHarmonic: 0.6,
+  streamHarmonic: 0.65,
   /**
    * Kerr frame-drag spiral wind (dimensionless).
    * Phase add: dragGain · a★ · (M/r) — arms twist tighter near hole.
    */
-  frameDragGain: 1.35,
+  frameDragGain: 1.5,
   /**
    * Log-normal MRI dens variance σ (unit-mean: exp(σ·ξ − σ²/2), ξ∈[-1,1] from noise).
    */
-  mriSigma: 0.78,
+  mriSigma: 0.85,
   /**
    * Photon-ring silk: multi-wrap intensity boost near r~r_ph.
    * 0 = honest (only true multi-hit accumulation); >0 is display boost.
@@ -158,11 +159,15 @@ export const DISK_TEXTURE = {
    * Mild midplane warp amplitude as fraction of local H (m=2).
    * Real disks warp under LT + MRI channels — not a free look knob.
    */
-  warpAmp: 0.1,
+  warpAmp: 0.08,
   /**
    * Outer rim raggedness: fractional radius modulation (irregular truncation).
    */
-  rimRagged: 0.16,
+  rimRagged: 0.18,
+  /** Noise dens layer weight (singularity-style deep noise) */
+  noiseDensMix: 0.72,
+  /** Dual-sample edge boost on noise */
+  noiseEdgeBoost: 14,
 } as const
 
 /**
