@@ -74,7 +74,11 @@ export function accumulateDiskHit(p) {
     uShearRate,
     uAnim,
     pathAbsY,
+    /** Optional intensity weight (1 = full midplane hit; <1 soft volume sample) */
+    weight,
   } = p
+
+  const w = weight === undefined ? float(1) : weight
 
   // Effective contrasts: master structure × per-channel knobs
   const armContrast = uStructure.mul(uArms)
@@ -100,19 +104,25 @@ export function accumulateDiskHit(p) {
   const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
   const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
 
-  // Soft radial edges: plasma fades at ISCO; dust fades at outer rim
+  // Soft radial edges: plasma fades at ISCO; irregular outer rim (not a perfect circle)
   const softIn = min(
     float(1),
     max(float(0), hitR.sub(rin).div(max(rin.mul(0.4), M.mul(0.45)))),
   )
+  // Azimuthal rim irregularity (seamless m=3) — real disks are not round cutouts
+  const c3 = cphi.mul(cphi.mul(cphi).sub(sphi.mul(sphi).mul(3)))
+  const s3 = sphi.mul(cphi.mul(cphi).mul(3).sub(sphi.mul(sphi)))
+  // c3 = cos3φ, s3 = sin3φ from (c,s)
+  const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
+  const routEff = rout.mul(float(0.9).add(rimWobble.mul(0.12)))
   const softOut = min(
     float(1),
-    max(float(0), rout.sub(hitR).div(max(rout.sub(rin).mul(0.28), M.mul(1.0)))),
+    max(float(0), routEff.sub(hitR).div(max(rout.sub(rin).mul(0.32), M.mul(1.2)))),
   )
   const edgeIn = softIn.mul(softIn).mul(float(3).sub(softIn.mul(2)))
   const edgeOut = softOut.mul(softOut).mul(float(3).sub(softOut.mul(2)))
   // Mild: mid-disk ≈ 1, edges dip without vanishing
-  const edgeFac = float(0.68).add(float(0.32).mul(edgeIn.mul(edgeOut)))
+  const edgeFac = float(0.62).add(float(0.38).mul(edgeIn.mul(edgeOut)))
 
   // Finite scale-height look: longer path when ray is edge-on (small |v_y|)
   const nY = max(pathAbsY, float(0.055))
@@ -315,14 +325,15 @@ export function accumulateDiskHit(p) {
     .mul(mdotBright)
     .mul(E.intensityGain)
     .mul(pathFac)
-  const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
+  const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce).mul(w)
 
   dbgG.assign(freq)
   dbgT.assign(TK.div(float(12000)))
-  dbgFlux.assign(fluxVis.mul(texFac))
+  dbgFlux.assign(fluxVis.mul(texFac).mul(w))
 
   If(uDebugMode.notEqual(float(8)), () => {
     col.addAssign(emit.mul(transm))
-    transm.mulAssign(0.5)
+    // Full midplane hit: stronger attenuation; soft volume: proportional
+    transm.mulAssign(max(float(0.12), float(1).sub(w.mul(0.55))))
   })
 }

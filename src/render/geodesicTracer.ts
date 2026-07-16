@@ -9,6 +9,7 @@ import {
   cos,
   cross,
   dot,
+  exp,
   float,
   int,
   max,
@@ -353,6 +354,7 @@ export function createGeodesicTracer(): GeodesicTracer {
                   uAnim,
                   // BL equator: moderate path (no easy |v_y|)
                   pathAbsY: float(0.35),
+                  weight: float(1),
                 })
               })
             },
@@ -477,8 +479,109 @@ export function createGeodesicTracer(): GeodesicTracer {
               uShearRate,
               uAnim,
               pathAbsY: abs(nRay.y),
+              weight: float(1),
             })
           })
+        },
+      )
+
+      // Soft volumetric thin-disk slab (Gaussian |y|/H) — not a zero-thickness circle.
+      // Real thin disks still have H/R ~ few %; volume path + light bending give depth.
+      // Sample when inside the slab without requiring a midplane crossing (edge-on thickness).
+  // Soft volume can fire every step — cap how often with stepCount stride to save cost
+  // (every 2nd step when far from midplane density peak)
+  If(
+    transm
+      .greaterThan(0.05)
+      .and(hits.lessThan(10))
+      .and(stepCount.mod(int(2)).equal(int(0))),
+    () => {
+          const hxV = pos.x
+          const hzV = pos.z
+          const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
+          const H = max(uScaleH.mul(rhoV), M.mul(0.02))
+          const absY = abs(pos.y)
+          If(
+            rhoV
+              .greaterThanEqual(rin)
+              .and(rhoV.lessThanEqual(rout.mul(1.05)))
+              .and(absY.lessThan(H.mul(2.4))),
+            () => {
+              // dens = exp(-(y/H)²); path weight ∝ dens · min(ds/H, ·)
+              const yOverH = absY.div(H)
+              const dens = exp(yOverH.mul(yOverH).mul(-1))
+              // Skip near-zero density; avoid double-counting pure midplane (plane hit handles y≈0)
+              If(dens.greaterThan(0.08).and(absY.greaterThan(H.mul(0.12))), () => {
+                const rhoSafe = max(rhoV, float(1e-5))
+                const sqrtM = sqrt(max(M, float(1e-8)))
+                const r32 = pow(rhoSafe, float(1.5))
+                const OmegaPro = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+                const denomR = r32.sub(a.mul(sqrtM))
+                const OmegaRet = float(-1)
+                  .mul(sqrtM)
+                  .div(abs(denomR).lessThan(1e-12).select(float(1e-12), denomR))
+                const Omega = uPrograde.greaterThan(0.5).select(OmegaPro, OmegaRet)
+                const g_tt = float(-1)
+                  .add(rs.div(rhoSafe))
+                  .sub(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
+                const g_tphi = a.mul(M).mul(-2).div(rhoSafe)
+                const g_phiphi = rhoSafe
+                  .mul(rhoSafe)
+                  .add(a.mul(a))
+                  .add(M.mul(2).mul(a).mul(a).div(rhoSafe))
+                  .sub(a.mul(a).mul(Q).mul(Q).div(rhoSafe.mul(rhoSafe)))
+                const Xorb = g_tt
+                  .mul(-1)
+                  .sub(Omega.mul(2).mul(g_tphi))
+                  .sub(Omega.mul(Omega).mul(g_phiphi))
+                const u_t = float(1).div(sqrt(max(Xorb, float(1e-8))))
+                const tdirPro = vec3(hzV.mul(-1), float(0), hxV).normalize()
+                const tdirRet = vec3(hzV, float(0), hxV.mul(-1)).normalize()
+                const tdir = uPrograde.greaterThan(0.5).select(tdirPro, tdirRet)
+                const nObs = vel.normalize().mul(-1)
+                const mu = dot(tdir, nObs)
+                const lambda = rhoSafe.mul(mu)
+                const freq = float(1).div(
+                  max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)),
+                )
+                const invRho = float(1).div(max(rhoSafe, float(1e-5)))
+                const nRay = vel.normalize()
+                // Soft contribution — thinner optical depth than a hard plane hit
+                const pathW = min(float(1.6), dens.mul(float(0.55)))
+                accumulateDiskHit({
+                  hitR: rhoV,
+                  freq,
+                  cphi: hxV.mul(invRho),
+                  sphi: hzV.mul(invRho),
+                  M,
+                  aStar,
+                  mdot,
+                  rin,
+                  rout,
+                  uRIscoM,
+                  hits,
+                  col,
+                  transm,
+                  dbgG,
+                  dbgT,
+                  dbgFlux,
+                  uDebugMode,
+                  uIdealBeam,
+                  uTime,
+                  uPrograde,
+                  uStructure,
+                  uArms,
+                  uClumps,
+                  uDust,
+                  uScaleH,
+                  uShearRate,
+                  uAnim,
+                  pathAbsY: abs(nRay.y),
+                  weight: pathW,
+                })
+              })
+            },
+          )
         },
       )
       }) // end RT path (useBl.not)
