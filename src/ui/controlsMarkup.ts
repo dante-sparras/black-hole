@@ -64,14 +64,6 @@ export function buildControlsHtml(): string {
       <span class="ctrl-val" data-val="outer"></span>
     </label>
     <label class="ctrl">
-      <span class="ctrl-name">Orbit</span>
-      <select id="d-orbit" style="flex:1;min-width:0">
-        <option value="pro">Prograde (co-rot)</option>
-        <option value="ret">Retrograde (counter)</option>
-      </select>
-      <span class="ctrl-val" data-val="orbit"></span>
-    </label>
-    <label class="ctrl">
       <span class="ctrl-name">Tilt °</span>
       <input type="range" id="d-tilt" min="0" max="${tiltDegMax.toFixed(0)}" step="0.5" />
       <span class="ctrl-val" data-val="tilt"></span>
@@ -81,7 +73,7 @@ export function buildControlsHtml(): string {
       <input type="range" id="d-jet" min="0" max="1" step="0.01" />
       <span class="ctrl-val" data-val="jet"></span>
     </label>
-    <p class="ctrl-hint">Free: ṁ · ρ₀ · β₀ · r_out · orbit · tilt · jet boost · r_in=ISCO, H/r, Γ, ℓ, MAD class derived</p>
+    <p class="ctrl-hint">Free: ṁ · ρ₀ · β₀ · r_out · tilt · jet boost · disk always co-rotates with a★ (L ‖ J)</p>
 
     <div class="ctrl-section">Observer</div>
     <label class="ctrl">

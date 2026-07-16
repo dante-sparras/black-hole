@@ -72,7 +72,6 @@ export function mountControls(
   const rho0Input = qs<HTMLInputElement>(root, '#d-rho0')
   const betaInput = qs<HTMLInputElement>(root, '#d-beta')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
-  const orbitSelect = qs<HTMLSelectElement>(root, '#d-orbit')
   const tiltInput = qs<HTMLInputElement>(root, '#d-tilt')
   const jetInput = qs<HTMLInputElement>(root, '#d-jet')
 
@@ -83,7 +82,6 @@ export function mountControls(
   const rho0Val = qs<HTMLElement>(root, '[data-val="rho0"]')
   const betaVal = qs<HTMLElement>(root, '[data-val="beta"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
-  const orbitVal = qs<HTMLElement>(root, '[data-val="orbit"]')
   const tiltVal = qs<HTMLElement>(root, '[data-val="tilt"]')
   const jetVal = qs<HTMLElement>(root, '[data-val="jet"]')
 
@@ -133,7 +131,6 @@ export function mountControls(
       sliderFromLog(d.plasmaBeta, DISK_LIMITS.plasmaBeta.min, DISK_LIMITS.plasmaBeta.max),
     )
     setRangeValue(outerInput, d.outerM)
-    if (orbitSelect) orbitSelect.value = d.prograde ? 'pro' : 'ret'
     setRangeValue(tiltInput, radToDeg(d.tiltRad))
     setRangeValue(jetInput, d.jetPower)
 
@@ -144,7 +141,6 @@ export function mountControls(
     setText(rho0Val, fmt(d.rho0, 2))
     setText(betaVal, fmt(d.plasmaBeta, 1))
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
-    setText(orbitVal, d.prograde ? 'pro' : 'ret')
     setText(tiltVal, fmt(radToDeg(d.tiltRad), 1))
     setText(jetVal, fmt(d.jetPower, 2))
   }
@@ -193,10 +189,6 @@ export function mountControls(
   bindRange(outerInput, (v) => {
     onUserTweaked()
     setDisk({ outerM: v })
-  })
-  bindSelect(orbitSelect, (v) => {
-    onUserTweaked()
-    setDisk({ prograde: v === 'pro' })
   })
   bindRange(tiltInput, (v) => {
     onUserTweaked()

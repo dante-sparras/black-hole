@@ -159,9 +159,9 @@ export const PRESET_NT_SMOOTH: ScenePreset = {
 export const PRESET_RETROGRADE: ScenePreset = {
   id: 'retrograde',
   label: 'Retrograde',
-  hint: 'a★=−0.9 · co-rot disk · weak jets · flipped frame-drag',
+  hint: 'a★=−0.9 · co-rot disk · spin direction only (no counter-L)',
   params: { mass: 1, spinStar: -0.9, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 0.12, prograde: true },
+  disk: { ...DISK_DEFAULT, mdot: 0.12 },
   camera: { ...CAMERA_DEFAULTS },
   look: { ...LOOK_SOFT, bloomStrength: 0.26, exposure: 0.98 },
 }

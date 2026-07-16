@@ -33,7 +33,7 @@ export function effectiveDiskGeom(
   disk: DiskParams,
 ): EffectiveDiskGeom {
   const M = Math.max(params.mass, 1e-12)
-  const isco = diskIsco(params, disk.prograde)
+  const isco = diskIsco(params, true) // co-rotating ISCO; a★ sign handled in helpers
   const iscoOverM = rIscoOverM(isco, M)
   const a = spinLength(params)
   const rPlus = horizonPlus(M, a, params.charge)

@@ -94,7 +94,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       mdot: disk.mdot,
       rIscoOverM: rinM,
       outerM: disk.outerM,
-      prograde: disk.prograde,
+      prograde: true, // always co-rotating; a★ sign sets lab sense
       structure: disk.structure,
       arms: disk.arms,
       clumps: disk.clumps,

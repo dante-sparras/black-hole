@@ -23,12 +23,12 @@ export function renderDerivedHud(
   derived: DerivedGeometry,
   disk: DiskParams,
 ): void {
-  const diag = shadowDiagnostics(params, derived, disk.prograde)
+  const diag = shadowDiagnostics(params, derived, true)
   const geom = effectiveDiskGeom(params, disk)
   const tScale = mdotTemperatureScale(disk.mdot)
   const m = Math.max(params.mass, 1e-12)
-  const orbit = disk.prograde ? 'prograde (co-rot)' : 'retrograde (counter)'
-  const eta = novikovThorneEfficiency(params.spinStar, disk.prograde)
+  const orbit = 'co-rotating (L ‖ J)'
+  const eta = novikovThorneEfficiency(params.spinStar, true)
   const hOverR = thinDiskScaleHeight(disk.mdot, geom.rinOverM, 5 / 3)
   const ell = keplerSpecificL(geom.rinOverM)
   const magClass = magnetClassFromBeta(disk.plasmaBeta)
@@ -48,7 +48,7 @@ export function renderDerivedHud(
       <div><dt>r_ph</dt><dd>${fmt(derived.rPhotonSphere)} <span class="dim">(${fmt(diag.rPhotonOverM, 2)} M)</span></dd></div>
 
       <div class="diag-title">Disk (derived · not free)</div>
-      <div><dt>orbit</dt><dd>${orbit}</dd></div>
+      <div><dt>orbit</dt><dd>${orbit} <span class="dim">a★ sign sets sense</span></dd></div>
       <div><dt>tilt</dt><dd>${fmt(tiltDeg, 1)}° <span class="dim">(free)</span></dd></div>
       <div><dt>r_in</dt><dd>${fmt(geom.rinOverM, 2)} M <span class="dim">= ISCO</span></dd></div>
       <div><dt>r_ISCO</dt><dd>${fmt(geom.iscoOverM, 2)} M</dd></div>

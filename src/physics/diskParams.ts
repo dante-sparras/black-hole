@@ -155,8 +155,7 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
     DISK_LIMITS.rinM.max,
   )
   const rinClamped = Math.min(rinMRaw, outerM - 1)
-  const prograde =
-    typeof input.prograde === 'boolean' ? input.prograde : DEFAULT_DISK.prograde
+  const prograde = true // always co-rotating with spin (L ‖ J); a★ sign sets direction
   const scaleHeight = clamp(
     num(input.scaleHeight, DEFAULT_DISK.scaleHeight),
     DISK_LIMITS.scaleHeight.min,
