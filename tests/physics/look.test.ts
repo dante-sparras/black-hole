@@ -7,8 +7,10 @@ import {
 } from '../../src/state/look'
 
 describe('look store (bloom)', () => {
-  test('defaults have bloom off (perf)', () => {
-    expect(LOOK_DEFAULTS.bloomEnabled).toBe(false)
+  test('defaults enable soft bloom (singularity-style glow)', () => {
+    expect(LOOK_DEFAULTS.bloomEnabled).toBe(true)
+    expect(LOOK_DEFAULTS.bloomStrength).toBeLessThanOrEqual(0.35)
+    expect(LOOK_DEFAULTS.bloomThreshold).toBeGreaterThanOrEqual(0.35)
   })
 
   test('clamps strength / radius / threshold / exposure', () => {

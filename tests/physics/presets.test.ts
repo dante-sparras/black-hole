@@ -66,7 +66,7 @@ describe('presets', () => {
     applyPreset(PRESET_HOT)
     expect(getDisk().mdot).toBeGreaterThan(1)
     expect(getLook().bloomStrength).toBeLessThan(0.5)
-    expect(getLook().bloomThreshold).toBeGreaterThanOrEqual(0.7)
+    expect(getLook().bloomThreshold).toBeGreaterThanOrEqual(0.35)
   })
 
   test('apply cool is low ṁ', () => {
@@ -112,13 +112,13 @@ describe('presets', () => {
       applyPreset(p)
       const look = getLook()
       expect(look.bloomStrength).toBeLessThanOrEqual(0.45)
-      expect(look.bloomThreshold).toBeGreaterThanOrEqual(0.5)
+      expect(look.bloomThreshold).toBeGreaterThanOrEqual(0.35)
     }
   })
 
   test('defaults stay subtle', () => {
     expect(LOOK_DEFAULTS.bloomStrength).toBeLessThanOrEqual(0.35)
-    expect(LOOK_DEFAULTS.bloomThreshold).toBeGreaterThanOrEqual(0.6)
+    expect(LOOK_DEFAULTS.bloomThreshold).toBeGreaterThanOrEqual(0.35)
   })
 
   test('every preset applies without throw and stays physical', () => {
