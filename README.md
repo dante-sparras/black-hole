@@ -30,8 +30,7 @@ bun run build
 | Section | Controls |
 |---------|----------|
 | Black hole | \(M\), signed \(a_★\), \(Q\) |
-| **Accretion disk (all together)** | \(\dot m\), \(
-ho_0\), \(H/r\), \(\Gamma\), \(K\), \(\ell\), \(\beta_0\), B geometry, SANE/MAD, \(r_\mathrm{in}\) mode+value, \(r_\mathrm{out}\), orbit, tilt, perturb, jet power |
+| **Accretion disk (all together)** | mdot, rho0, H/r, Gamma, K, ell, beta0, B geom, SANE/MAD, r_in, r_out, orbit, tilt, perturb, jets |
 | Observer | distance/\(M\), incl, azim, FOV |
 | Numerics | Quality, Density source |
 
