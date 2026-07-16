@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  autoExposureFromPhysics,
   colorRedshiftFactor,
   diskIsco,
   DISK_EMISSION,
@@ -14,6 +15,7 @@ import {
   novikovThornePeakRadius,
   novikovThorneTemperature,
   pageThorneFluxFactor,
+  pageThornePeakRadius,
   rnIsco,
   sliderFromMdot,
 } from '../../src/physics/disk'
@@ -185,6 +187,22 @@ describe('mdot scales', () => {
     expect(op).toBeGreaterThan(0)
     expect(or).toBeLessThan(0)
     expect(Math.abs(op)).not.toBeCloseTo(Math.abs(or), 5)
+  })
+  test('pageThornePeakRadius closer in for high spin', () => {
+    const rIsco = diskIsco({ mass: 1, spinStar: 0.9, charge: 0 }, true)
+    const peak0 = pageThornePeakRadius(6, 1, 0)
+    const peak9 = pageThornePeakRadius(rIsco, 1, 0.9)
+    expect(peak0).toBeCloseTo(novikovThornePeakRadius(6), 5)
+    expect(peak9).toBeGreaterThan(rIsco)
+    expect(peak9 / rIsco).toBeLessThan(peak0 / 6 + 0.5)
+  })
+
+  test('autoExposureFromPhysics responds to ṁ and spin', () => {
+    const eCool = autoExposureFromPhysics(0, 0.01, true)
+    const eHot = autoExposureFromPhysics(0.9, 1.5, true)
+    expect(eCool).toBeGreaterThan(eHot)
+    expect(eHot).toBeGreaterThanOrEqual(0.55)
+    expect(eCool).toBeLessThanOrEqual(1.35)
   })
 })
 

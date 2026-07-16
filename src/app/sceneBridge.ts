@@ -4,7 +4,7 @@
  * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
-import { diskIsco, thinDiskScaleHeight } from '../physics/disk'
+import { diskIsco, thinDiskScaleHeight, autoExposureFromPhysics } from '../physics/disk'
 import { resolveCameraDistance } from '../physics/observer'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
@@ -12,7 +12,7 @@ import type { GeodesicTracer } from '../render/geodesicTracerTypes'
 import { getCamera, subscribeCamera } from '../state/camera'
 import { getDisk, subscribeDisk } from '../state/disk'
 import { getGeodesicIntegrator, subscribeGeodesic } from '../state/geodesic'
-import { getLook, subscribeLook } from '../state/look'
+import { getLook, setLook, subscribeLook } from '../state/look'
 import { getParams, subscribe as subscribeParams } from '../state/params'
 import { getScaleFree, subscribeScaleFree } from '../state/scaleFree'
 import { getIdealBeam, subscribeIdealBeam } from '../state/idealBeam'
@@ -86,6 +86,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       scaleHeight,
       shearRate: disk.shearRate,
       animate: disk.animate,
+    })
+    // Exposure from η·ṁ (physics), not a film slider
+    setLook({
+      exposure: autoExposureFromPhysics(p.spinStar, disk.mdot, disk.prograde),
     })
   }
 

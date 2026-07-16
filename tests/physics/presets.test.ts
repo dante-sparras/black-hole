@@ -34,7 +34,7 @@ describe('presets', () => {
   test('all presets have unique ids', () => {
     const ids = listPresetIds()
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids.length).toBe(7)
+    expect(ids.length).toBe(8)
   })
 
   test('getPresetById finds interstellar', () => {

@@ -470,12 +470,16 @@ export function createGeodesicTracer(): GeodesicTracer {
         Break()
       })
 
-      // Photon-sphere refinement: smaller steps near r~3M → nested rings from geometry
+      // Photon-sphere + critical-curve refinement
       const rOverM = r.div(max(M, float(1e-8)))
       const nearPh = exp(
         abs(rOverM.sub(float(RT.phCenterM))).div(float(RT.phWidthM)).mul(-1),
       )
-      const adaptFloorL = float(RT.adaptFloor).mul(float(1).sub(nearPh.mul(float(RT.phRefine))))
+      // b_c ~ 5.2 M Schw; refine when impact near critical
+      const bOverM = impactB.div(max(M, float(1e-8)))
+      const nearCrit = exp(abs(bOverM.sub(float(5.2))).mul(-0.55))
+      const refine = max(nearPh, nearCrit)
+      const adaptFloorL = float(RT.adaptFloor).mul(float(1).sub(refine.mul(float(RT.phRefine))))
       const adapt = min(
         float(RT.adaptMax),
         max(adaptFloorL, r.div(M.mul(RT.adaptScale))),
@@ -549,9 +553,10 @@ export function createGeodesicTracer(): GeodesicTracer {
         .mul(float(28))
         .mul(OmegaDim)
         .mul(uTime)
-      // Kerr frame-drag: arms wind more near the hole for high a★
+      // Kerr frame-drag + Lense–Thirring dens wind
       const drag = aStar.mul(float(1.85)).div(max(rhoM, float(1.05)))
-      const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12))))
+      const ltWind = aStar.mul(float(2.4)).div(max(rhoM.mul(rhoM).mul(rhoM), float(1.2)))
+      const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12)))).add(ltWind)
       const csh = cos(shearTot)
       const ssh = sin(shearTot)
       const cx = cphiV.mul(csh).sub(sphiV.mul(ssh))
@@ -656,10 +661,14 @@ export function createGeodesicTracer(): GeodesicTracer {
             .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
             .mul(float(0.8).add(struct.mul(0.25)))
           const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(uVolumeStride))
+          // Multi-image: when outside dense slab after a hit, decay τ so secondary survives
+          const outSlab = absY.greaterThan(Hloc.mul(1.8))
+          If(outSlab.and(hits.greaterThan(0.5)), () => {
+            diskTau.mulAssign(0.92)
+          })
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
           const beer = exp(diskTau.mul(float(-RT.beerSoft)))
-          // Secondary images: less attenuation after first wrap (true multi-path)
-          const sec = hits.greaterThan(1.2).select(float(1.06), float(1))
+          const sec = hits.greaterThan(1.2).select(float(1.08), float(1))
           const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.88)).mul(sec)
           If(w.greaterThan(0.016), () => {
             processDiskVolumeSample({
@@ -700,6 +709,55 @@ export function createGeodesicTracer(): GeodesicTracer {
           })
         },
       )
+        },
+      )
+      // Hot dilute corona above inner disk (optical proxy for soft X-ray region)
+      If(
+        rhoV
+          .greaterThan(rin.mul(0.95))
+          .and(rhoV.lessThan(rin.mul(5)))
+          .and(absY.greaterThan(roughH.mul(0.9)))
+          .and(absY.lessThan(roughH.mul(5)))
+          .and(transm.greaterThan(0.15))
+          .and(stepCount.mod(int(4)).equal(int(0))),
+        () => {
+          const cFall = exp(absY.div(max(roughH.mul(2.5), M.mul(0.2))).mul(-1))
+          const wC = cFall.mul(0.04).mul(mdot.add(0.05))
+          If(wC.greaterThan(0.008), () => {
+            processDiskVolumeSample({
+              hx: hxV,
+              hz: hzV,
+              weight: wC,
+              densVert: cFall.mul(0.3),
+              M,
+              a,
+              aStar,
+              Q,
+              rs,
+              mdot: mdot.mul(0.3).add(0.05),
+              rin,
+              rout,
+              uRIscoM,
+              hits,
+              col,
+              transm,
+              dbgG,
+              dbgT,
+              dbgFlux,
+              uDebugMode,
+              uIdealBeam,
+              uTime,
+              uPrograde,
+              uStructure: float(0.2),
+              uArms: float(0),
+              uClumps: float(0.3),
+              uDust: float(0),
+              uScaleH,
+              uShearRate,
+              uAnim,
+              nRay: vel.normalize(),
+            })
+          })
         },
       )
       }) // end RT path (useBl.not)

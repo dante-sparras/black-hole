@@ -27,9 +27,6 @@ import {
   vec3,
 } from 'three/tsl'
 import {
-  LAMBDA_B_NM,
-  LAMBDA_G_NM,
-  LAMBDA_R_NM,
   PLANCK_C2_NM_K,
 } from '../../physics/blackbody'
 import {
@@ -147,7 +144,10 @@ export function accumulateDiskHit(p) {
       .mul(hitR.mul(hitR).mul(hitR).add(1e-12)),
   )
   const Ftilde = abs(aEff).lessThan(1e-4).select(Fschw, Fkerr)
-  const rPeak = rin.mul(E.ntPeakOverRin)
+  // Kerr peak radius ≈ rin · (1.15 + 0.2·(1−|a|)) — closer in for high spin
+  // (matches pageThornePeakRadius search order-of-magnitude without 48 samples on GPU)
+  const peakMul = float(1.12).add(float(0.25).mul(float(1).sub(abs(aEff))))
+  const rPeak = max(rin.mul(peakMul), rin.mul(1.05))
   const xP = sqrt(max(rPeak.div(max(M, float(1e-8))), float(1.05)))
   const gapP = max(float(1).sub(sqrt(rin.div(max(rPeak, rin.mul(1.0001))))), float(0))
   const FschwP = gapP.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
@@ -240,9 +240,10 @@ export function accumulateDiskHit(p) {
     .mul(float(TX.shearGain))
     .mul(OmegaDim)
     .mul(uTime)
-  // Kerr frame-drag spiral wind: δφ ∝ a★ (M/r) — stronger near the hole
+  // Kerr frame-drag + Lense–Thirring spiral wind: δφ ∝ a★/r³ (near hole)
   const drag = aStar.mul(float(TX.frameDragGain)).div(max(rhoM, float(1.05)))
-  const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12))))
+  const ltWind = aStar.mul(float(2.4)).div(max(rhoM.mul(rhoM).mul(rhoM), float(1.2)))
+  const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12)))).add(ltWind)
 
   // Rotate (cφ,sφ) into material frame — Kepler + frame-drag
   const csh = cos(shearTot)
@@ -384,20 +385,6 @@ export function accumulateDiskHit(p) {
     .sub(dustZone.mul(0.07).mul(dustContrast.add(0.3)))
   TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), TK.mul(tJitter)))
 
-  // Max-norm Planck chroma
-  const planckC2 = float(PLANCK_C2_NM_K)
-  const lamR = float(LAMBDA_R_NM)
-  const lamG = float(LAMBDA_G_NM)
-  const lamB = float(LAMBDA_B_NM)
-  const xR = min(planckC2.div(lamR.mul(TK)), float(80))
-  const xG = min(planckC2.div(lamG.mul(TK)), float(80))
-  const xB = min(planckC2.div(lamB.mul(TK)), float(80))
-  const br = float(1).div(pow(lamR, float(5)).mul(max(exp(xR).sub(1), float(1e-20))))
-  const bg = float(1).div(pow(lamG, float(5)).mul(max(exp(xG).sub(1), float(1e-20))))
-  const bb = float(1).div(pow(lamB, float(5)).mul(max(exp(xB).sub(1), float(1e-20))))
-  const bMax = max(br, max(bg, bb))
-  const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
-
   // Photon-ring: multi-wrap from true path accumulation only (boost=0 by default)
   const wrap = max(hits.sub(float(1)), float(0))
   const photonProx = exp(abs(rhoM.sub(float(3))).mul(-1.15))
@@ -412,19 +399,53 @@ export function accumulateDiskHit(p) {
       E.mdotBrightScale,
     ),
   )
-  // Path length + linear limb darkening (optically thick atmosphere μ = |n·ẑ|)
+  // Path length + optical-depth limb darkening I∝1−e^{−τ₀/μ}
   const mu = min(float(1), max(pathAbsY, float(0.04)))
-  const limb = float(0.5).add(float(0.5).mul(pow(mu, float(0.7))))
+  const tau0 = float(0.85).add(uScaleH.mul(4))
+  const limb = float(1).sub(exp(tau0.div(mu).mul(-1)))
   const pathFac = min(float(1.1), uScaleH.div(max(mu, float(0.12))).mul(0.18).add(0.9))
   const iFlux = max(fluxVis, float(E.fluxVisFloor))
     .mul(mdotBright)
     .mul(E.intensityGain)
     .mul(pathFac)
-    .mul(limb)
-  // Mild ACES pre-soft only (not milk-glass)
-  const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w)
-  const softI = raw.div(float(1).add(raw.mul(0.18)))
-  const emit = chroma.mul(softI)
+    .mul(max(limb, float(0.12)))
+  const imageW = hits.greaterThan(1.5).select(float(1.12), float(1))
+  const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w).mul(imageW)
+  const softI = raw.div(float(1).add(raw.mul(0.16)))
+  // 5-band blackbody chroma (R,Y,G,C,B → RGB)
+  const planckC2 = float(PLANCK_C2_NM_K)
+  const TKc = max(TK, float(E.tColorMinK))
+  const b680 = float(1).div(
+    pow(float(680), float(5)).mul(
+      max(exp(min(planckC2.div(float(680).mul(TKc)), float(80))).sub(1), float(1e-20)),
+    ),
+  )
+  const b610 = float(1).div(
+    pow(float(610), float(5)).mul(
+      max(exp(min(planckC2.div(float(610).mul(TKc)), float(80))).sub(1), float(1e-20)),
+    ),
+  )
+  const b550 = float(1).div(
+    pow(float(550), float(5)).mul(
+      max(exp(min(planckC2.div(float(550).mul(TKc)), float(80))).sub(1), float(1e-20)),
+    ),
+  )
+  const b490 = float(1).div(
+    pow(float(490), float(5)).mul(
+      max(exp(min(planckC2.div(float(490).mul(TKc)), float(80))).sub(1), float(1e-20)),
+    ),
+  )
+  const b440 = float(1).div(
+    pow(float(440), float(5)).mul(
+      max(exp(min(planckC2.div(float(440).mul(TKc)), float(80))).sub(1), float(1e-20)),
+    ),
+  )
+  const br5 = b680.mul(0.55).add(b610.mul(0.45))
+  const bg5 = b610.mul(0.2).add(b550.mul(0.55)).add(b490.mul(0.25))
+  const bb5 = b490.mul(0.35).add(b440.mul(0.65))
+  const bMax5 = max(br5, max(bg5, bb5))
+  const chroma5 = vec3(br5, bg5, bb5).div(max(bMax5, float(1e-20)))
+  const emit = chroma5.mul(softI)
 
   dbgG.assign(freq)
   dbgT.assign(TK.div(float(12000)))
@@ -432,7 +453,8 @@ export function accumulateDiskHit(p) {
 
   If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.01)), () => {
     col.addAssign(emit.mul(transm))
-  // Mild multi-hit extinction only — leave room for true lensed far side
-  transm.mulAssign(max(float(0.94), float(1).sub(w.mul(0.06))))
+    // Multi-image isolation: less extinction after first hit so secondary survives
+    const ext = hits.greaterThan(1.5).select(float(0.04), float(0.07))
+    transm.mulAssign(max(float(0.93), float(1).sub(w.mul(ext))))
   })
 }

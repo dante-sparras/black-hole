@@ -226,9 +226,85 @@ export const DISK_EMISSION = {
   ntPeakOverRin: 49 / 36,
 } as const
 
-/** Approx peak of simple NT flux: r ≈ (49/36) r_in */
+/** Approx peak of simple NT flux: r ≈ (49/36) r_in (Schw). Prefer pageThornePeakRadius for Kerr. */
 export function novikovThornePeakRadius(rIsco: number): number {
   return DISK_EMISSION.ntPeakOverRin * rIsco
+}
+
+/**
+ * Radius of maximum Page–Thorne flux for Kerr (numeric search on F̃).
+ * Falls back to Schw 49/36 rin when a→0.
+ */
+export function pageThornePeakRadius(
+  rIsco: number,
+  mass: number,
+  aStarSigned: number,
+): number {
+  const M = Math.max(mass, 1e-12)
+  if (!(rIsco > 0)) return novikovThornePeakRadius(Math.max(rIsco, 6 * M))
+  if (Math.abs(aStarSigned) < 1e-5) {
+    return novikovThornePeakRadius(rIsco)
+  }
+  let bestR = rIsco * 1.2
+  let bestF = 0
+  const rMax = Math.max(rIsco * 8, 40 * M)
+  const n = 48
+  for (let i = 1; i <= n; i++) {
+    const t = i / n
+    // denser samples near ISCO
+    const r = rIsco * (1.02 + t * t * ((rMax / rIsco) - 1.02))
+    const F = pageThorneFluxFactor(r, M, aStarSigned, rIsco)
+    if (F > bestF) {
+      bestF = F
+      bestR = r
+    }
+  }
+  return bestR
+}
+
+/**
+ * α-disk midplane estimates (relative units for viz, not cgs tables).
+ * Gas-pressure (low ṁ) vs radiation-pressure tendency (high ṁ).
+ */
+export function alphaDiskMidplane(
+  mdot: number,
+  rOverM: number,
+  rIscoOverM: number,
+): { TcRel: number; rhoRel: number; regime: 'gas' | 'rad' } {
+  const m = Math.max(mdot, 1e-4)
+  const x = Math.max(rOverM / Math.max(rIscoOverM, 1.2), 1)
+  const regime: 'gas' | 'rad' = m > 0.35 ? 'rad' : 'gas'
+  // Relative central T and dens (order-unity at r~few r_in, ṁ=0.1)
+  const f = Math.max(0, 1 - Math.sqrt(1 / x))
+  const TcRel =
+    regime === 'gas'
+      ? Math.pow(m / 0.1, 0.3) * Math.pow(x, -0.75) * Math.pow(f + 1e-4, 0.3)
+      : Math.pow(m / 0.1, 0.2) * Math.pow(x, -0.375) * Math.pow(f + 1e-4, 0.2)
+  const rhoRel =
+    regime === 'gas'
+      ? Math.pow(m / 0.1, 0.55) * Math.pow(x, -15 / 8) * Math.pow(f + 1e-4, 0.5)
+      : Math.pow(m / 0.1, 0.4) * Math.pow(x, -3) * Math.pow(f + 1e-4, 0.4)
+  return {
+    TcRel: Math.min(3, Math.max(0.05, TcRel)),
+    rhoRel: Math.min(4, Math.max(0.02, rhoRel)),
+    regime,
+  }
+}
+
+/**
+ * Auto tone-mapping exposure from radiative power proxy η · ṁ.
+ * Keeps ACES readable without a film exposure slider.
+ */
+export function autoExposureFromPhysics(
+  aStar: number,
+  mdot: number,
+  prograde = true,
+): number {
+  const eta = novikovThorneEfficiency(aStar, prograde)
+  const power = eta * Math.max(mdot, 1e-4)
+  // Map power ~0.005..0.4 → exposure ~1.15..0.7
+  const e = 1.05 - 0.35 * Math.log10(1 + 40 * power)
+  return Math.min(1.35, Math.max(0.55, e))
 }
 
 /**
@@ -256,7 +332,7 @@ export function diskPeakTemperatureK(
 /**
  * Rest-frame effective temperature [K] from Page–Thorne / NT profile:
  *   T(r) = T_peak · (F̃(r) / F̃_peak)^{1/4}
- * @param aStarSigned — +a★ prograde, −a★ retrograde
+ * Peak radius from true Kerr F_max when spinning.
  */
 export function diskTemperatureK(
   r: number,
@@ -269,7 +345,7 @@ export function diskTemperatureK(
   const a = prograde ? spinStar : -spinStar
   const F = pageThorneFluxFactor(r, mass, a, rIsco)
   if (F <= 0) return 0
-  const rPeak = novikovThornePeakRadius(rIsco)
+  const rPeak = pageThornePeakRadius(rIsco, mass, a)
   const Fmax = pageThorneFluxFactor(rPeak, mass, a, rIsco)
   if (!(Fmax > 0)) return 0
   const rIscoOverM = rIsco / Math.max(mass, 1e-12)

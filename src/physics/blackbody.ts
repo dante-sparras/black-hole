@@ -45,13 +45,18 @@ export function clampColorTemperatureK(tKelvin: number): number {
 
 /**
  * Linear RGB chromaticity of a blackbody (max channel = 1).
- * Uses true Kelvin — no dimensionless stretch.
+ * 5-band optical sampling weighted into RGB (better than 3-point).
  */
 export function blackbodyRgb(tKelvin: number): Rgb {
   const T = clampColorTemperatureK(tKelvin)
-  const r = planckBLambdaRel(LAMBDA_R_NM, T)
-  const g = planckBLambdaRel(LAMBDA_G_NM, T)
-  const b = planckBLambdaRel(LAMBDA_B_NM, T)
+  const b680 = planckBLambdaRel(680, T)
+  const b610 = planckBLambdaRel(610, T)
+  const b550 = planckBLambdaRel(550, T)
+  const b490 = planckBLambdaRel(490, T)
+  const b440 = planckBLambdaRel(440, T)
+  const r = 0.55 * b680 + 0.45 * b610
+  const g = 0.2 * b610 + 0.55 * b550 + 0.25 * b490
+  const b = 0.35 * b490 + 0.65 * b440
   const m = Math.max(r, g, b, 1e-30)
   return { r: r / m, g: g / m, b: b / m }
 }

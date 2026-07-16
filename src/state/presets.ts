@@ -26,7 +26,7 @@ export type ScenePreset = {
   /** No-hair only */
   params: Pick<BlackHoleParams, 'mass' | 'spinStar' | 'charge'>
   /** Accretion disk (not hair) */
-  disk: Pick<DiskParams, 'mdot' | 'outerM'>
+  disk: Partial<DiskParams> & Pick<DiskParams, 'mdot' | 'outerM'>
   camera: Partial<CameraState>
   look: Partial<LookState>
 }
@@ -137,6 +137,24 @@ export const PRESET_RN: ScenePreset = {
   look: { ...LOOK_SOFT },
 }
 
+/** Pure Page–Thorne / smooth NT (no spiral texture) */
+export const PRESET_NT_SMOOTH: ScenePreset = {
+  id: 'nt-smooth',
+  label: 'NT smooth',
+  hint: 'structure=0 · pure Page–Thorne theory disk',
+  params: { mass: 1, spinStar: 0.9, charge: 0 },
+  disk: {
+    ...DISK_DEFAULT,
+    mdot: 0.15,
+    structure: 0,
+    arms: 0,
+    clumps: 0,
+    dust: 0,
+  },
+  camera: { ...CAMERA_DEFAULTS },
+  look: { bloomEnabled: false, exposure: 0.95 },
+}
+
 export const ALL_PRESETS: readonly ScenePreset[] = [
   PRESET_DEFAULT,
   PRESET_INTERSTELLAR,
@@ -145,6 +163,7 @@ export const ALL_PRESETS: readonly ScenePreset[] = [
   PRESET_SCHWARZSCHILD,
   PRESET_EXTREMAL,
   PRESET_RN,
+  PRESET_NT_SMOOTH,
 ] as const
 
 export function getPresetById(id: string): ScenePreset | undefined {
@@ -165,6 +184,10 @@ export function applyPreset(preset: ScenePreset | string): ScenePreset {
     setDisk({
       mdot: p.disk.mdot,
       outerM: p.disk.outerM,
+      ...(typeof p.disk.structure === 'number' ? { structure: p.disk.structure } : {}),
+      ...(typeof p.disk.arms === 'number' ? { arms: p.disk.arms } : {}),
+      ...(typeof p.disk.clumps === 'number' ? { clumps: p.disk.clumps } : {}),
+      ...(typeof p.disk.dust === 'number' ? { dust: p.disk.dust } : {}),
     })
     setCamera({ ...CAMERA_DEFAULTS })
     setLook({
