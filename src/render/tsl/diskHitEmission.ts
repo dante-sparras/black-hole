@@ -481,9 +481,9 @@ export function accumulateDiskHit(p) {
   const filmMid = vec3(float(E.filmMidR), float(E.filmMidG), float(E.filmMidB))
   const filmDark = vec3(float(E.filmDarkR), float(E.filmDarkG), float(E.filmDarkB))
   // 3-stop ramp like ColorRamp3 (pos ~0.05 / 0.42 / 1)
-  const t1 = min(float(1), rampT.div(0.42))
-  const t2 = max(float(0), rampT.sub(0.42)).div(0.58)
-  const filmCol = mix(filmWarm, filmMid, t1).mul(float(1).sub(t2)).add(filmDark.mul(t2))
+  const rampT1 = min(float(1), rampT.div(0.42))
+  const rampT2 = max(float(0), rampT.sub(0.42)).div(0.58)
+  const filmCol = mix(filmWarm, filmMid, rampT1).mul(float(1).sub(rampT2)).add(filmDark.mul(rampT2))
   // Keep a whisper of blackbody/Doppler under heavy film grade
   const filmTint = mix(filmCol, chroma5, min(float(0.18), beam.mul(0.12)))
   const chroma = mix(chroma5, filmTint, float(E.filmGrade))
