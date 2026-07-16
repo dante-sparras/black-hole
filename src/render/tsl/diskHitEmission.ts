@@ -124,9 +124,10 @@ export function accumulateDiskHit(p) {
   // Mild: mid-disk ≈ 1, edges dip without vanishing
   const edgeFac = float(0.62).add(float(0.38).mul(edgeIn.mul(edgeOut)))
 
-  // Finite scale-height look: longer path when ray is edge-on (small |v_y|)
-  const nY = max(pathAbsY, float(0.055))
-  const pathFac = min(float(3.2), uScaleH.div(nY).add(0.5))
+  // Finite scale-height: path length ∝ H/|n_y| but HARD-CAPPED.
+  // Uncapped edge-on → infinite sheet / bright slash through the shadow.
+  const nY = max(pathAbsY, float(0.1))
+  const pathFac = min(float(1.55), uScaleH.div(nY).mul(0.85).add(0.75))
 
   // Radial zones: hot plasma (inner) → gas arms (mid) → dust (outer)
   const xM = hitR.div(max(M, float(1e-6)))
@@ -333,7 +334,7 @@ export function accumulateDiskHit(p) {
 
   If(uDebugMode.notEqual(float(8)), () => {
     col.addAssign(emit.mul(transm))
-    // Full midplane hit: stronger attenuation; soft volume: proportional
-    transm.mulAssign(max(float(0.12), float(1).sub(w.mul(0.55))))
+    // Fixed midplane attenuation (weight already scales intensity; avoid OD blow-up)
+    transm.mulAssign(0.45)
   })
 }

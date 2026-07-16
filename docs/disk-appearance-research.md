@@ -11,31 +11,27 @@ Sources: NASA GSFC SVS 13326 (Goddard), GRMHD+GRRT literature, Interstellar/Rous
 | **Bright approaching side** | Doppler + beaming \(I\propto g^{3}\) | Orbiting fluid |
 | **Photon ring** | Light wraps 1+ times; nested rings | Strong lensing near \(b_c\) |
 | **See underside / far side** | Light bent over the hole | Null geodesics |
-| **Volume / thickness** | Finite \(H/R\); path length; not \(y=0\) only | Thin-disk scale height |
+| **Volume / thickness** | Finite \(H/R\); path length at *crossings* | Thin-disk scale height |
 | **Flow filaments** | MRI / turbulence streaks along \(\varphi\) | GRMHD structure |
 | **Irregular outer edge** | Truncation + clumpy outer disk | Not a hard circle |
-| **Warm blackbody palette** | \(T(r)\) NT-like + redshift | Planck, not film LUT as primary |
 
-## Thin vs thick
+## Pitfall — midplane slash (fixed)
 
-- **Thin disk (NT):** \(H/R \sim 0.01\)–\(0.1\) — still *looks* deep because of lensing + path through Gaussian density.
-- **Thick / truncated (hard state):** geometrically thick flow near hole — needs different model.
-- Full **volume GRRT + GRMHD cubes** = offline film quality; real-time uses approximations.
+**Symptom:** white thin line / solid band through the black hole at high inclination.
 
-## What this project does
+**Cause:**
+1. Per-step soft-volume samples along \(|y|<H\) — edge-on rays stack emission all the way into the shadow.
+2. Uncapped path factor \(H/|n_y|\) → infinite bright sheet.
+
+**Fix:** plane crossings only + micro-crossing guard + hard-capped pathFac + crossing-angle weight.
+
+## Real-time approach (this project)
 
 | Layer | Status |
 |-------|--------|
 | Plane midplane hit + multi-bounce | yes |
-| Soft Gaussian slab \(\propto e^{-(y/H)^2}\) | yes (RT) |
+| Capped path-length thickness at crossings | yes |
 | Dimensionless Keplerian texture advection | yes |
-| Irregular outer rim (azim. wobble) | yes |
-| Full multi-orbit photon-ring stack | partial (hit count) |
+| Irregular outer rim | yes |
+| Per-step volumetric slab | **removed** (slash bug) |
 | True GRMHD density cube | not yet |
-
-## Controls that matter for the “volume” look
-
-- **H/R thickness** — scale height for slab + path factor  
-- **Structure / arms / clumps / dust** — filament detail  
-- **Shear / animate** — flow motion  
-- Edge-on **inclination** — path length through slab
