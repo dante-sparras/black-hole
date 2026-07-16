@@ -217,48 +217,34 @@ export const DISK_EMISSION = {
    * Pre-tone intensity into HDR (before eye adaptation).
    * Keep moderate — high ṁ must not white-out; exposure + final tonemap carry range.
    */
-  intensityGain: 1.55,
+  intensityGain: 1.25,
   /**
    * Display brightness vs ṁ (eye-like compressive, not pure F∝ṁ).
-   * Physical F∝ṁ still lives in fluxRel × mdotFluxScale paths for T/F shape;
-   * this is photopic “how bright it looks” so ṁ=3 ≠ pure white blast.
    */
-  mdotBrightBase: 0.28,
-  mdotBrightScale: 0.9,
-  /** Compressive: ~0.4 ≈ log-ish for human dynamic range */
-  mdotBrightPower: 0.38,
+  mdotBrightBase: 0.22,
+  mdotBrightScale: 0.85,
+  mdotBrightPower: 0.4,
   mdotBrightFloor: 0.006,
-  /** Final eye tonemap knee on accumulated luminance (Reinhard-like) */
-  eyeTonemapKnee: 0.35,
-  /** Per-sample soft-knee (preserves chroma when applied to I only) */
-  sampleKnee: 0.22,
-  /** Extra optical-depth growth with ṁ — photosphere saturates, less milk-glass stack */
-  mdotOpacityBoost: 1.15,
-  /** Weight compress at high ṁ (eye adapts; surface not infinitely brighter) */
+  eyeTonemapKnee: 0.38,
+  sampleKnee: 0.28,
+  mdotOpacityBoost: 0.9,
   mdotWeightCompress: 0.5,
+  mdotPhotScale: 0.85,
+  photMidSuppress: 0.65,
+  structureBoostMdot: 0.5,
+  outerDustCool: 0.3,
   /**
-   * High-ṁ photosphere: suppress deep midplane dens (kill edge-on bar).
-   * dens *= 1 − mdotPhot * densZ * photMidSuppress
+   * Film grade — KEEP LOW. High values look painted, not natural.
+   * Natural look comes from alpha/noise structure, not palette.
+   * 0 = pure blackbody; small mix only for mild warmth.
    */
-  mdotPhotScale: 0.9,
-  photMidSuppress: 0.75,
-  /** Boost structure contrast at high ṁ so filaments survive tonemap */
-  structureBoostMdot: 0.65,
-  /** Outer dust cooling (rest-frame T) — keep red outer limb under hot ṁ */
-  outerDustCool: 0.28,
-  /**
-   * Cinematic film-grade mix — push toward singularity look (warm ramp dominant).
-   * 0 = pure blackbody, 1 = full art ramp. High default = “more like his.”
-   */
-  filmGrade: 0.88,
-  /**
-   * Singularity rampEmission × base + warm emission bias (display).
-   */
-  filmEmission: 2.0,
-  filmBiasR: 0.14,
-  filmBiasG: 0.129,
-  filmBiasB: 0.09,
-  /** Warm ramp colors — exact singularity defaults */
+  filmGrade: 0.12,
+  /** Display emission scale — 1 = no singularity-style ×2 paint */
+  filmEmission: 1.0,
+  filmBiasR: 0.04,
+  filmBiasG: 0.035,
+  filmBiasB: 0.025,
+  /** Soft warm anchors (only used if filmGrade > 0) */
   filmWarmR: 0.95,
   filmWarmG: 0.71,
   filmWarmB: 0.44,
@@ -268,11 +254,9 @@ export const DISK_EMISSION = {
   filmDarkR: 0.0,
   filmDarkG: 0.0,
   filmDarkB: 0.0,
-  /** Mid-contrast tonemap: lift mids (a), compress highs (b) */
-  tonemapMid: 0.22,
-  tonemapHigh: 0.42,
-  tonemapSat: 1.35,
-  /** NT peak radius ≈ (49/36) r_in */
+  tonemapMid: 0.2,
+  tonemapHigh: 0.5,
+  tonemapSat: 1.15,
   ntPeakOverRin: 49 / 36,
 } as const
 

@@ -463,8 +463,8 @@ export function accumulateDiskHit(p) {
   const bb5 = b490.mul(0.35).add(b440.mul(0.65))
   const bMax5 = max(br5, max(bg5, bb5))
   const chroma5 = vec3(br5, bg5, bb5).div(max(bMax5, float(1e-20)))
-  // Film grade — singularity ramp dominant (gold→brown→black) + emission×2
-  // rampInput ≈ radial + noise-edge punch (his noiseAmp − noiseNormal)
+  // Film grade — LOW by design (see docs/recheck-vs-singularity.md).
+  // High film + emission looked painted, not natural. Mild warmth only.
   const rampT = min(
     float(1),
     max(
@@ -473,26 +473,24 @@ export function accumulateDiskHit(p) {
         .sub(xRad)
         .mul(0.55)
         .add(fluxVis.mul(0.55))
-        .add(texFac.sub(1).mul(0.35))
+        .add(texFac.sub(1).mul(0.25))
         .add(beam.mul(0.08)),
     ),
   )
   const filmWarm = vec3(float(E.filmWarmR), float(E.filmWarmG), float(E.filmWarmB))
   const filmMid = vec3(float(E.filmMidR), float(E.filmMidG), float(E.filmMidB))
   const filmDark = vec3(float(E.filmDarkR), float(E.filmDarkG), float(E.filmDarkB))
-  // 3-stop ramp like ColorRamp3 (pos ~0.05 / 0.42 / 1)
   const rampT1 = min(float(1), rampT.div(0.42))
   const rampT2 = max(float(0), rampT.sub(0.42)).div(0.58)
   const filmCol = mix(filmWarm, filmMid, rampT1).mul(float(1).sub(rampT2)).add(filmDark.mul(rampT2))
-  // Keep a whisper of blackbody/Doppler under heavy film grade
-  const filmTint = mix(filmCol, chroma5, min(float(0.18), beam.mul(0.12)))
+  // Prefer blackbody; film is a soft tint only
+  const filmTint = mix(chroma5, filmCol, float(0.35))
   const chroma = mix(chroma5, filmTint, float(E.filmGrade))
-  // rampEmission * col + warm bias (singularity emissiveCol)
   const filmBias = vec3(float(E.filmBiasR), float(E.filmBiasG), float(E.filmBiasB))
   const emit = chroma
     .mul(softI)
     .mul(float(E.filmEmission))
-    .add(filmBias.mul(softI.mul(0.35)))
+    .add(filmBias.mul(softI.mul(float(E.filmGrade))))
 
   dbgG.assign(freq)
   dbgT.assign(TK.div(float(12000)))
@@ -500,9 +498,8 @@ export function accumulateDiskHit(p) {
 
   If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.01)), () => {
     col.addAssign(emit.mul(transm))
-    // Multi-image isolation + stronger extinction at high ṁ (less white fog stack)
-    const mdotFog = float(1).add(mdot.mul(0.12))
-    const ext = hits.greaterThan(1.5).select(float(0.04), float(0.07)).mul(mdotFog)
-    transm.mulAssign(max(float(0.88), float(1).sub(w.mul(ext))))
+    const mdotFog = float(1).add(mdot.mul(0.1))
+    const ext = hits.greaterThan(1.5).select(float(0.035), float(0.055)).mul(mdotFog)
+    transm.mulAssign(max(float(0.9), float(1).sub(w.mul(ext))))
   })
 }
