@@ -181,10 +181,11 @@ export function decodeBhcm(buffer: ArrayBuffer): GrmhdCube {
 }
 
 /**
- * Build a GRMHD-*like* density field (for offline gen / demos).
- * Not a true HARM dump — use convert-harm.ts for real cubes.
+ * Build a high-quality GRMHD-*like* density field (offline gen / default cube).
+ * Not a true HARM dump — use convert-harm for real cubes.
  *
- * Features: thin sech² disk, log-spiral dens waves, log-normal MRI, ISCO hole.
+ * Features: sech² + warp, multi-arm spirals, MRI log-normal, plasma/gas/dust
+ * zones, irregular outer rim, frame-drag / LT wind from a★.
  */
 export function synthesizeGrmhdLikeCube(opts: {
   n?: number
@@ -196,20 +197,18 @@ export function synthesizeGrmhdLikeCube(opts: {
   aStar?: number
   seed?: number
 }): GrmhdCube {
-  const n = opts.n ?? 80
-  const halfBoxM = opts.halfBoxM ?? 36
+  const n = opts.n ?? 96
+  const halfBoxM = opts.halfBoxM ?? 32
   const zHalfM = opts.zHalfM ?? 10
-  const rIn = opts.rInM ?? 2.2 // near high-spin ISCO
-  const rOut = opts.rOutM ?? 28
-  const h0 = opts.hOverR ?? 0.08
-  const aStar = opts.aStar ?? 0.9
-  const seed = opts.seed ?? 42
+  const rIn = opts.rInM ?? 2.15
+  const rOut = opts.rOutM ?? 26
+  const h0 = opts.hOverR ?? 0.09
+  const aStar = opts.aStar ?? 0.94
+  const seed = opts.seed ?? 11
 
-  const cube = createEmptyCube(n, Math.max(24, Math.floor(n * 0.45)), n, halfBoxM, zHalfM)
-  // ny can differ
-  const ny = cube.ny
-  const nx = cube.nx
-  const nz = cube.nz
+  const ny = Math.max(28, Math.floor(n * 0.42))
+  const cube = createEmptyCube(n, ny, n, halfBoxM, zHalfM)
+  const { nx, nz } = cube
   cube.data = new Float32Array(nx * ny * nz)
 
   let peak = 0
@@ -220,44 +219,94 @@ export function synthesizeGrmhdLikeCube(opts: {
         const y = cube.origin.y + ((iy + 0.5) / ny) * cube.extent.y
         const z = cube.origin.z + ((iz + 0.5) / nz) * cube.extent.z
         const rho = Math.hypot(x, z)
-        if (rho < rIn * 0.95 || rho > rOut * 1.15) {
+        if (rho < rIn * 0.92 || rho > rOut * 1.22) {
           cube.data[cubeIndex(cube, ix, iy, iz)] = 0
           continue
         }
+
         const phi = Math.atan2(z, x)
-        const lnR = Math.log(Math.max(rho, 1e-3))
-        // Log spiral m=2 + frame-drag wind
-        const drag = aStar * (1 / Math.max(rho, 1.2))
-        const arm = 0.5 + 0.5 * Math.cos(2 * phi - 0.75 * lnR + drag * 2)
-        const fil = 0.5 + 0.5 * Math.cos(6 * phi - 0.4 * lnR + drag)
-        // MRI log-normal from hash
-        const h = hash01(ix * 12.9898 + iy * 78.233 + iz * 37.719 + seed)
-        const h2 = hash01(ix * 5.1 + iy * 11.3 + iz * 17.7 + seed * 1.7)
-        const mri = Math.exp(0.65 * (2 * h - 1) - 0.5 * 0.65 * 0.65)
-        const H = h0 * rho * (0.35 + Math.pow(rho / rOut, 0.9))
-        const sech = 1 / Math.max(Math.cosh(y / Math.max(H, 0.05)), 1e-4)
+        const lnR = Math.log(Math.max(rho / Math.max(rIn, 1e-3), 1e-3))
+        const xRad = Math.min(1, Math.max(0, (rho - rIn) / Math.max(rOut - rIn, 1)))
+
+        const plasmaW = Math.exp(-4.8 * xRad)
+        const dustW = Math.pow(Math.max(xRad - 0.22, 0) / 0.78, 1.3)
+        const gasW = Math.max(0, 1 - plasmaW * 0.85 - dustW * 0.5)
+
+        const drag = aStar * (1.1 / Math.max(rho, 1.15))
+        const lt = aStar * (2.6 / Math.max(rho * rho * rho, 1.5))
+
+        const arm2 =
+          0.5 + 0.5 * Math.cos(2 * phi - 0.82 * lnR + drag * 2.2 + lt)
+        const arm4 =
+          0.5 + 0.5 * Math.cos(4 * phi - 0.55 * lnR + drag * 1.4 + 0.7)
+        const fil8 =
+          0.5 + 0.5 * Math.cos(8 * phi - 0.35 * lnR + drag * 0.9 + 1.3)
+        const spiral =
+          0.22 +
+          0.95 * Math.pow(Math.max(arm2, 1e-4), 1.75) +
+          0.4 * Math.pow(Math.max(arm4, 1e-4), 1.9) +
+          0.28 * Math.pow(Math.max(fil8, 1e-4), 2.2)
+
+        const h1 = hash01(ix * 12.9898 + iy * 78.233 + iz * 37.719 + seed)
+        const h2 = hash01(ix * 5.13 + iy * 11.37 + iz * 17.71 + seed * 1.7)
+        const h3 = hash01(ix * 19.2 + iy * 3.7 + iz * 9.1 + seed * 2.3)
+        const turb = 0.5 * h1 + 0.3 * h2 + 0.2 * h3
+        const sigma = 0.72
+        const mri = Math.exp(sigma * (2 * turb - 1) - 0.5 * sigma * sigma)
+
+        const hOverR =
+          h0 * (0.28 + Math.pow(xRad + 0.08, 1.1) * 1.55 + dustW * 0.85)
+        const H = Math.max(hOverR * rho, 0.04)
+        const warp = 0.1 * H * Math.sin(2 * phi + drag)
+        const zEff = y - warp
+        const sech = 1 / Math.max(Math.cosh(zEff / H), 1e-4)
         const densZ = sech * sech
-        const radial =
-          Math.max(0, 1 - Math.sqrt(rIn / Math.max(rho, rIn * 1.01))) *
-          Math.exp(-Math.max(0, (rho - rOut * 0.85) / (rOut * 0.2)))
-        const spiral = 0.35 + 0.9 * Math.pow(arm, 1.6) + 0.35 * Math.pow(fil, 2)
-        let dens = densZ * radial * spiral * mri * (0.7 + 0.5 * h2)
-        // Inner plasma boost
-        if (rho < rIn * 3) dens *= 1.15 + 0.4 * h
-        // Outer dust lanes (lower dens)
-        if (rho > rOut * 0.55) dens *= 0.75 + 0.35 * Math.sin(lnR * 4 + phi * 2)
+
+        const gap = Math.max(0, 1 - Math.sqrt(rIn / Math.max(rho, rIn * 1.01)))
+        const rim =
+          0.5 +
+          0.5 *
+            (0.5 * Math.cos(3 * phi) +
+              0.25 * Math.sin(5 * phi + 0.4) +
+              0.4 * h2 -
+              0.15)
+        const rOutEff = rOut * (0.86 + 0.2 * rim)
+        const outer = Math.exp(
+          -Math.max(0, (rho - rOutEff * 0.88) / Math.max(rOut * 0.18, 0.5)),
+        )
+        const radial = gap * outer
+
+        const densPlasma = 1 + plasmaW * (0.55 + 0.9 * h1)
+        const densDust =
+          1 -
+          dustW *
+            (0.25 + 0.55 * (0.5 + 0.5 * Math.sin(lnR * 3.5 + phi * 2)))
+        const densGas = 0.45 + gasW * spiral * 0.85
+
+        let dens =
+          densZ *
+          radial *
+          densPlasma *
+          densDust *
+          densGas *
+          (0.55 + 0.55 * mri) *
+          (0.75 + 0.45 * h3)
+
+        dens *= 1 + plasmaW * (0.35 + 0.4 * h1)
+        dens *= 1 - dustW * 0.18
+
         cube.data[cubeIndex(cube, ix, iy, iz)] = dens
         if (dens > peak) peak = dens
       }
     }
   }
-  // Normalize peak ≈ 1
+
   if (peak > 1e-12) {
     for (let i = 0; i < cube.data.length; i++) {
       cube.data[i]! /= peak
     }
   }
-  cube.densScale = 1
+  cube.densScale = 1.15
   return cube
 }
 

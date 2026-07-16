@@ -19,7 +19,7 @@ export type GrmhdState = {
 }
 
 const DEFAULT: GrmhdState = {
-  enabled: false,
+  enabled: true,
   mix: 1,
   cube: null,
   label: 'none',

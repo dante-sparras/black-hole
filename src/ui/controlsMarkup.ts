@@ -106,7 +106,7 @@ export function buildControlsHtml(): string {
       <span class="ctrl-name">Density source</span>
       <select id="grmhd-src" style="flex:1;min-width:0">
         <option value="analytic">Analytic</option>
-        <option value="cube">GRMHD cube</option>
+        <option value="cube" selected>GRMHD cube</option>
       </select>
       <span class="ctrl-val" data-val="grmhd"></span>
     </label>
