@@ -42,25 +42,12 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 
 ### Disk (not hair) — separate store `state/disk.ts`
 
-| Param | Code | Range | Notes |
-| ----- | ---- | ----- | ----- |
-| Eddington ratio \(\dot{m}\) | `mdot` | \(10^{-3}\)–\(3\) | \(F\propto\dot{m}\), \(T\propto\dot{m}^{1/4}\) |
-| Outer radius | `outerM` | \(8\)–\(80\,M\) | Luminous cutoff; **inner edge = family ISCO** (derived) |
-| Orbit sense | `prograde` | pro / ret | Co-rotating (default) vs counter-rotating ISCO + Doppler |
-| Structure | `structure` | \(0\)–\(1\) | Master mix: 0 = smooth NT, 1 = full texture |
-| Gas arms | `arms` | \(0\)–\(1\) | Spiral filament contrast (× structure) |
-| Plasma clumps | `clumps` | \(0\)–\(1\) | Turbulence contrast |
-| Dust lanes | `dust` | \(0\)–\(1\) | Outer dust contrast + cooler outer T |
-| H/R | `scaleHeight` | \(0.02\)–\(0.18\) | Path-length thickness (edge-on); **derived from ṁ+Γ in bridge** |
-| Shear speed | `shearRate` | \(0\)–\(1.2\) | Keplerian pattern wind |
-| Animate | `animate` | on/off | Differential rotation animation |
-| Tilt | `tiltRad` | \(0\)–\(~40°\) | Midplane vs BH spin (+Y) |
-| Tilt node | `tiltNodeRad` | \(0\)–\(2\pi\) | Line of nodes |
-| Jet power | `jetPower` | \(0\)–\(1\) | Optional bipolar funnel (0 = off) |
-| \(\Gamma\) | `gamma` | \(4/3\) or \(5/3\) | Expert EOS → derived H/R |
-| Plasma \(\beta\) | `plasmaBeta` | \(0.1\)–\(100\) | Expert MRI dens variance |
+**Free (UI):** ṁ, ρ₀, β₀, r_out, tilt, jet boost.
 
-**Not free (realism):** inner edge (locked to ISCO), film palette as primary color.
+**Derived / locked:** r_in = co-rotating ISCO; H/r thin-disk; Γ=5/3; ℓ; SANE/MAD from β₀; structure defaults; tilt node 0; B geometry single-loop. Disk always co-rotates (L ‖ J); use signed a★ for spin direction.
+
+**Not free:** counter-rotating disk toggle; film palette as primary color.
+
 
 ## Physics layout
 

@@ -25,8 +25,8 @@ export type EffectiveDiskGeom = {
 
 /**
  * Resolve luminous inner edge (thin-disk policy):
- * always family ISCO (co/counter from disk.prograde), floored above ~1.05 r₊.
- * Free r_in is not a user control.
+ * always co-rotating family ISCO (L ‖ J), floored above ~1.05 r₊.
+ * Free r_in / counter-rotating disk are not user controls.
  */
 export function effectiveDiskGeom(
   params: BlackHoleParams,

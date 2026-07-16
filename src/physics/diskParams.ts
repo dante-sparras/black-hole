@@ -1,9 +1,9 @@
 /**
  * Accretion disk parameters — NOT black-hole hair.
  *
- * Base torus / thin-disk free inputs (GRMHD-init style):
- *   ρ₀, H/r, Γ, K, ℓ (specific ang. mom.), β₀, B geometry, r_in,
- *   tilt, jet power, MAD/SANE, perturbation, ṁ, r_out, orbit.
+ * Thin-disk free bases (UI): ṁ, ρ₀, β₀, r_out, tilt, jet boost.
+ * Locked / derived: prograde=true (L‖J), r_in=ISCO, Γ=5/3, H/r, ℓ, MAD class,
+ * B geometry=single-loop, tiltNode=0, structure defaults.
  *
  * No-hair = (M, a★, Q) only. Geometric units G = c = 1.
  */

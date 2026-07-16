@@ -117,7 +117,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       exposure: autoExposureFromPhysics(
         p.spinStar,
         disk.mdot * Math.sqrt(disk.rho0),
-        disk.prograde,
+        true,
       ),
     })
   }
@@ -246,7 +246,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const distTag = scaleFree
       ? `d=${c.distanceM.toFixed(1)}M (D/M)`
       : `D=${D.toFixed(1)} (fixed)`
-    const orbitTag = disk.prograde ? 'pro' : 'ret'
+    const orbitTag = 'co' // disk always co-rotates; a★ sign sets sense
     const beamTag = idealBeam ? 'g³' : 'g²'
     const qTag = getQuality().level
     const grmhd = getGrmhd()
