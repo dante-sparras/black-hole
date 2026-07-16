@@ -89,8 +89,14 @@ async function boot(): Promise<void> {
     await renderer.init()
   } catch (err) {
     showError(
-      `WebGPU failed to initialize.\\n\\n${err instanceof Error ? err.message : String(err)}\\n\\nUse Chrome/Edge with WebGPU enabled.`,
-    )
+          [
+            'WebGPU failed to initialize.',
+            '',
+            err instanceof Error ? err.message : String(err),
+            '',
+            'Use Chrome/Edge with WebGPU enabled.',
+          ].join('\n'),
+        )
     return
   }
 

@@ -1,7 +1,7 @@
 /**
  * Ideal bolometric beaming toggle (not hair, not per-preset).
- * false (default) = soft display I ∝ g²
- * true = ideal GRRT-like I ∝ g³
+ * Default ON: ideal GRRT-like I ∝ g³.
+ * false = soft display I ∝ g² (opt-out only).
  */
 import { emitStore } from './batch'
 

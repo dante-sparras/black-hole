@@ -1,6 +1,7 @@
 /**
- * Unified scene snapshot: no-hair + disk + camera + look + sky + geodesic mode.
- * Sky and geodesic integrator are global (not overridden by presets).
+ * Unified scene snapshot: no-hair + disk + camera + look + sky + globals.
+ * Sky, geodesic, scale-free, ideal beam, quality, grmhd dens mode are global
+ * (presets should not override them unless intentional).
  */
 import type { DiskInput, DiskParams } from '../physics/diskParams'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
@@ -19,6 +20,12 @@ import {
   subscribeGeodesic,
   type GeodesicIntegrator,
 } from './geodesic'
+import {
+  getGrmhd,
+  setGrmhd,
+  subscribeGrmhd,
+  type GrmhdState,
+} from './grmhd'
 import { getLook, setLook, subscribeLook, type LookState } from './look'
 import {
   getDerived,
@@ -26,6 +33,13 @@ import {
   setParams,
   subscribe as subscribeParams,
 } from './params'
+import {
+  getQuality,
+  setQuality,
+  subscribeQuality,
+  type QualityConfig,
+  type QualityLevel,
+} from './quality'
 import {
   getScaleFree,
   setScaleFree,
@@ -37,6 +51,16 @@ import {
   subscribeIdealBeam,
 } from './idealBeam'
 import { getSky, setSky, subscribeSky, type SkyState } from './sky'
+
+/** Lightweight dens-mode view for snapshots (no cube payload). */
+export type GrmhdSceneView = {
+  enabled: boolean
+  mix: number
+  label: string
+  error: string | null
+  /** Whether a cube is currently loaded */
+  hasCube: boolean
+}
 
 export type SceneSnapshot = {
   params: BlackHoleParams
@@ -51,6 +75,10 @@ export type SceneSnapshot = {
   scaleFree: boolean
   /** Global ideal I∝g³ beam — not hair, not per-preset */
   idealBeam: boolean
+  /** Numerics quality (not physics law) */
+  quality: QualityConfig
+  /** Dens source mode (not physics law; cube binary not included) */
+  grmhd: GrmhdSceneView
 }
 
 export type ScenePatch = {
@@ -65,9 +93,24 @@ export type ScenePatch = {
   scaleFree?: boolean
   /** Optional — presets should leave idealBeam alone */
   idealBeam?: boolean
+  /** Optional quality level */
+  quality?: QualityLevel
+  /** Optional dens mode (not cube bytes) */
+  grmhd?: Partial<Pick<GrmhdState, 'enabled' | 'mix' | 'label' | 'error'>>
 }
 
 type SceneListener = (scene: SceneSnapshot) => void
+
+function grmhdView(): GrmhdSceneView {
+  const g = getGrmhd()
+  return {
+    enabled: g.enabled,
+    mix: g.mix,
+    label: g.label,
+    error: g.error,
+    hasCube: g.cube !== null,
+  }
+}
 
 export function getScene(): SceneSnapshot {
   return {
@@ -80,6 +123,8 @@ export function getScene(): SceneSnapshot {
     geodesic: getGeodesicIntegrator(),
     scaleFree: getScaleFree(),
     idealBeam: getIdealBeam(),
+    quality: getQuality(),
+    grmhd: grmhdView(),
   }
 }
 
@@ -93,29 +138,28 @@ export function setScene(patch: ScenePatch): SceneSnapshot {
     if (patch.geodesic) setGeodesicIntegrator(patch.geodesic)
     if (typeof patch.scaleFree === 'boolean') setScaleFree(patch.scaleFree)
     if (typeof patch.idealBeam === 'boolean') setIdealBeam(patch.idealBeam)
+    if (patch.quality) setQuality(patch.quality)
+    if (patch.grmhd) setGrmhd(patch.grmhd)
   })
   return getScene()
 }
 
 export function subscribeScene(listener: SceneListener): () => void {
   const fire = () => listener(getScene())
-  const u1 = subscribeParams(() => fire())
-  const u2 = subscribeDisk(() => fire())
-  const u3 = subscribeCamera(() => fire())
-  const u4 = subscribeLook(() => fire())
-  const u5 = subscribeSky(() => fire())
-  const u6 = subscribeGeodesic(() => fire())
-  const u7 = subscribeScaleFree(() => fire())
-  const u8 = subscribeIdealBeam(() => fire())
+  const unsubs = [
+    subscribeParams(() => fire()),
+    subscribeDisk(() => fire()),
+    subscribeCamera(() => fire()),
+    subscribeLook(() => fire()),
+    subscribeSky(() => fire()),
+    subscribeGeodesic(() => fire()),
+    subscribeScaleFree(() => fire()),
+    subscribeIdealBeam(() => fire()),
+    subscribeQuality(() => fire()),
+    subscribeGrmhd(() => fire()),
+  ]
   fire()
   return () => {
-    u1()
-    u2()
-    u3()
-    u4()
-    u5()
-    u6()
-    u7()
-    u8()
+    for (const u of unsubs) u()
   }
 }

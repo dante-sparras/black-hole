@@ -18,9 +18,10 @@ export type GrmhdState = {
   error: string | null
 }
 
+/** Store defaults match boot dens policy: analytic until a cube is enabled. */
 const DEFAULT: GrmhdState = {
-  enabled: true,
-  mix: 1,
+  enabled: false,
+  mix: 0,
   cube: null,
   label: 'none',
   error: null,

@@ -3,6 +3,7 @@
  * Bloom is Unreal-style luminance threshold + multi-mip blur.
  * Defaults stay subtle so the shadow stays readable.
  */
+import { clamp } from '../physics/math'
 import { emitStore } from './batch'
 
 export type LookState = {
@@ -42,10 +43,6 @@ type Listener = (look: LookState) => void
 
 let look: LookState = { ...LOOK_DEFAULTS }
 const listeners = new Set<Listener>()
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v))
-}
 
 export function getLook(): LookState {
   return look

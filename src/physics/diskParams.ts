@@ -10,6 +10,7 @@
 import { DEFAULT_MDOT, MDOT_MAX, MDOT_MIN } from './constants'
 import { RT } from './geodesic/rtConstants'
 import { DISK_TEXTURE } from './diskTexture'
+import { clamp, finiteNumber } from './math'
 
 /** Thin-disk free bases + internal texture model (not free UI). */
 export type DiskParams = {
@@ -72,42 +73,58 @@ export type DiskInput = Partial<DiskParams>
 
 export function normalizeDisk(input: DiskInput = {}): DiskParams {
   return {
-    mdot: clamp(num(input.mdot, DEFAULT_DISK.mdot), DISK_LIMITS.mdot.min, DISK_LIMITS.mdot.max),
-    rho0: clamp(num(input.rho0, DEFAULT_DISK.rho0), DISK_LIMITS.rho0.min, DISK_LIMITS.rho0.max),
+    mdot: clamp(
+      finiteNumber(input.mdot, DEFAULT_DISK.mdot),
+      DISK_LIMITS.mdot.min,
+      DISK_LIMITS.mdot.max,
+    ),
+    rho0: clamp(
+      finiteNumber(input.rho0, DEFAULT_DISK.rho0),
+      DISK_LIMITS.rho0.min,
+      DISK_LIMITS.rho0.max,
+    ),
     outerM: clamp(
-      num(input.outerM, DEFAULT_DISK.outerM),
+      finiteNumber(input.outerM, DEFAULT_DISK.outerM),
       DISK_LIMITS.outerM.min,
       DISK_LIMITS.outerM.max,
     ),
     plasmaBeta: clamp(
-      num(input.plasmaBeta, DEFAULT_DISK.plasmaBeta),
+      finiteNumber(input.plasmaBeta, DEFAULT_DISK.plasmaBeta),
       DISK_LIMITS.plasmaBeta.min,
       DISK_LIMITS.plasmaBeta.max,
     ),
     tiltRad: clamp(
-      num(input.tiltRad, DEFAULT_DISK.tiltRad),
+      finiteNumber(input.tiltRad, DEFAULT_DISK.tiltRad),
       DISK_LIMITS.tiltRad.min,
       DISK_LIMITS.tiltRad.max,
     ),
     jetBoost: clamp(
-      num(input.jetBoost, DEFAULT_DISK.jetBoost),
+      finiteNumber(input.jetBoost, DEFAULT_DISK.jetBoost),
       DISK_LIMITS.jetBoost.min,
       DISK_LIMITS.jetBoost.max,
     ),
     structure: clamp(
-      num(input.structure, DEFAULT_DISK.structure),
+      finiteNumber(input.structure, DEFAULT_DISK.structure),
       DISK_LIMITS.structure.min,
       DISK_LIMITS.structure.max,
     ),
-    arms: clamp(num(input.arms, DEFAULT_DISK.arms), DISK_LIMITS.arms.min, DISK_LIMITS.arms.max),
+    arms: clamp(
+      finiteNumber(input.arms, DEFAULT_DISK.arms),
+      DISK_LIMITS.arms.min,
+      DISK_LIMITS.arms.max,
+    ),
     clumps: clamp(
-      num(input.clumps, DEFAULT_DISK.clumps),
+      finiteNumber(input.clumps, DEFAULT_DISK.clumps),
       DISK_LIMITS.clumps.min,
       DISK_LIMITS.clumps.max,
     ),
-    dust: clamp(num(input.dust, DEFAULT_DISK.dust), DISK_LIMITS.dust.min, DISK_LIMITS.dust.max),
+    dust: clamp(
+      finiteNumber(input.dust, DEFAULT_DISK.dust),
+      DISK_LIMITS.dust.min,
+      DISK_LIMITS.dust.max,
+    ),
     shearRate: clamp(
-      num(input.shearRate, DEFAULT_DISK.shearRate),
+      finiteNumber(input.shearRate, DEFAULT_DISK.shearRate),
       DISK_LIMITS.shearRate.min,
       DISK_LIMITS.shearRate.max,
     ),
@@ -182,10 +199,4 @@ export function effectiveDiskStructure(d: DiskParams): {
   }
 }
 
-function num(v: number | undefined, fallback: number): number {
-  return Number.isFinite(v as number) ? (v as number) : fallback
-}
 
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v))
-}

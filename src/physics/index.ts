@@ -1,4 +1,5 @@
 export * from './constants'
+export * from './math'
 export * from './types'
 export * from './validate'
 export * from './geometry'

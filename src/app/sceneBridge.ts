@@ -25,7 +25,7 @@ import { getParams, subscribe as subscribeParams } from '../state/params'
 import { getScaleFree, subscribeScaleFree } from '../state/scaleFree'
 import { getIdealBeam, subscribeIdealBeam } from '../state/idealBeam'
 import { getQuality, subscribeQuality } from '../state/quality'
-import { getGrmhd, subscribeGrmhd } from '../state/grmhd'
+import { subscribeGrmhd } from '../state/grmhd'
 import { getScene } from '../state/scene'
 import { getSky, subscribeSky } from '../state/sky'
 import { syncGrmhdToTracer } from './grmhdLoader'
@@ -232,8 +232,18 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   }
 
   function formatStats(fps: number, healthLine?: string): string {
-    const { params: p, derived: d, disk, camera: c, look, geodesic, scaleFree, idealBeam } =
-      getScene()
+    const {
+      params: p,
+      derived: d,
+      disk,
+      camera: c,
+      look,
+      geodesic,
+      scaleFree,
+      idealBeam,
+      quality,
+      grmhd,
+    } = getScene()
     const m = p.mass.toFixed(2)
     const a = p.spinStar.toFixed(3)
     const q = p.charge.toFixed(3)
@@ -245,15 +255,14 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       : `D=${D.toFixed(1)} (fixed)`
     const orbitTag = 'co' // disk always co-rotates; a★ sign sets sense
     const beamTag = idealBeam ? 'g³' : 'g²'
-    const qTag = getQuality().level
-    const grmhd = getGrmhd()
-    const densTag = grmhd.enabled && grmhd.cube ? `dens=${grmhd.label}` : 'dens=analytic'
+    const densTag =
+      grmhd.enabled && grmhd.hasCube ? `dens=${grmhd.label}` : 'dens=analytic'
     const mode = realtimeModeTag(p, geodesic)
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
-    const base = `${fps} fps · ${mode} · ${densTag} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · q=${qTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
+    const base = `${fps} fps · ${mode} · ${densTag} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · q=${quality.level} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
     return healthLine ? `${base}
 ${healthLine}` : base
   }

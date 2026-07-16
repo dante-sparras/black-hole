@@ -4,6 +4,7 @@ import {
   OBSERVER_LIMITS,
   type ObserverCamera,
 } from '../physics/observer'
+import { clamp } from '../physics/math'
 import { emitStore } from './batch'
 
 export type CameraState = ObserverCamera
@@ -49,10 +50,6 @@ export function subscribeCamera(listener: Listener): () => void {
   return () => {
     listeners.delete(listener)
   }
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v))
 }
 
 function wrapAngle(a: number): number {

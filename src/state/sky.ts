@@ -2,6 +2,7 @@
  * Deep-space backdrop controls (not black-hole hair, not per-preset).
  * Shared globally so every preset sees the same sky unless the user changes it.
  */
+import { clamp } from '../physics/math'
 import { emitStore } from './batch'
 
 export type SkyState = {
@@ -33,10 +34,6 @@ type Listener = (sky: SkyState) => void
 
 let sky: SkyState = { ...SKY_DEFAULTS }
 const listeners = new Set<Listener>()
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v))
-}
 
 export function getSky(): SkyState {
   return sky
