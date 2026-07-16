@@ -98,7 +98,12 @@ export function buildControlsHtml(): string {
       </select>
       <span class="ctrl-val" data-val="geodesic"></span>
     </label>
-    <p class="ctrl-hint">RT = live force approx · BL = Mino Kerr nulls · not hair · not presets</p>
+    <label class="ctrl">
+      <span class="ctrl-name">I ∝ g³ ideal</span>
+      <input type="checkbox" id="g-ideal-beam" />
+      <span class="ctrl-val" data-val="idealBeam"></span>
+    </label>
+    <p class="ctrl-hint">RT = force approx · BL = Mino · default beam g² (display); ideal g³ = bolometric science</p>
 
     <div class="ctrl-section">Look</div>
     <label class="ctrl">

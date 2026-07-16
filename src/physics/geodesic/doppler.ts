@@ -215,9 +215,12 @@ export function diskFrequencyFactor(options: {
 
 /**
  * Bolometric intensity scaling.
- * Ideal GRRT: I ∝ g³. Display path may use DISK_EMISSION.beamExponent (softer).
+ * Ideal GRRT: I ∝ g³. Display path uses DISK_EMISSION.beamExponent (softer).
+ * Prefer beamIntensity(g, ideal) from disk.ts for the dual-mode path.
  */
-export function bolometricBeaming(D: number): number {
+export function bolometricBeaming(D: number, ideal = true): number {
   const d = Math.max(D, 1e-4)
-  return d * d * d
+  if (ideal) return d * d * d
+  // soft display default matches DISK_EMISSION.beamExponent = 2
+  return d * d
 }

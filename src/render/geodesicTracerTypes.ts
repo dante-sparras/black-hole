@@ -37,4 +37,6 @@ export type GeodesicTracer = {
   setIntegratorMode: (mode: 0 | 1) => void
   /** true = D = distanceM · M; false = fixed geometric D */
   setScaleFree: (on: boolean) => void
+  /** true = ideal I ∝ g³; false = soft display I ∝ g² */
+  setIdealBeam: (on: boolean) => void
 }

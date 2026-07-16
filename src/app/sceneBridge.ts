@@ -15,6 +15,7 @@ import { getGeodesicIntegrator, subscribeGeodesic } from '../state/geodesic'
 import { getLook, subscribeLook } from '../state/look'
 import { getParams, subscribe as subscribeParams } from '../state/params'
 import { getScaleFree, subscribeScaleFree } from '../state/scaleFree'
+import { getIdealBeam, subscribeIdealBeam } from '../state/idealBeam'
 import { getScene } from '../state/scene'
 import { getSky, subscribeSky } from '../state/sky'
 
@@ -28,6 +29,7 @@ export type SceneBridge = {
   applyDebug: () => void
   applyGeodesic: () => void
   applyScaleFree: () => void
+  applyIdealBeam: () => void
   /** Wire store listeners; returns unsubscribe. Applies once immediately via store subs. */
   connect: () => () => void
   formatStats: (fps: number, healthLine?: string) => string
@@ -42,6 +44,7 @@ type Dirty = {
   debug: boolean
   geodesic: boolean
   scaleFree: boolean
+  idealBeam: boolean
 }
 
 export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
@@ -54,6 +57,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     debug: false,
     geodesic: false,
     scaleFree: false,
+    idealBeam: false,
   }
   let scheduled = false
 
@@ -97,6 +101,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     tracer.setScaleFree(getScaleFree())
   }
 
+  function applyIdealBeam(): void {
+    tracer.setIdealBeam(getIdealBeam())
+  }
+
   function flush(): void {
     scheduled = false
     if (dirty.physics) {
@@ -127,6 +135,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       dirty.scaleFree = false
       applyScaleFree()
     }
+    if (dirty.idealBeam) {
+      dirty.idealBeam = false
+      applyIdealBeam()
+    }
   }
 
   function mark(key: keyof Dirty): void {
@@ -145,6 +157,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       subscribeSky(() => mark('sky')),
       subscribeGeodesic(() => mark('geodesic')),
       subscribeScaleFree(() => mark('scaleFree')),
+      subscribeIdealBeam(() => mark('idealBeam')),
       subscribeDebug(() => mark('debug')),
     ]
     return () => {
@@ -153,7 +166,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   }
 
   function formatStats(fps: number, healthLine?: string): string {
-    const { params: p, derived: d, disk, camera: c, look, geodesic, scaleFree } =
+    const { params: p, derived: d, disk, camera: c, look, geodesic, scaleFree, idealBeam } =
       getScene()
     const m = p.mass.toFixed(2)
     const a = p.spinStar.toFixed(3)
@@ -165,12 +178,13 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       ? `d=${c.distanceM.toFixed(1)}M (D/M)`
       : `D=${D.toFixed(1)} (fixed)`
     const orbitTag = disk.prograde ? 'pro' : 'ret'
+    const beamTag = idealBeam ? 'g³' : 'g²'
     const mode = realtimeModeTag(p, geodesic)
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
-    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
+    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
     return healthLine ? `${base}\n${healthLine}` : base
   }
 
@@ -182,6 +196,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     applyDebug,
     applyGeodesic,
     applyScaleFree,
+    applyIdealBeam,
     connect,
     formatStats,
     setBloomPipeline: (pipeline) => {

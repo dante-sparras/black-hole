@@ -56,9 +56,17 @@ export function accumulateDiskHit(p) {
     dbgT,
     dbgFlux,
     uDebugMode,
+    uIdealBeam,
   } = p
 
-  const beam = pow(max(freq, float(E.beamFloor)), float(E.beamExponent))
+  // Display: g²; ideal bolometric: g³ (color path stays soft)
+  const beamExp = uIdealBeam
+    .greaterThan(0.5)
+    .select(float(E.beamExponentIdeal), float(E.beamExponent))
+  const beamFl = uIdealBeam
+    .greaterThan(0.5)
+    .select(float(E.beamFloorIdeal), float(E.beamFloor))
+  const beam = pow(max(freq, beamFl), beamExp)
 
   const gap = max(float(1).sub(sqrt(rin.div(max(hitR, rin.mul(1.0001))))), float(0))
   const Ftilde = gap.div(hitR.mul(hitR).mul(hitR).add(1e-12))

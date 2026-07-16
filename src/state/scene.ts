@@ -31,6 +31,11 @@ import {
   setScaleFree,
   subscribeScaleFree,
 } from './scaleFree'
+import {
+  getIdealBeam,
+  setIdealBeam,
+  subscribeIdealBeam,
+} from './idealBeam'
 import { getSky, setSky, subscribeSky, type SkyState } from './sky'
 
 export type SceneSnapshot = {
@@ -44,6 +49,8 @@ export type SceneSnapshot = {
   geodesic: GeodesicIntegrator
   /** Global scale-free camera (D∝M) — not hair, not per-preset */
   scaleFree: boolean
+  /** Global ideal I∝g³ beam — not hair, not per-preset */
+  idealBeam: boolean
 }
 
 export type ScenePatch = {
@@ -56,6 +63,8 @@ export type ScenePatch = {
   geodesic?: GeodesicIntegrator
   /** Optional — presets should leave scaleFree alone */
   scaleFree?: boolean
+  /** Optional — presets should leave idealBeam alone */
+  idealBeam?: boolean
 }
 
 type SceneListener = (scene: SceneSnapshot) => void
@@ -70,6 +79,7 @@ export function getScene(): SceneSnapshot {
     sky: getSky(),
     geodesic: getGeodesicIntegrator(),
     scaleFree: getScaleFree(),
+    idealBeam: getIdealBeam(),
   }
 }
 
@@ -82,6 +92,7 @@ export function setScene(patch: ScenePatch): SceneSnapshot {
     if (patch.sky) setSky(patch.sky)
     if (patch.geodesic) setGeodesicIntegrator(patch.geodesic)
     if (typeof patch.scaleFree === 'boolean') setScaleFree(patch.scaleFree)
+    if (typeof patch.idealBeam === 'boolean') setIdealBeam(patch.idealBeam)
   })
   return getScene()
 }
@@ -95,6 +106,7 @@ export function subscribeScene(listener: SceneListener): () => void {
   const u5 = subscribeSky(() => fire())
   const u6 = subscribeGeodesic(() => fire())
   const u7 = subscribeScaleFree(() => fire())
+  const u8 = subscribeIdealBeam(() => fire())
   fire()
   return () => {
     u1()
@@ -104,5 +116,6 @@ export function subscribeScene(listener: SceneListener): () => void {
     u5()
     u6()
     u7()
+    u8()
   }
 }

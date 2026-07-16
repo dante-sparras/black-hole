@@ -26,6 +26,11 @@ import {
   subscribeGeodesic,
 } from '../state/geodesic'
 import {
+  getIdealBeam,
+  setIdealBeam,
+  subscribeIdealBeam,
+} from '../state/idealBeam'
+import {
   getScaleFree,
   setScaleFree,
   subscribeScaleFree,
@@ -113,6 +118,8 @@ export function mountControls(
 
   const geodesicSelect = qs<HTMLSelectElement>(root, '#g-integr')
   const geodesicVal = qs<HTMLElement>(root, '[data-val="geodesic"]')
+  const idealBeamInput = qs<HTMLInputElement>(root, '#g-ideal-beam')
+  const idealBeamVal = qs<HTMLElement>(root, '[data-val="idealBeam"]')
 
   const presetHint = qs<HTMLElement>(root, '#preset-hint')
   const presetBtns = root.querySelectorAll<HTMLButtonElement>('.preset-btn:not(#s-reset)')
@@ -215,6 +222,11 @@ export function mountControls(
     setText(geodesicVal, mode === 'bl' ? 'BL' : 'RT')
   }
 
+  function syncIdealBeamUi(on: boolean): void {
+    if (idealBeamInput) idealBeamInput.checked = on
+    setText(idealBeamVal, on ? 'g³' : 'g²')
+  }
+
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
     if (!derivedRoot) return
     renderDerivedHud(derivedRoot, p, d, getDisk())
@@ -306,6 +318,10 @@ export function mountControls(
     setGeodesicIntegrator(v === 'bl' ? 'bl' : 'rt')
   })
 
+  bindCheckbox(idealBeamInput, (checked) => {
+    setIdealBeam(checked)
+  })
+
   for (const btn of presetBtns) {
     btn.addEventListener('click', () => {
       const id = btn.dataset.preset
@@ -345,7 +361,12 @@ export function mountControls(
     syncGeodesicUi()
   })
 
+  subscribeIdealBeam((on) => {
+    syncIdealBeamUi(on)
+  })
+
   syncGeodesicUi()
+  syncIdealBeamUi(getIdealBeam())
 
   massInput?.addEventListener('input', () => {
     if (!chargeInput) return

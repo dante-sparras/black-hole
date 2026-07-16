@@ -77,6 +77,8 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uIntegratorMode = uniform(0)
   /** 1 = scale-free D = distanceM · M; 0 = fixed geometric D */
   const uScaleFree = uniform(1)
+  /** 1 = ideal I∝g³; 0 = display I∝g² */
+  const uIdealBeam = uniform(0)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -327,6 +329,7 @@ export function createGeodesicTracer(): GeodesicTracer {
                   dbgT,
                   dbgFlux,
                   uDebugMode,
+                  uIdealBeam,
                 })
               })
             },
@@ -438,6 +441,7 @@ export function createGeodesicTracer(): GeodesicTracer {
               dbgT,
               dbgFlux,
               uDebugMode,
+              uIdealBeam,
             })
           })
         },
@@ -559,6 +563,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setScaleFree: (on) => {
       uScaleFree.value = on ? 1 : 0
+    },
+    setIdealBeam: (on) => {
+      uIdealBeam.value = on ? 1 : 0
     },
   }
 }

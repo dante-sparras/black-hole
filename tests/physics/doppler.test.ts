@@ -123,6 +123,10 @@ describe('bolometricBeaming / blackbodyRgb', () => {
     expect(bolometricBeaming(1.5)).toBeCloseTo(1.5 ** 3, 10)
   })
 
+  test('display mode is softer g²', () => {
+    expect(bolometricBeaming(1.5, false)).toBeCloseTo(1.5 ** 2, 10)
+  })
+
   test('hotter Kelvin is bluer (max-norm Planck)', () => {
     const cold = blackbodyRgb(2500)
     const hot = blackbodyRgb(12000)

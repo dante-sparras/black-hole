@@ -119,10 +119,14 @@ export const DISK_EMISSION = {
   tColorMaxK: 45_000,
   /**
    * Doppler beam I ∝ g^{beamExponent}.
-   * Ideal bolometric invariant is g³; 2 is a softer display choice.
+   * Default = soft display (2). Ideal bolometric GRRT uses 3 (toggle).
    */
   beamExponent: 2.0,
+  /** Ideal invariant I_ν/ν³ → I ∝ g³ for bolometric-like display */
+  beamExponentIdeal: 3.0,
   beamFloor: 0.4,
+  /** Slightly lower floor when ideal g³ so dim side is not clipped as hard */
+  beamFloorIdeal: 0.3,
   /** Soft radial flux for display: fluxVis = fluxRel^{fluxVisPower} */
   fluxVisPower: 0.5,
   fluxVisFloor: 0.2,
@@ -200,6 +204,29 @@ export function observedTemperatureK(tRestK: number, g: number): number {
 export function colorRedshiftFactor(g: number): number {
   const { gColorExponent, gColorFloor } = DISK_EMISSION
   return Math.pow(Math.max(g, gColorFloor), gColorExponent)
+}
+
+/**
+ * Intensity beam power: display g² vs ideal bolometric g³.
+ * Color path stays soft (colorRedshiftFactor) regardless.
+ */
+export function beamIntensityExponent(idealBolometric: boolean): number {
+  return idealBolometric
+    ? DISK_EMISSION.beamExponentIdeal
+    : DISK_EMISSION.beamExponent
+}
+
+export function beamIntensityFloor(idealBolometric: boolean): number {
+  return idealBolometric
+    ? DISK_EMISSION.beamFloorIdeal
+    : DISK_EMISSION.beamFloor
+}
+
+/** I ∝ g^n with mode-dependent n and floor. */
+export function beamIntensity(g: number, idealBolometric = false): number {
+  const floor = beamIntensityFloor(idealBolometric)
+  const n = beamIntensityExponent(idealBolometric)
+  return Math.pow(Math.max(g, floor), n)
 }
 
 /** Clamp T for optical chroma sampling (matches GPU). */
