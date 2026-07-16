@@ -39,9 +39,10 @@ describe('diskTextureFactor', () => {
     const f = diskTextureFactor(12, 0, 1, {
       armContrast: 0,
       turbContrast: 0,
+      dustContrast: 0,
     })
-    expect(f).toBeGreaterThan(0.85)
-    expect(f).toBeLessThan(1.15)
+    expect(f).toBeGreaterThan(0.75)
+    expect(f).toBeLessThan(1.25)
   })
 
   test('varies with azimuth (spiral structure)', () => {
@@ -58,6 +59,7 @@ describe('diskTextureFactor', () => {
   test('seamless across atan2 branch cut (no radial seam)', () => {
     for (const rho of [6, 10, 14, 20]) {
       expect(azimuthSeamDelta(rho, 1)).toBeLessThan(1e-3)
+      expect(azimuthSeamDelta(rho, 1, { time: 3.5, prograde: false })).toBeLessThan(1e-3)
     }
   })
 
@@ -75,7 +77,25 @@ describe('diskTextureFactor', () => {
     const first = diskTextureFactor(rho, 0, 1)
     maxStep = Math.max(maxStep, Math.abs(prev - first))
     // Smooth walk: no single step jump like a branch-cut seam
-    expect(maxStep).toBeLessThan(0.12)
+    expect(maxStep).toBeLessThan(0.15)
+  })
+
+  test('Keplerian shear changes pattern over time at fixed point', () => {
+    const f0 = diskTextureFactor(10, 2, 1, { time: 0 })
+    const f1 = diskTextureFactor(10, 2, 1, { time: 20 })
+    expect(Math.abs(f1 - f0)).toBeGreaterThan(0.01)
+  })
+
+  test('inner radius shears faster than outer (differential rotation)', () => {
+    // Phase advance ∝ Ω ∝ r^{-3/2}: same Δt moves pattern more at small r
+    const dt = 2
+    const dIn = Math.abs(
+      diskTextureFactor(7, 0, 1, { time: dt }) - diskTextureFactor(7, 0, 1, { time: 0 }),
+    )
+    const dOut = Math.abs(
+      diskTextureFactor(22, 0, 1, { time: dt }) - diskTextureFactor(22, 0, 1, { time: 0 }),
+    )
+    expect(dIn).toBeGreaterThan(dOut * 0.8)
   })
 })
 

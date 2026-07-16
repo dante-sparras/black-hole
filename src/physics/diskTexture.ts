@@ -1,6 +1,7 @@
 /**
- * Accretion-disk surface texture (not black-hole hair).
- * Log spirals + multi-scale turbulence for surface brightness modulation.
+ * Accretion-disk surface structure (not black-hole hair).
+ * Flattened gas/plasma/dust look: log spirals + multi-scale turbulence +
+ * radial dust lanes. Optional Keplerian shear phase for rotation.
  *
  * Continuity: never sample noise/ripples with raw φ (atan2 branch cut ±π
  * creates a visible radial seam). Use (cos φ, sin φ) or Cartesian (x,z).
@@ -72,12 +73,13 @@ export function turbulenceSeamless(
   cx: number,
   sz: number,
   lnR: number,
+  octaves = 4,
 ): number {
   let amp = 0.5
   let sum = 0
   let norm = 0
   let s = 1
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < octaves; i++) {
     sum += amp * valueNoise3(cx, sz, lnR * 0.35, s)
     norm += amp
     amp *= 0.5
@@ -101,12 +103,42 @@ export function turbulence2(x: number, y: number): number {
   return sum / Math.max(norm, 1e-8)
 }
 
+/** Shared defaults — GPU should stay visually close. */
+export const DISK_TEXTURE = {
+  arms: 2,
+  /** Log-spiral pitch (tighter = more wound) */
+  pitch: 0.68,
+  /** Arm vs inter-arm contrast (gas filaments) */
+  armContrast: 0.78,
+  /** Multi-scale plasma / eddy contrast */
+  turbContrast: 0.62,
+  /** Outer dusty lanes */
+  dustContrast: 0.42,
+  phase0: 0.35,
+  /** Visual Keplerian rate so structure shears without hyper-spin */
+  shearRate: 0.45,
+  texMin: 0.22,
+  texMax: 2.15,
+  /** Mild T jitter from clumping */
+  tempJitterAmp: 0.16,
+  /** H/R scale-height used for path-length thickness (edge-on look) */
+  scaleHeight: 0.065,
+} as const
+
 export type DiskTextureOptions = {
   arms?: number
   pitch?: number
   armContrast?: number
   turbContrast?: number
+  dustContrast?: number
   phase?: number
+  /** Seconds; differential rotation phase Ω(r)·t */
+  time?: number
+  /** true = co-rotating pattern sense */
+  prograde?: boolean
+  mass?: number
+  /** Shear animation rate multiplier */
+  shearRate?: number
 }
 
 /**
@@ -114,6 +146,7 @@ export type DiskTextureOptions = {
  *
  * Spiral uses cos(m·φ − …) with integer m → continuous at φ=±π.
  * Turbulence samples (cos φ, sin φ, ln ρ) — no raw φ coordinate.
+ * Optional time shears pattern with Keplerian Ω ∝ r^{-3/2}.
  */
 export function diskTextureFactor(
   hx: number,
@@ -121,11 +154,16 @@ export function diskTextureFactor(
   mass: number,
   opts: DiskTextureOptions = {},
 ): number {
-  const arms = Math.max(1, Math.round(opts.arms ?? 2))
-  const pitch = opts.pitch ?? 0.55
-  const armContrast = opts.armContrast ?? 0.55
-  const turbContrast = opts.turbContrast ?? 0.4
-  const phase = opts.phase ?? 0.3
+  const T = DISK_TEXTURE
+  const arms = Math.max(1, Math.round(opts.arms ?? T.arms))
+  const pitch = opts.pitch ?? T.pitch
+  const armContrast = opts.armContrast ?? T.armContrast
+  const turbContrast = opts.turbContrast ?? T.turbContrast
+  const dustContrast = opts.dustContrast ?? T.dustContrast
+  const phase0 = opts.phase ?? T.phase0
+  const time = opts.time ?? 0
+  const prograde = opts.prograde ?? true
+  const shearRate = opts.shearRate ?? T.shearRate
 
   const M = Math.max(mass, 1e-8)
   const rho = Math.hypot(hx, hz)
@@ -136,8 +174,12 @@ export function diskTextureFactor(
   const sphi = hz * invR
   const lnR = Math.log(Math.max(rho / M, 1e-4))
 
-  // cos(m·φ) = T_m(cphi) via complex power: (c+is)^m
-  // For m=2: cos(2φ)=c²−s², sin(2φ)=2cs
+  // Keplerian shear: faster inside → winding (visual rotation)
+  const OmegaK = Math.sqrt(M) / Math.pow(Math.max(rho, 1e-6), 1.5)
+  const sense = prograde ? 1 : -1
+  const shear = sense * shearRate * OmegaK * time
+
+  // cos(m·φ) via (c+is)^m
   let cm = cphi
   let sm = sphi
   for (let k = 1; k < arms; k++) {
@@ -146,51 +188,84 @@ export function diskTextureFactor(
     cm = nc
     sm = ns
   }
-  // Spiral: Re[ e^{i(mφ − m·pitch·lnR + phase)} ] = cm·cos(α) + sm·sin(α)
-  // where α = −m·pitch·lnR + phase
-  const alpha = -arms * pitch * lnR + phase
+  // α = −m·pitch·lnR + phase0 + m·shear  (shear winds the spiral)
+  const alpha = -arms * pitch * lnR + phase0 + arms * shear
   const ca = Math.cos(alpha)
   const sa = Math.sin(alpha)
   const armWave = 0.5 + 0.5 * (cm * ca + sm * sa)
-  const armsBright = Math.pow(Math.max(armWave, 1e-4), 1.35)
+  const armsBright = Math.pow(Math.max(armWave, 1e-4), 1.45)
 
-  // Seamless turbulence in (cosφ, sinφ, lnR)
-  const turb = turbulenceSeamless(cphi * 1.4, sphi * 1.4, lnR)
+  // Multi-scale seamless turbulence
+  const turb = turbulenceSeamless(cphi * 1.45, sphi * 1.45, lnR + 0.15 * shear, 4)
+  // Clumpy mid-scale (plasma)
+  const clump = turbulenceSeamless(cphi * 2.8, sphi * 2.8, lnR * 1.1, 2)
 
-  // Radial-only ripple (no φ) — fully seamless
+  // Radial dust lanes / rings (φ-independent → seamless)
+  const dustWave = 0.5 + 0.5 * Math.sin(lnR * 5.1 + 0.4)
+  const dustOuter = Math.min(1, Math.max(0, (lnR - 0.8) / 2.2)) // stronger outward
+  const dust = 1 - dustContrast * dustOuter * (0.55 + 0.45 * dustWave)
+
+  // Fine radial ripple (settling rings)
   const ripple = 0.5 + 0.5 * Math.sin(lnR * 4.2)
 
-  let f = 1
-  f *= 1 - armContrast + armContrast * (0.35 + 0.9 * armsBright)
-  f *= 1 - turbContrast + turbContrast * (0.45 + 0.9 * turb)
-  f *= 0.92 + 0.16 * ripple
+  // Soft radial edges (match GPU spirit) — mild so mid-disk stays free
+  const softIn = Math.min(1, Math.max(0, (rho / M - 5.5) / 2.5))
+  const softOut = Math.min(1, Math.max(0, (3.4 - lnR) / 1.6))
+  const edgeIn = softIn * softIn * (3 - 2 * softIn)
+  const edgeOut = softOut * softOut * (3 - 2 * softOut)
 
-  return Math.min(1.85, Math.max(0.28, f))
+  let f = 1
+  f *= 1 - armContrast + armContrast * (0.22 + 1.05 * armsBright)
+  f *= 1 - turbContrast + turbContrast * (0.28 + 0.75 * turb + 0.35 * clump)
+  f *= dust
+  f *= 0.88 + 0.24 * ripple
+  // Soft edge envelope (never floors the mid-disk)
+  f *= 0.82 + 0.18 * edgeIn * edgeOut
+
+  return Math.min(T.texMax, Math.max(T.texMin, f))
 }
 
+/**
+ * Mild rest-frame T multiplier from local clumping (plasma hotspots / cooler dust).
+ */
 export function diskTemperatureJitter(
   hx: number,
   hz: number,
   mass: number,
-  turbContrast = 0.4,
+  opts: { turbContrast?: number; time?: number; prograde?: boolean } = {},
 ): number {
+  const T = DISK_TEXTURE
   const rho = Math.hypot(hx, hz)
   if (rho < 1e-8) return 1
   const M = Math.max(mass, 1e-8)
   const invR = 1 / rho
   const lnR = Math.log(Math.max(rho / M, 1e-4))
-  const turb = turbulenceSeamless(hx * invR * 1.6, hz * invR * 1.6, lnR)
-  const j = 1 - 0.5 * turbContrast + turbContrast * turb
-  return Math.min(1.2, Math.max(0.85, j))
+  const sense = (opts.prograde ?? true) ? 1 : -1
+  const OmegaK = Math.sqrt(M) / Math.pow(Math.max(rho, 1e-6), 1.5)
+  const shear = sense * T.shearRate * OmegaK * (opts.time ?? 0)
+  const turb = turbulenceSeamless(
+    hx * invR * 1.6,
+    hz * invR * 1.6,
+    lnR + 0.1 * shear,
+    3,
+  )
+  const amp = opts.turbContrast ?? T.tempJitterAmp
+  // turb ~ [0,1] → jitter around 1
+  const j = 1 + amp * (2 * turb - 1)
+  return Math.min(1.22, Math.max(0.82, j))
 }
 
 /**
  * Max |Δf| across the negative-x axis (atan2 branch), at fixed ρ.
  * Samples just above and below the cut at the same radius.
  */
-export function azimuthSeamDelta(rho: number, mass: number): number {
+export function azimuthSeamDelta(
+  rho: number,
+  mass: number,
+  opts: DiskTextureOptions = {},
+): number {
   const eps = 1e-6
-  const a = diskTextureFactor(-rho, eps, mass)
-  const b = diskTextureFactor(-rho, -eps, mass)
+  const a = diskTextureFactor(-rho, eps, mass, opts)
+  const b = diskTextureFactor(-rho, -eps, mass, opts)
   return Math.abs(a - b)
 }

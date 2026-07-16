@@ -1,9 +1,16 @@
 // @ts-nocheck — TSL node graphs; keep helpers top-level (never nest inside Fn).
 /**
- * Shared disk-hit emission: NT flux, blackbody chroma, seamless texture, intensity.
+ * Shared disk-hit emission: NT flux, blackbody chroma, structured texture, intensity.
  * Called from both RT (y=0 plane) and BL (θ=π/2) hit sites with the same recipe.
+ *
+ * Realism targets: rotating flattened gas/plasma/dust —
+ *   - Keplerian-sheared log spirals (integer m, seamless)
+ *   - Multi-scale turbulence (plasma clumps)
+ *   - Outer dust lanes + soft radial edges
+ *   - Path-length factor for finite scale-height look when edge-on
  */
 import {
+  abs,
   cos,
   exp,
   float,
@@ -30,15 +37,14 @@ import {
   T_PEAK_MDOT_REF,
   T_PEAK_REF_K,
 } from '../../physics/disk'
+import { DISK_TEXTURE } from '../../physics/diskTexture'
 
 /**
  * Accumulate one disk hit into col/transm and update debug channels.
- * @param p.hitR geometric radius of hit (ρ or r)
- * @param p.freq orbiting redshift g
- * @param p.cphi / p.sphi cos/sin φ for seamless texture
  */
 export function accumulateDiskHit(p) {
   const E = DISK_EMISSION
+  const TX = DISK_TEXTURE
   const {
     hitR,
     freq,
@@ -48,6 +54,7 @@ export function accumulateDiskHit(p) {
     aStar,
     mdot,
     rin,
+    rout,
     uRIscoM,
     hits,
     col,
@@ -57,9 +64,12 @@ export function accumulateDiskHit(p) {
     dbgFlux,
     uDebugMode,
     uIdealBeam,
+    uTime,
+    uPrograde,
+    pathAbsY,
   } = p
 
-  // Display: g²; ideal bolometric: g³ (color path stays soft)
+  // Intensity beam: display g² vs ideal g³
   const beamExp = uIdealBeam
     .greaterThan(0.5)
     .select(float(E.beamExponentIdeal), float(E.beamExponent))
@@ -68,6 +78,7 @@ export function accumulateDiskHit(p) {
     .select(float(E.beamFloorIdeal), float(E.beamFloor))
   const beam = pow(max(freq, beamFl), beamExp)
 
+  // NT flux shape
   const gap = max(float(1).sub(sqrt(rin.div(max(hitR, rin.mul(1.0001))))), float(0))
   const Ftilde = gap.div(hitR.mul(hitR).mul(hitR).add(1e-12))
   const rPeak = rin.mul(E.ntPeakOverRin)
@@ -75,6 +86,30 @@ export function accumulateDiskHit(p) {
   const FtildeMax = gapPeak.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
   const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
   const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
+
+  // Soft radial edges: plasma fades at ISCO; dust fades at outer rim
+  const softIn = min(
+    float(1),
+    max(float(0), hitR.sub(rin).div(max(rin.mul(0.35), M.mul(0.4)))),
+  )
+  const softOut = min(
+    float(1),
+    max(float(0), rout.sub(hitR).div(max(rout.sub(rin).mul(0.22), M.mul(0.8)))),
+  )
+  const edgeIn = softIn.mul(softIn).mul(float(3).sub(softIn.mul(2)))
+  const edgeOut = softOut.mul(softOut).mul(float(3).sub(softOut.mul(2)))
+  // Mild: mid-disk ≈ 1, edges dip without vanishing
+  const edgeFac = float(0.72).add(float(0.28).mul(edgeIn.mul(edgeOut)))
+
+  // Finite scale-height look: longer path when ray is edge-on (small |v_y|)
+  // H/R ~ 0.05–0.08 thin disk; path ∝ H / |n·ẑ|
+  const nY = max(pathAbsY, float(0.06))
+  const pathFac = min(float(2.8), float(TX.scaleHeight).div(nY).add(0.55))
+
+  // Radial zones: hot plasma (inner) → gas arms (mid) → dust (outer)
+  const xM = hitR.div(max(M, float(1e-6)))
+  const plasmaZone = exp(max(xM.sub(float(12)), float(0)).mul(-0.35)) // strong near ISCO
+  const dustZone = min(float(1), max(float(0), xM.sub(float(14)).div(18)))
 
   const rIscoM = max(uRIscoM, float(1.05))
   const iscoHot = pow(float(R_ISCO_SCHW_OVER_M).div(rIscoM), float(E.iscoHotPower))
@@ -85,8 +120,132 @@ export function accumulateDiskHit(p) {
     .mul(spinFac)
   const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
-  const TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), tRestK.mul(gColor)))
+  let TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), tRestK.mul(gColor)))
 
+  // --- Structured surface: spirals + plasma + dust ---
+  const lnR = log(max(hitR.div(M), float(1e-4)))
+  const OmegaK = sqrt(max(M, float(1e-8))).div(pow(max(hitR, float(1e-5)), float(1.5)))
+  const sense = uPrograde.greaterThan(0.5).select(float(1), float(-1))
+  const shear = sense.mul(float(TX.shearRate)).mul(OmegaK).mul(uTime)
+
+  // m=2 log spiral from (c,s) — seamless at ±π
+  const c2a = cphi.mul(cphi).sub(sphi.mul(sphi))
+  const s2a = cphi.mul(sphi).mul(2)
+  const arms = float(TX.arms)
+  const alpha = arms
+    .mul(float(-TX.pitch))
+    .mul(lnR)
+    .add(float(TX.phase0))
+    .add(arms.mul(shear))
+  const armWave = float(0.5).add(
+    float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))),
+  )
+  // Filamentary arms (gas)
+  const armsBright = pow(max(armWave, float(1e-4)), float(1.55))
+  const armFac = float(1)
+    .sub(float(TX.armContrast))
+    .add(float(TX.armContrast).mul(float(0.22).add(armsBright.mul(1.05))))
+
+  // Turbulence octave 1 (large gas eddies)
+  const turbDomainZ = lnR.add(shear.mul(0.18))
+  const nUVx = cphi.mul(1.55).add(turbDomainZ.mul(0.1))
+  const nUVy = sphi.mul(1.55).add(turbDomainZ.mul(0.09))
+  const ix1 = floor(nUVx)
+  const iy1 = floor(nUVy)
+  const fx1 = nUVx.sub(ix1)
+  const fy1 = nUVy.sub(iy1)
+  const ux1 = fx1.mul(fx1).mul(float(3).sub(fx1.mul(2)))
+  const uy1 = fy1.mul(fy1).mul(float(3).sub(fy1.mul(2)))
+  const n00 = fract(sin(ix1.mul(127.1).add(iy1.mul(311.7))).mul(43758.5453))
+  const n10 = fract(sin(ix1.add(1).mul(127.1).add(iy1.mul(311.7))).mul(43758.5453))
+  const n01 = fract(sin(ix1.mul(127.1).add(iy1.add(1).mul(311.7))).mul(43758.5453))
+  const n11 = fract(sin(ix1.add(1).mul(127.1).add(iy1.add(1).mul(311.7))).mul(43758.5453))
+  const turb1 = n00
+    .mul(float(1).sub(ux1))
+    .add(n10.mul(ux1))
+    .mul(float(1).sub(uy1))
+    .add(n01.mul(float(1).sub(ux1)).add(n11.mul(ux1)).mul(uy1))
+
+  // Octave 2 (plasma clumps)
+  const nUVx2 = nUVx.mul(2.15)
+  const nUVy2 = nUVy.mul(2.15)
+  const ix2 = floor(nUVx2)
+  const iy2 = floor(nUVy2)
+  const fx2 = nUVx2.sub(ix2)
+  const fy2 = nUVy2.sub(iy2)
+  const ux2 = fx2.mul(fx2).mul(float(3).sub(fx2.mul(2)))
+  const uy2 = fy2.mul(fy2).mul(float(3).sub(fy2.mul(2)))
+  const m00 = fract(sin(ix2.mul(127.1).add(iy2.mul(311.7)).add(19.1)).mul(43758.5453))
+  const m10 = fract(sin(ix2.add(1).mul(127.1).add(iy2.mul(311.7)).add(19.1)).mul(43758.5453))
+  const m01 = fract(sin(ix2.mul(127.1).add(iy2.add(1).mul(311.7)).add(19.1)).mul(43758.5453))
+  const m11 = fract(
+    sin(ix2.add(1).mul(127.1).add(iy2.add(1).mul(311.7)).add(19.1)).mul(43758.5453),
+  )
+  const turb2 = m00
+    .mul(float(1).sub(ux2))
+    .add(m10.mul(ux2))
+    .mul(float(1).sub(uy2))
+    .add(m01.mul(float(1).sub(ux2)).add(m11.mul(ux2)).mul(uy2))
+
+  // Octave 3 (fine dust graininess)
+  const nUVx3 = nUVx.mul(4.4)
+  const nUVy3 = nUVy.mul(4.4)
+  const ix3 = floor(nUVx3)
+  const iy3 = floor(nUVy3)
+  const fx3 = nUVx3.sub(ix3)
+  const fy3 = nUVy3.sub(iy3)
+  const ux3 = fx3.mul(fx3).mul(float(3).sub(fx3.mul(2)))
+  const uy3 = fy3.mul(fy3).mul(float(3).sub(fy3.mul(2)))
+  const p00 = fract(sin(ix3.mul(91.7).add(iy3.mul(173.3)).add(41.2)).mul(43758.5453))
+  const p10 = fract(sin(ix3.add(1).mul(91.7).add(iy3.mul(173.3)).add(41.2)).mul(43758.5453))
+  const p01 = fract(sin(ix3.mul(91.7).add(iy3.add(1).mul(173.3)).add(41.2)).mul(43758.5453))
+  const p11 = fract(
+    sin(ix3.add(1).mul(91.7).add(iy3.add(1).mul(173.3)).add(41.2)).mul(43758.5453),
+  )
+  const turb3 = p00
+    .mul(float(1).sub(ux3))
+    .add(p10.mul(ux3))
+    .mul(float(1).sub(uy3))
+    .add(p01.mul(float(1).sub(ux3)).add(p11.mul(ux3)).mul(uy3))
+
+  const turb = turb1.mul(0.5).add(turb2.mul(0.32)).add(turb3.mul(0.18))
+  // Hot plasma clumping stronger inward
+  const plasmaClump = pow(max(turb2, float(1e-4)), float(1.8)).mul(plasmaZone)
+
+  // Outer dust lanes (radial-only → seamless)
+  const dustWave = float(0.5).add(float(0.5).mul(sin(lnR.mul(5.4).add(0.55))))
+  const dustOuter = min(float(1), max(float(0), lnR.sub(0.65).div(2.0)))
+  const dust = float(1).sub(
+    float(TX.dustContrast)
+      .mul(dustOuter)
+      .mul(float(0.5).add(dustWave.mul(0.5)))
+      .mul(float(0.65).add(dustZone.mul(0.55))),
+  )
+  // Settling rings
+  const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.6).add(shear.mul(0.4)))))
+
+  const turbFac = float(1)
+    .sub(float(TX.turbContrast))
+    .add(
+      float(TX.turbContrast).mul(
+        float(0.28).add(turb.mul(0.85)).add(plasmaClump.mul(0.55)),
+      ),
+    )
+  let texFac = armFac
+    .mul(turbFac)
+    .mul(dust)
+    .mul(float(0.88).add(ripple.mul(0.24)))
+    .mul(edgeFac)
+  texFac = max(float(TX.texMin), min(float(TX.texMax), texFac))
+
+  // Plasma hotspots / cooler dust: T jitter (still blackbody)
+  const tJitter = float(1)
+    .add(float(TX.tempJitterAmp).mul(turb.mul(2).sub(1)))
+    .add(plasmaZone.mul(0.08))
+    .sub(dustZone.mul(0.06))
+  TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), TK.mul(tJitter)))
+
+  // Max-norm Planck chroma
   const planckC2 = float(PLANCK_C2_NM_K)
   const lamR = float(LAMBDA_R_NM)
   const lamG = float(LAMBDA_G_NM)
@@ -100,43 +259,21 @@ export function accumulateDiskHit(p) {
   const bMax = max(br, max(bg, bb))
   const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-  const lnR = log(max(hitR.div(M), float(1e-4)))
-  const c2a = cphi.mul(cphi).sub(sphi.mul(sphi))
-  const s2a = cphi.mul(sphi).mul(2)
-  const alpha = float(-1.1).mul(lnR).add(0.3)
-  const armWave = float(0.5).add(float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))))
-  const armFac = float(0.8).add(pow(max(armWave, float(1e-4)), float(1.1)).mul(0.32))
-  const nUVx = cphi.mul(1.3).add(lnR.mul(0.12))
-  const nUVy = sphi.mul(1.3).add(lnR.mul(0.1))
-  const ix = floor(nUVx)
-  const iy = floor(nUVy)
-  const fx = nUVx.sub(ix)
-  const fy = nUVy.sub(iy)
-  const ux = fx.mul(fx).mul(float(3).sub(fx.mul(2)))
-  const uy = fy.mul(fy).mul(float(3).sub(fy.mul(2)))
-  const n00 = fract(sin(ix.mul(127.1).add(iy.mul(311.7))).mul(43758.5453))
-  const n10 = fract(sin(ix.add(1).mul(127.1).add(iy.mul(311.7))).mul(43758.5453))
-  const n01 = fract(sin(ix.mul(127.1).add(iy.add(1).mul(311.7))).mul(43758.5453))
-  const n11 = fract(sin(ix.add(1).mul(127.1).add(iy.add(1).mul(311.7))).mul(43758.5453))
-  const turb = n00
-    .mul(float(1).sub(ux))
-    .add(n10.mul(ux))
-    .mul(float(1).sub(uy))
-    .add(n01.mul(float(1).sub(ux)).add(n11.mul(ux)).mul(uy))
-  const texFac = max(float(0.75), min(float(1.25), armFac.mul(float(0.9).add(turb.mul(0.2)))))
-
   const bounce = float(1).add(max(hits.sub(1), float(0)).mul(0.55))
   const mdotBright = float(E.mdotBrightBase).add(
     pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
       E.mdotBrightScale,
     ),
   )
-  const iFlux = max(fluxVis, float(E.fluxVisFloor)).mul(mdotBright).mul(E.intensityGain)
+  const iFlux = max(fluxVis, float(E.fluxVisFloor))
+    .mul(mdotBright)
+    .mul(E.intensityGain)
+    .mul(pathFac)
   const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce)
 
   dbgG.assign(freq)
   dbgT.assign(TK.div(float(12000)))
-  dbgFlux.assign(fluxVis)
+  dbgFlux.assign(fluxVis.mul(texFac))
 
   If(uDebugMode.notEqual(float(8)), () => {
     col.addAssign(emit.mul(transm))

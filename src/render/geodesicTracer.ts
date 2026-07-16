@@ -79,6 +79,8 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uScaleFree = uniform(1)
   /** 1 = ideal I∝g³; 0 = display I∝g² */
   const uIdealBeam = uniform(1)
+  /** Animation clock (s) — Keplerian disk shear */
+  const uTime = uniform(0)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -321,6 +323,7 @@ export function createGeodesicTracer(): GeodesicTracer {
                   aStar,
                   mdot,
                   rin,
+                  rout,
                   uRIscoM,
                   hits,
                   col,
@@ -330,6 +333,10 @@ export function createGeodesicTracer(): GeodesicTracer {
                   dbgFlux,
                   uDebugMode,
                   uIdealBeam,
+                  uTime,
+                  uPrograde,
+                  // BL equator: moderate path (no easy |v_y|)
+                  pathAbsY: float(0.35),
                 })
               })
             },
@@ -424,6 +431,7 @@ export function createGeodesicTracer(): GeodesicTracer {
               max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)),
             )
             const invRho = float(1).div(max(rhoSafe, float(1e-5)))
+            const nRay = vel.normalize()
             accumulateDiskHit({
               hitR: rho,
               freq,
@@ -433,6 +441,7 @@ export function createGeodesicTracer(): GeodesicTracer {
               aStar,
               mdot,
               rin,
+              rout,
               uRIscoM,
               hits,
               col,
@@ -442,6 +451,9 @@ export function createGeodesicTracer(): GeodesicTracer {
               dbgFlux,
               uDebugMode,
               uIdealBeam,
+              uTime,
+              uPrograde,
+              pathAbsY: abs(nRay.y),
             })
           })
         },
@@ -566,6 +578,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setIdealBeam: (on) => {
       uIdealBeam.value = on ? 1 : 0
+    },
+    setTime: (seconds) => {
+      uTime.value = seconds
     },
   }
 }

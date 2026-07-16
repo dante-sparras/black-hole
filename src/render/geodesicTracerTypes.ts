@@ -39,4 +39,6 @@ export type GeodesicTracer = {
   setScaleFree: (on: boolean) => void
   /** true = ideal I ∝ g³; false = soft display I ∝ g² */
   setIdealBeam: (on: boolean) => void
+  /** Animation time (seconds) for Keplerian disk shear */
+  setTime: (seconds: number) => void
 }

@@ -72,13 +72,14 @@ renderer.domElement.addEventListener('click', (ev) => {
 let frames = 0
 let fpsAccum = 0
 let last = performance.now()
+const t0 = performance.now()
 
 async function boot(): Promise<void> {
   try {
     await renderer.init()
   } catch (err) {
     showError(
-      `WebGPU failed to initialize.\n\n${err instanceof Error ? err.message : String(err)}\n\nUse Chrome/Edge with WebGPU enabled.`,
+      `WebGPU failed to initialize.\\n\\n${err instanceof Error ? err.message : String(err)}\\n\\nUse Chrome/Edge with WebGPU enabled.`,
     )
     return
   }
@@ -92,6 +93,9 @@ async function boot(): Promise<void> {
     const now = performance.now()
     const dt = Math.min((now - last) / 1000, 1 / 20)
     last = now
+
+    // Keplerian disk shear / plasma structure animation
+    tracer.setTime((now - t0) / 1000)
 
     if (bloomPipeline) {
       bloomPipeline.render()
