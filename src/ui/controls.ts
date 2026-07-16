@@ -4,8 +4,10 @@ import {
   mdotTemperatureScale,
   sliderFromMdot as sliderFromMdotRange,
 } from '../physics/disk'
+import { convertDistanceOnScaleFreeToggle } from '../physics/observer'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import type { DiskParams } from '../physics/diskParams'
+import { withBatch } from '../state/batch'
 import {
   degToRad,
   getCamera,
@@ -23,6 +25,11 @@ import {
   setGeodesicIntegrator,
   subscribeGeodesic,
 } from '../state/geodesic'
+import {
+  getScaleFree,
+  setScaleFree,
+  subscribeScaleFree,
+} from '../state/scaleFree'
 import {
   getSky,
   resetSky,
@@ -69,6 +76,10 @@ export function mountControls(
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
 
   const distInput = qs<HTMLInputElement>(root, '#c-dist')
+  const distName = qs<HTMLElement>(root, '#c-dist-name')
+  const scaleFreeInput = qs<HTMLInputElement>(root, '#c-scale-free')
+  const scaleFreeVal = qs<HTMLElement>(root, '[data-val="scaleFree"]')
+  const scaleHint = qs<HTMLElement>(root, '#c-scale-hint')
   const incInput = qs<HTMLInputElement>(root, '#c-inc')
   const azInput = qs<HTMLInputElement>(root, '#c-az')
   const fovInput = qs<HTMLInputElement>(root, '#c-fov')
@@ -147,10 +158,27 @@ export function mountControls(
     setRangeValue(incInput, radToDeg(c.inclination))
     setRangeValue(azInput, radToDeg(c.azimuth))
     setRangeValue(fovInput, c.fov)
-    setText(distVal, `${fmt(c.distanceM, 1)}M`)
+    const scaleFree = getScaleFree()
+    setText(
+      distVal,
+      scaleFree ? `${fmt(c.distanceM, 1)} M` : fmt(c.distanceM, 1),
+    )
     setText(incVal, fmt(radToDeg(c.inclination), 1))
     setText(azVal, fmt(radToDeg(c.azimuth), 1))
     setText(fovVal, fmt(c.fov, 2))
+  }
+
+  function syncScaleFreeUi(on: boolean): void {
+    if (scaleFreeInput) scaleFreeInput.checked = on
+    setText(scaleFreeVal, on ? 'on' : 'off')
+    if (distName) distName.textContent = on ? 'Distance / M' : 'Distance'
+    if (scaleHint) {
+      scaleHint.textContent = on
+        ? 'D = d·M · Mass cancels angular size · zoom with Distance / FOV'
+        : 'D fixed (geom units) · Mass grows hole & lensing · drag canvas to orbit'
+    }
+    // Refresh distance readout units
+    syncCameraInputs(getCamera())
   }
 
   function syncLookInputs(l: LookState): void {
@@ -226,6 +254,17 @@ export function mountControls(
     setCamera({ fov: v })
   })
 
+  bindCheckbox(scaleFreeInput, (checked) => {
+    const M = getParams().mass
+    const d = getCamera().distanceM
+    withBatch(() => {
+      setCamera({
+        distanceM: convertDistanceOnScaleFreeToggle(d, M, checked),
+      })
+      setScaleFree(checked)
+    })
+  })
+
   bindCheckbox(bloomOnInput, (checked) => {
     onUserTweaked()
     setLook({ bloomEnabled: checked })
@@ -282,6 +321,10 @@ export function mountControls(
     syncCameraInputs(c)
   })
 
+  subscribeScaleFree((on) => {
+    syncScaleFreeUi(on)
+  })
+
   subscribeLook((l) => {
     syncLookInputs(l)
   })
@@ -304,6 +347,7 @@ export function mountControls(
 
   syncPhysicsInputs(getParams())
   syncDiskInputs(getDisk())
+  syncScaleFreeUi(getScaleFree())
   syncCameraInputs(getCamera())
   syncLookInputs(getLook())
   syncSkyInputs(getSky())

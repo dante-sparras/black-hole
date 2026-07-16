@@ -55,7 +55,12 @@ export function buildControlsHtml(): string {
 
     <div class="ctrl-section">Camera</div>
     <label class="ctrl">
-      <span class="ctrl-name">Distance</span>
+      <span class="ctrl-name">Scale-free</span>
+      <input type="checkbox" id="c-scale-free" checked />
+      <span class="ctrl-val" data-val="scaleFree"></span>
+    </label>
+    <label class="ctrl">
+      <span class="ctrl-name" id="c-dist-name">Distance / M</span>
       <input type="range" id="c-dist" min="${distLim.min}" max="${distLim.max}" step="0.5" />
       <span class="ctrl-val" data-val="dist"></span>
     </label>
@@ -74,7 +79,7 @@ export function buildControlsHtml(): string {
       <input type="range" id="c-fov" min="${fovLim.min}" max="${fovLim.max}" step="0.01" />
       <span class="ctrl-val" data-val="fov"></span>
     </label>
-    <p class="ctrl-hint">Drag canvas to orbit · scroll/pinch to zoom</p>
+    <p class="ctrl-hint" id="c-scale-hint">D = d·M · Mass cancels angular size · zoom with Distance / FOV</p>
 
     <div class="ctrl-section">Geodesics (global)</div>
     <label class="ctrl">

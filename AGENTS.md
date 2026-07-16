@@ -32,7 +32,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 
 | Param | Code | Range (UI) | Notes |
 | ----- | ---- | ---------- | ----- |
-| Mass \(M\) | `mass` | \(0.1\)–\(10\) (default \(1\)) | Primary scale |
+| Mass \(M\) | `mass` | \(0.1\)–\(10\) (default \(1\)) | Scale; angular image invariant if scale-free ON |
 | Dimensionless spin \(a_\star = J/M^2\) | `spinStar` | \(0\)–\(0.998\) | Kerr length \(a = a_\star M\) — **affects rays** |
 | Charge \(Q\) | `charge` | default 0 | Affects rays (RN/KN) |
 
@@ -58,7 +58,12 @@ src/ui/          # controls, hud, format, orbit
 src/main.ts      # WebGPU boot only
 ```
 
-**Camera:** distance in units of \(M\); spin ‖ +Y; disk in XZ (\(y=0\)). Defaults: `OBSERVER_DEFAULTS`.
+**Camera:** spin ‖ +Y; disk in XZ (\(y=0\)). Defaults: `OBSERVER_DEFAULTS`.
+
+**Scale-free distance (global, not hair / not presets):**
+- **ON (default):** \(D = d\cdot M\) with slider = \(d\) (units of \(M\)) — mass **does not** change angular lensing (scale-invariant).
+- **OFF:** slider = absolute geometric \(D\) — raising mass **grows** the hole and strengthens angular lensing.
+- Resolve with `resolveCameraDistance(mass, distanceM, scaleFree)` (GPU + CPU + probe). Toggle converts \(d \leftrightarrow D\) so the image does not jump.
 
 **Emission:** `DISK_EMISSION` in `physics/disk.ts` — shared with GPU tracer (optical display curves, not SI bolometric).
 

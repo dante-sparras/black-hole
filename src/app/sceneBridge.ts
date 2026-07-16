@@ -4,6 +4,7 @@
  * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
+import { resolveCameraDistance } from '../physics/observer'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
 import type { GeodesicTracer } from '../render/geodesicTracerTypes'
@@ -12,6 +13,7 @@ import { getDisk, subscribeDisk } from '../state/disk'
 import { getGeodesicIntegrator, subscribeGeodesic } from '../state/geodesic'
 import { getLook, subscribeLook } from '../state/look'
 import { getDerived, getParams, subscribe as subscribeParams } from '../state/params'
+import { getScaleFree, subscribeScaleFree } from '../state/scaleFree'
 import { getScene } from '../state/scene'
 import { getSky, subscribeSky } from '../state/sky'
 
@@ -24,6 +26,7 @@ export type SceneBridge = {
   applySky: () => void
   applyDebug: () => void
   applyGeodesic: () => void
+  applyScaleFree: () => void
   /** Wire store listeners; returns unsubscribe. Applies once immediately via store subs. */
   connect: () => () => void
   formatStats: (fps: number, healthLine?: string) => string
@@ -37,6 +40,7 @@ type Dirty = {
   sky: boolean
   debug: boolean
   geodesic: boolean
+  scaleFree: boolean
 }
 
 export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
@@ -48,6 +52,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     sky: false,
     debug: false,
     geodesic: false,
+    scaleFree: false,
   }
   let scheduled = false
 
@@ -86,6 +91,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     tracer.setIntegratorMode(mode === 'bl' ? 1 : 0)
   }
 
+  function applyScaleFree(): void {
+    tracer.setScaleFree(getScaleFree())
+  }
+
   function flush(): void {
     scheduled = false
     if (dirty.physics) {
@@ -112,6 +121,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       dirty.geodesic = false
       applyGeodesic()
     }
+    if (dirty.scaleFree) {
+      dirty.scaleFree = false
+      applyScaleFree()
+    }
   }
 
   function mark(key: keyof Dirty): void {
@@ -129,6 +142,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       subscribeLook(() => mark('look')),
       subscribeSky(() => mark('sky')),
       subscribeGeodesic(() => mark('geodesic')),
+      subscribeScaleFree(() => mark('scaleFree')),
       subscribeDebug(() => mark('debug')),
     ]
     return () => {
@@ -137,19 +151,23 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   }
 
   function formatStats(fps: number, healthLine?: string): string {
-    const { params: p, derived: d, disk, camera: c, look, geodesic } = getScene()
+    const { params: p, derived: d, disk, camera: c, look, geodesic, scaleFree } =
+      getScene()
     const m = p.mass.toFixed(2)
     const a = p.spinStar.toFixed(3)
     const q = p.charge.toFixed(3)
     const md = disk.mdot >= 0.01 ? disk.mdot.toFixed(2) : disk.mdot.toExponential(1)
     const rp = Number.isFinite(d.rPlus) ? d.rPlus.toFixed(3) : '—'
-    const dist = c.distanceM.toFixed(1)
+    const D = resolveCameraDistance(p.mass, c.distanceM, scaleFree)
+    const distTag = scaleFree
+      ? `d=${c.distanceM.toFixed(1)}M (D/M)`
+      : `D=${D.toFixed(1)} (fixed)`
     const mode = realtimeModeTag(p, geodesic)
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
-    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · D=${dist}M${dbg}`
+    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
     return healthLine ? `${base}\n${healthLine}` : base
   }
 
@@ -160,6 +178,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     applySky,
     applyDebug,
     applyGeodesic,
+    applyScaleFree,
     connect,
     formatStats,
     setBloomPipeline: (pipeline) => {

@@ -26,6 +26,11 @@ import {
   setParams,
   subscribe as subscribeParams,
 } from './params'
+import {
+  getScaleFree,
+  setScaleFree,
+  subscribeScaleFree,
+} from './scaleFree'
 import { getSky, setSky, subscribeSky, type SkyState } from './sky'
 
 export type SceneSnapshot = {
@@ -37,6 +42,8 @@ export type SceneSnapshot = {
   sky: SkyState
   /** Global geodesic integrator (rt | bl) — not hair, not per-preset */
   geodesic: GeodesicIntegrator
+  /** Global scale-free camera (D∝M) — not hair, not per-preset */
+  scaleFree: boolean
 }
 
 export type ScenePatch = {
@@ -47,6 +54,8 @@ export type ScenePatch = {
   /** Optional — presets should leave sky alone */
   sky?: Partial<SkyState>
   geodesic?: GeodesicIntegrator
+  /** Optional — presets should leave scaleFree alone */
+  scaleFree?: boolean
 }
 
 type SceneListener = (scene: SceneSnapshot) => void
@@ -60,6 +69,7 @@ export function getScene(): SceneSnapshot {
     look: getLook(),
     sky: getSky(),
     geodesic: getGeodesicIntegrator(),
+    scaleFree: getScaleFree(),
   }
 }
 
@@ -71,6 +81,7 @@ export function setScene(patch: ScenePatch): SceneSnapshot {
     if (patch.look) setLook(patch.look)
     if (patch.sky) setSky(patch.sky)
     if (patch.geodesic) setGeodesicIntegrator(patch.geodesic)
+    if (typeof patch.scaleFree === 'boolean') setScaleFree(patch.scaleFree)
   })
   return getScene()
 }
@@ -83,6 +94,7 @@ export function subscribeScene(listener: SceneListener): () => void {
   const u4 = subscribeLook(() => fire())
   const u5 = subscribeSky(() => fire())
   const u6 = subscribeGeodesic(() => fire())
+  const u7 = subscribeScaleFree(() => fire())
   fire()
   return () => {
     u1()
@@ -91,5 +103,6 @@ export function subscribeScene(listener: SceneListener): () => void {
     u4()
     u5()
     u6()
+    u7()
   }
 }

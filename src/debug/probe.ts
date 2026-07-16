@@ -4,7 +4,7 @@
  */
 import { diskIsco } from '../physics/disk'
 import { knHorizon } from '../physics/kn'
-import { OBSERVER_DEFAULTS, type ObserverCamera } from '../physics/observer'
+import { OBSERVER_DEFAULTS, resolveCameraDistance, type ObserverCamera } from '../physics/observer'
 import type { BlackHoleParams } from '../physics/types'
 import { spinLength } from '../physics/types'
 import { normalizeParams } from '../physics/validate'
@@ -49,14 +49,18 @@ export type ProbeResult = {
   summary: string
 }
 
-function camBasis(cam: ObserverCamera, mass: number): {
+function camBasis(
+  cam: ObserverCamera,
+  mass: number,
+  scaleFree: boolean,
+): {
   origin: Vec3
   forward: Vec3
   right: Vec3
   up: Vec3
   camD: number
 } {
-  const camD = cam.distanceM * mass
+  const camD = resolveCameraDistance(mass, cam.distanceM, scaleFree)
   const th = cam.inclination
   const ph = cam.azimuth
   const origin: Vec3 = {
@@ -82,6 +86,7 @@ export type ProbeOptions = {
   maxSteps?: number
   /** Log every Nth step + events (default 8) */
   logStride?: number
+  scaleFree?: boolean
 }
 
 /**
@@ -106,7 +111,11 @@ export function probeRay(options: ProbeOptions = {}): ProbeResult {
     (Number.isFinite(rPlus) ? rPlus : 2 * M) * RT.iscoHorizonMargin,
   )
   const rout = diskOuterM * M
-  const { origin, forward, right, up, camD } = camBasis(camera, M)
+  const { origin, forward, right, up, camD } = camBasis(
+    camera,
+    M,
+    options.scaleFree ?? true,
+  )
 
   const dir = normalize(
     add(add(forward, scale(right, ndcX * camera.fov)), scale(up, ndcY * camera.fov)),

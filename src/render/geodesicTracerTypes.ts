@@ -33,4 +33,6 @@ export type GeodesicTracer = {
   setDebugMode: (mode: number) => void
   /** 0 = real-time Cartesian (default), 1 = Boyer–Lindquist Mino */
   setIntegratorMode: (mode: 0 | 1) => void
+  /** true = D = distanceM · M; false = fixed geometric D */
+  setScaleFree: (on: boolean) => void
 }

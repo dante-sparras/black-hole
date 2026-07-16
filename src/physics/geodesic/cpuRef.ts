@@ -19,6 +19,7 @@ import { diskIsco } from '../disk'
 import { knHorizon } from '../kn'
 import {
   OBSERVER_DEFAULTS,
+  resolveCameraDistance,
   type ObserverCamera,
 } from '../observer'
 import type { BlackHoleParams } from '../types'
@@ -68,6 +69,11 @@ export type CpuRefOptions = {
    * 'bl' = Boyer–Lindquist Mino tracer (disk g available).
    */
   integrator?: CpuRefIntegrator
+  /**
+   * Scale-free camera: D = distanceM · M (default true).
+   * false → distanceM is absolute geometric D.
+   */
+  scaleFree?: boolean
 }
 
 export type CpuRefResult = {
@@ -82,14 +88,18 @@ export type CpuRefResult = {
   rgb: Uint8Array
 }
 
-function camBasis(cam: ObserverCamera, mass: number): {
+function camBasis(
+  cam: ObserverCamera,
+  mass: number,
+  scaleFree: boolean,
+): {
   origin: Vec3
   forward: Vec3
   right: Vec3
   up: Vec3
   camD: number
 } {
-  const camD = cam.distanceM * mass
+  const camD = resolveCameraDistance(mass, cam.distanceM, scaleFree)
   const th = cam.inclination
   const ph = cam.azimuth
   const origin: Vec3 = {
@@ -200,6 +210,7 @@ export function traceCpuRefPixelBl(
     rin: number
     rout: number
     maxSteps: number
+    scaleFree?: boolean
   },
 ): CpuRefPixel {
   const ray = cameraRayToBl({
@@ -208,6 +219,7 @@ export function traceCpuRefPixelBl(
     camera: opts.camera,
     ndcX,
     ndcY,
+    scaleFree: opts.scaleFree ?? true,
   })
   const tr = traceKerrBlNull({
     mass: opts.mass,
@@ -273,7 +285,11 @@ export function renderCpuRef(options: CpuRefOptions = {}): CpuRefResult {
   )
   const rout = diskOuterM * M
 
-  const { origin, forward, right, up, camD } = camBasis(camera, M)
+  const { origin, forward, right, up, camD } = camBasis(
+    camera,
+    M,
+    options.scaleFree ?? true,
+  )
 
   const counts: CpuRefCounts = { capture: 0, disk: 0, escape: 0, max: 0 }
   const rgb = new Uint8Array(W * H * 3)
@@ -302,6 +318,7 @@ export function renderCpuRef(options: CpuRefOptions = {}): CpuRefResult {
     rin,
     rout,
     maxSteps,
+    scaleFree: options.scaleFree ?? true,
   }
 
   for (let j = 0; j < H; j++) {

@@ -73,6 +73,8 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uDebugMode = uniform(DEBUG_DEFAULTS.mode)
   /** 0 = RT Cartesian, 1 = BL Mino */
   const uIntegratorMode = uniform(0)
+  /** 1 = scale-free D = distanceM · M; 0 = fixed geometric D */
+  const uScaleFree = uniform(1)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -91,7 +93,8 @@ export function createGeodesicTracer(): GeodesicTracer {
     // Family ISCO from CPU (units of M → geometric)
     const rin = max(uRIscoM.mul(M), rPlus.mul(RT.iscoHorizonMargin))
     const rout = uRoutM.mul(M)
-    const camD = uCamDistM.mul(M)
+    // scale-free: D = d·M; fixed: D = d
+    const camD = uScaleFree.greaterThan(0.5).select(uCamDistM.mul(M), uCamDistM)
 
     const tex = uv()
     const aspect = screenSize.x.div(max(screenSize.y, float(1)))
@@ -535,6 +538,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setIntegratorMode: (mode) => {
       uIntegratorMode.value = mode
+    },
+    setScaleFree: (on) => {
+      uScaleFree.value = on ? 1 : 0
     },
   }
 }

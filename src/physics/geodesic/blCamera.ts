@@ -3,7 +3,7 @@
  *
  * Matches project observer convention (OBSERVER_DEFAULTS / cpuRef):
  *   - Spin ‖ +Y; polar θ from +Y; φ around spin
- *   - camD = distanceM · M
+ *   - camD = resolveCameraDistance(M, distanceM, scaleFree)
  *   - Ray: dir = normalize(forward + right·ndcX·fov + up·ndcY·fov)
  *
  * At the camera (r ≫ M) we use the asymptotic static-frame map from a
@@ -24,6 +24,7 @@
 
 import {
   OBSERVER_DEFAULTS,
+  resolveCameraDistance,
   type ObserverCamera,
 } from '../observer'
 import {
@@ -59,6 +60,7 @@ export type CameraRayBl = {
 export function cameraBasis(
   cam: ObserverCamera,
   mass: number,
+  scaleFree = true,
 ): {
   origin: Vec3
   forward: Vec3
@@ -66,7 +68,7 @@ export function cameraBasis(
   up: Vec3
   camD: number
 } {
-  const camD = cam.distanceM * mass
+  const camD = resolveCameraDistance(mass, cam.distanceM, scaleFree)
   const th = cam.inclination
   const ph = cam.azimuth
   const origin: Vec3 = {
@@ -93,8 +95,9 @@ export function cameraBlPosition(
   cam: ObserverCamera,
   mass: number,
   _spinLength = 0,
+  scaleFree = true,
 ): BlCoords {
-  const camD = cam.distanceM * mass
+  const camD = resolveCameraDistance(mass, cam.distanceM, scaleFree)
   return {
     r: camD,
     theta: cam.inclination,
@@ -139,11 +142,13 @@ export function cameraRayToBl(options: {
   camera?: Partial<ObserverCamera>
   ndcX: number
   ndcY: number
+  scaleFree?: boolean
 }): CameraRayBl {
   const M = options.mass
   const a = options.spinLength
   const cam: ObserverCamera = { ...OBSERVER_DEFAULTS, ...options.camera }
-  const { origin, forward, right, up, camD } = cameraBasis(cam, M)
+  const scaleFree = options.scaleFree ?? true
+  const { origin, forward, right, up, camD } = cameraBasis(cam, M, scaleFree)
 
   const cartDir = normalize(
     {
@@ -215,6 +220,7 @@ export function traceCameraRayBl(options: {
   fracStep?: number
   diskInner?: number
   diskOuter?: number
+  scaleFree?: boolean
 }): BlTraceResult & { ray: CameraRayBl } {
   const ray = cameraRayToBl(options)
   const result = traceKerrBlNull({
@@ -243,6 +249,7 @@ export function cameraRayImpactB(options: {
   camera?: Partial<ObserverCamera>
   ndcX: number
   ndcY: number
+  scaleFree?: boolean
 }): number {
   const ray = cameraRayToBl(options)
   return Math.abs(ray.conserved.Lz / ray.conserved.E)

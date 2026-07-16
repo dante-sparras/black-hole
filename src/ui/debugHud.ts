@@ -18,6 +18,7 @@ import {
 import { getCamera } from '../state/camera'
 import { getDisk } from '../state/disk'
 import { getDerived, getParams } from '../state/params'
+import { getScaleFree } from '../state/scaleFree'
 
 export type DebugHudApi = {
   /** Call periodically from main loop */
@@ -167,6 +168,7 @@ export function mountDebugHud(root: HTMLElement): DebugHudApi {
         derived: getDerived(),
         disk: getDisk(),
         camera: getCamera(),
+        scaleFree: getScaleFree(),
       })
       renderHealth(report)
     } catch (err) {
@@ -195,6 +197,7 @@ export function mountDebugHud(root: HTMLElement): DebugHudApi {
       ndcX,
       ndcY,
       logStride: 6,
+      scaleFree: getScaleFree(),
     })
     renderProbe(p)
     debugLog.info('probe', p.summary, {

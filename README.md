@@ -9,9 +9,11 @@ Best-effort general-relativistic black hole visualization in the browser
 2. **Spin \(a_\star\)** — \(0\) … \(0.998\)  
 3. **Charge \(Q\)** — default \(0\)
 
-**Not hair:** camera, \(\dot{m}\), texture, bloom, presets.
+**Not hair:** camera, \(\dot{m}\), texture, bloom, presets, **scale-free toggle**.
 
 Geometric units: \(G = c = 1\).
+
+**Camera modes:** scale-free **ON** (default): \(D = d\cdot M\), mass does not change angular size. Scale-free **OFF**: fixed geometric \(D\), mass grows the hole / lensing on screen.
 
 ## Setup
 
@@ -58,3 +60,4 @@ src/
 | BL camera → (E,Lz,Q) (Phase 2) | ✅ OBSERVER_DEFAULTS rays |
 | BL disk hits + cpuRef `bl` (Phase 3) | ✅ θ=π/2 + orbiting g |
 | Live GPU BL + stats tags (Phase 4) | ✅ RT/BL toggle · `*-BL` tags |
+| Scale-free camera toggle | ✅ ON: \(D\propto M\); OFF: fixed \(D\), mass affects lensing |

@@ -6,7 +6,7 @@ import { getParams, setParams } from '../../src/state/params'
 import { getScene, setScene, subscribeScene } from '../../src/state/scene'
 
 describe('scene facade', () => {
-  test('getScene returns all slices including disk + geodesic', () => {
+  test('getScene returns all slices including disk + geodesic + scaleFree', () => {
       setParams({ mass: 1, spinStar: 0.2, charge: 0 })
       setDisk({ mdot: 0.15, outerM: 25 })
       const s = getScene()
@@ -17,6 +17,7 @@ describe('scene facade', () => {
       expect(s.look.exposure).toBe(getLook().exposure)
       expect(s.derived.family).toBe('kerr')
       expect(s.geodesic === 'rt' || s.geodesic === 'bl').toBe(true)
+      expect(typeof s.scaleFree).toBe('boolean')
     })
 
   test('setScene patches multiple stores', () => {

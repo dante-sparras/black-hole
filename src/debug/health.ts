@@ -43,6 +43,7 @@ export type HealthInput = {
   derived: DerivedGeometry
   disk: DiskParams
   camera: ObserverCamera
+  scaleFree?: boolean
 }
 
 /**
@@ -50,6 +51,7 @@ export type HealthInput = {
  */
 export function runHealthCheck(input: HealthInput): HealthReport {
   const { params, derived, disk, camera } = input
+  const scaleFree = input.scaleFree ?? true
   const checks: HealthCheck[] = []
 
   // Sparse topology render
@@ -59,6 +61,7 @@ export function runHealthCheck(input: HealthInput): HealthReport {
     diskOuterM: disk.outerM,
     width: 48,
     height: 27,
+    scaleFree,
   })
   const total =
     ref.counts.capture + ref.counts.disk + ref.counts.escape + ref.counts.max
@@ -143,6 +146,7 @@ export function runHealthCheck(input: HealthInput): HealthReport {
     ndcX: 0,
     ndcY: 0,
     logStride: 64,
+    scaleFree,
   })
   if (centerProbe.fate === 'escape' && params.spinStar < 0.5) {
     checks.push({
