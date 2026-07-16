@@ -43,23 +43,18 @@ import { fmt, fmtMdot } from './format'
 import { renderDerivedHud } from './hud'
 
 /** Log-space slider (0…1000) ↔ ṁ ∈ [MDOT_MIN, MDOT_MAX]. */
-export function mdotFromSlider(t: number): number {
+function mdotFromSlider(t: number): number {
   return mdotFromSliderRange(t, MDOT_MIN, MDOT_MAX)
 }
 
-export function sliderFromMdot(mdot: number): number {
+function sliderFromMdot(mdot: number): number {
   return sliderFromMdotRange(mdot, MDOT_MIN, MDOT_MAX)
-}
-
-export type ControlsApi = {
-  /** Refresh camera slider labels from store (after orbit drag). */
-  syncCameraUi: () => void
 }
 
 export function mountControls(
   root: HTMLElement,
   derivedRoot: HTMLElement | null,
-): ControlsApi {
+): void {
   const distLim = CAMERA_LIMITS.distanceM
   const incDegMin = radToDeg(CAMERA_LIMITS.inclination.min)
   const incDegMax = radToDeg(CAMERA_LIMITS.inclination.max)
@@ -448,14 +443,11 @@ export function mountControls(
     chargeInput.max = String(Math.max(0, m * 0.99))
   })
 
+  // Initial paint (each subscribe also fires once; these cover any missed sync order).
   syncPhysicsInputs(getParams())
   syncDiskInputs(getDisk())
   syncCameraInputs(getCamera())
   syncLookInputs(getLook())
   syncSkyInputs(getSky())
   syncDerived(getDerived(), getParams())
-
-  return {
-    syncCameraUi: () => syncCameraInputs(getCamera()),
-  }
 }

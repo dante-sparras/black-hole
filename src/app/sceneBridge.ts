@@ -1,12 +1,18 @@
 /**
  * Application bridge: pure stores → render tracer / bloom / debug mode.
+ * Targeted subscriptions so a sky tweak does not re-upload spacetime, etc.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
-import type { GeodesicTracer } from '../render/geodesicTracer'
-import { toUniforms, type SpacetimeUniforms } from '../render/uniforms'
-import { getScene, subscribeScene } from '../state/scene'
+import type { GeodesicTracer } from '../render/geodesicTracerTypes'
+import { getCamera, subscribeCamera } from '../state/camera'
+import { getDisk, subscribeDisk } from '../state/disk'
+import { getGeodesicIntegrator, subscribeGeodesic } from '../state/geodesic'
+import { getLook, subscribeLook } from '../state/look'
+import { getDerived, getParams, subscribe as subscribeParams } from '../state/params'
+import { getScene } from '../state/scene'
+import { getSky, subscribeSky } from '../state/sky'
 
 export type BloomPipeline = ReturnType<typeof createBloomPipeline>
 
@@ -17,20 +23,19 @@ export type SceneBridge = {
   applySky: () => void
   applyDebug: () => void
   applyGeodesic: () => void
+  /** Wire store listeners; returns unsubscribe. Applies once immediately via store subs. */
   connect: () => () => void
-  getSpacetime: () => SpacetimeUniforms
   formatStats: (fps: number, healthLine?: string) => string
   setBloomPipeline: (pipeline: BloomPipeline | null) => void
 }
 
 export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
-  const initial = getScene()
-  let spacetime = toUniforms(initial.params, initial.derived, initial.disk)
   let bloom: BloomPipeline | null = null
 
   function applyPhysics(): void {
-    const { params: p, derived: d, disk } = getScene()
-    spacetime = toUniforms(p, d, disk)
+    const p = getParams()
+    const d = getDerived()
+    const disk = getDisk()
     tracer.setSpacetime({
       mass: p.mass,
       spinStar: p.spinStar,
@@ -42,15 +47,15 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   }
 
   function applyCamera(): void {
-    tracer.setCamera(getScene().camera)
+    tracer.setCamera(getCamera())
   }
 
   function applyLook(): void {
-    if (bloom) bloom.applyLook(getScene().look)
+    if (bloom) bloom.applyLook(getLook())
   }
 
   function applySky(): void {
-    tracer.setSky(getScene().sky)
+    tracer.setSky(getSky())
   }
 
   function applyDebug(): void {
@@ -58,25 +63,23 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   }
 
   function applyGeodesic(): void {
-    const mode = getScene().geodesic
+    const mode = getGeodesicIntegrator()
     tracer.setIntegratorMode(mode === 'bl' ? 1 : 0)
   }
 
   function connect(): () => void {
-    const uScene = subscribeScene(() => {
-      applyPhysics()
-      applyCamera()
-      applyLook()
-      applySky()
-      applyDebug()
-      applyGeodesic()
-    })
-    const uDbg = subscribeDebug(() => {
-      applyDebug()
-    })
+    // Each store subscribe fires once on attach — full initial upload.
+    const unsubs = [
+      subscribeParams(() => applyPhysics()),
+      subscribeDisk(() => applyPhysics()),
+      subscribeCamera(() => applyCamera()),
+      subscribeLook(() => applyLook()),
+      subscribeSky(() => applySky()),
+      subscribeGeodesic(() => applyGeodesic()),
+      subscribeDebug(() => applyDebug()),
+    ]
     return () => {
-      uScene()
-      uDbg()
+      for (const u of unsubs) u()
     }
   }
 
@@ -94,8 +97,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
     const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · D=${dist}M${dbg}`
-        return healthLine ? `${base}
-${healthLine}` : base
+    return healthLine ? `${base}\n${healthLine}` : base
   }
 
   return {
@@ -106,7 +108,6 @@ ${healthLine}` : base
     applyDebug,
     applyGeodesic,
     connect,
-    getSpacetime: () => spacetime,
     formatStats,
     setBloomPipeline: (pipeline) => {
       bloom = pipeline

@@ -40,12 +40,8 @@ const tracer = createGeodesicTracer()
 scene.add(tracer.mesh)
 
 const bridge = createSceneBridge(tracer)
+// Store subscriptions apply physics/camera/sky/geodesic/debug on attach.
 bridge.connect()
-bridge.applyPhysics()
-bridge.applyCamera()
-bridge.applySky()
-bridge.applyGeodesic()
-bridge.applyDebug()
 
 let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
 let debugHud: ReturnType<typeof mountDebugHud> | null = null
@@ -89,6 +85,7 @@ async function boot(): Promise<void> {
 
   bloomPipeline = createBloomPipeline(renderer, scene, camera, getLook())
   bridge.setBloomPipeline(bloomPipeline)
+  // Bloom is created post-WebGPU init; look subscribe already ran before bloom existed.
   bridge.applyLook()
 
   renderer.setAnimationLoop(() => {

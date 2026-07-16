@@ -43,45 +43,14 @@ import {
 import { RT } from '../physics/geodesic/rtConstants'
 import { OBSERVER_DEFAULTS } from '../physics/observer'
 import { DEBUG_DEFAULTS } from '../debug/state'
-import { SKY_DEFAULTS, type SkyState } from '../state/sky'
+import { SKY_DEFAULTS } from '../state/sky'
+import type { GeodesicTracer } from './geodesicTracerTypes'
 
-export type SpacetimeTraceParams = {
-  mass: number
-  spinStar: number
-  charge: number
-  mdot: number
-  /** r_ISCO / M from CPU diskIsco */
-  rIscoOverM: number
-  /** Disk outer radius in units of M */
-  outerM: number
-}
-
-export type CameraTraceParams = {
-  distanceM: number
-  inclination: number
-  azimuth: number
-  fov: number
-}
-
-export type GeodesicTracer = {
-  material: THREE.MeshBasicNodeMaterial
-  mesh: THREE.Mesh
-  setSpacetime: (p: SpacetimeTraceParams) => void
-  setCamera: (c: CameraTraceParams) => void
-  setSky: (s: SkyState) => void
-  setDebugMode: (mode: number) => void
-  setMass: (mass: number) => void
-  setSpinStar: (spinStar: number) => void
-  setCharge: (charge: number) => void
-  setMdot: (mdot: number) => void
-  setRIscoM: (rIscoOverM: number) => void
-  setCameraDistanceM: (distanceM: number) => void
-  setInclination: (radians: number) => void
-  setAzimuth: (radians: number) => void
-  setFov: (fov: number) => void
-  /** 0 = real-time Cartesian (default), 1 = Boyer–Lindquist Mino */
-  setIntegratorMode: (mode: 0 | 1) => void
-}
+export type {
+  CameraTraceParams,
+  GeodesicTracer,
+  SpacetimeTraceParams,
+} from './geodesicTracerTypes'
 
 /**
  * Einstein–Maxwell null geodesic ray marcher (WebGPU / TSL).
@@ -1020,33 +989,6 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setDebugMode: (mode) => {
       uDebugMode.value = mode
-    },
-    setMass: (m) => {
-      uMass.value = m
-    },
-    setSpinStar: (s) => {
-      uSpinStar.value = s
-    },
-    setCharge: (q) => {
-      uCharge.value = q
-    },
-    setMdot: (m) => {
-      uMdot.value = m
-    },
-    setRIscoM: (r) => {
-      uRIscoM.value = r
-    },
-    setCameraDistanceM: (d) => {
-      uCamDistM.value = d
-    },
-    setInclination: (r) => {
-      uInclination.value = r
-    },
-    setAzimuth: (r) => {
-      uAzimuth.value = r
-    },
-    setFov: (f) => {
-      uFov.value = f
     },
     setIntegratorMode: (mode) => {
       uIntegratorMode.value = mode
