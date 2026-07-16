@@ -17,6 +17,7 @@ export function processDiskVolumeSample(p) {
     hx,
     hz,
     weight,
+    densVert,
     M,
     a,
     aStar,
@@ -77,6 +78,7 @@ export function processDiskVolumeSample(p) {
   const freq = float(1).div(max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)))
   const invRho = float(1).div(max(rhoSafe, float(1e-5)))
   const nY = abs(nRay.y)
+  const dVert = densVert === undefined ? float(1) : densVert
 
   accumulateDiskHit({
     hitR: rho,
@@ -108,5 +110,6 @@ export function processDiskVolumeSample(p) {
     uAnim,
     pathAbsY: nY,
     weight,
+    densVert: dVert,
   })
 }

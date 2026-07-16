@@ -407,40 +407,48 @@ export function createGeodesicTracer(): GeodesicTracer {
       const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
       vel.assign(vec3(vx, vel.y, vz))
 
-      // Continuous 3D thin-disk volume: Gaussian vertical structure
-      // dens = exp(−(y/H)²), H=(H/R)·ρ. Beer's law τ stops edge-on slash.
-      // No discrete stacked planes — smooth slab of gas.
+      // Continuous 3D thin-disk volume (isothermal-like sech² + flared H)
+      // dens ∝ sech²(y/H), H = h₀ ρ (ρ/ρ_ref)^ψ  — Beer's law τ stops edge-on slash.
       const hxV = pos.x
       const hzV = pos.z
       const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
-      const Hloc = max(uScaleH.mul(max(rhoV, M.mul(2))), M.mul(0.04))
-      const yOverH = abs(pos.y).div(Hloc)
-      const dens = exp(yOverH.mul(yOverH).mul(-1))
+      // Flare: H/R grows gently outward (illuminated outer disk looks thicker)
+      const rRef = M.mul(10)
+      const flare = float(0.3)
+      const hOverR = uScaleH.mul(pow(max(rhoV.div(rRef), float(0.4)), flare))
+      const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.035))
+      // sech²(z/H) hydrostatic vertical structure (smoother than Gaussian wings)
+      const zNorm = abs(pos.y).div(Hloc.mul(1.15))
+      const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
+      const dens = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
       const sphR = pos.length()
+      // Finer sampling near midplane where most mass sits
+      const strideOk = dens
+        .greaterThan(0.45)
+        .select(stepCount.mod(int(1)).equal(int(0)), stepCount.mod(int(2)).equal(int(0)))
 
       If(
         dens
-          .greaterThan(0.04)
+          .greaterThan(0.03)
           .and(rhoV.greaterThanEqual(rin))
           .and(rhoV.lessThanEqual(rout.mul(1.04)))
           .and(sphR.greaterThan(rCapture.mul(1.12)))
-          .and(diskTau.lessThan(2.8))
+          .and(diskTau.lessThan(3.0))
           .and(transm.greaterThan(0.04))
-          .and(hits.lessThan(14))
-          // stride: every 2nd step — enough samples for smooth volume, not a wall
-          .and(stepCount.mod(int(2)).equal(int(0))),
+          .and(hits.lessThan(16))
+          .and(strideOk),
         () => {
-          // Path element in scale-height units (cap so one step can't dominate)
-          const dsH = min(ds.div(Hloc), float(1.1))
-          const dTau = dens.mul(dsH).mul(0.62)
-          // e^{−τ} before this sample — Beer's law (saturates long equatorial paths)
+          const dsH = min(ds.div(Hloc), float(1.05))
+          const dTau = dens.mul(dsH).mul(0.7)
           const beer = exp(diskTau.mul(-1))
-          const w = dens.mul(dsH).mul(beer).mul(1.05)
-          If(w.greaterThan(0.02), () => {
+          // Slightly boost midplane (optically thicker photosphere feel)
+          const w = dens.mul(dsH).mul(beer).mul(float(0.95).add(dens.mul(0.25)))
+          If(w.greaterThan(0.018), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,
               weight: w,
+              densVert: dens,
               M,
               a,
               aStar,
@@ -469,8 +477,7 @@ export function createGeodesicTracer(): GeodesicTracer {
               uAnim,
               nRay: vel.normalize(),
             })
-            // fractional hit count — bounce stays mild for volume
-            hits.addAssign(0.18)
+            hits.addAssign(0.16)
             diskTau.addAssign(dTau)
           })
         },

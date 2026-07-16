@@ -76,9 +76,12 @@ export function accumulateDiskHit(p) {
     pathAbsY,
     /** Optional intensity weight (1 = full midplane hit; <1 soft volume sample) */
     weight,
+    /** Vertical density 0–1 for atmosphere cooling (1 = midplane) */
+    densVert,
   } = p
 
   const w = weight === undefined ? float(1) : weight
+  const dVert = densVert === undefined ? float(1) : densVert
 
   // Effective contrasts: master structure × per-channel knobs
   const armContrast = uStructure.mul(uArms)
@@ -141,9 +144,11 @@ export function accumulateDiskHit(p) {
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
   // Cooler outer dust floor (still blackbody)
   const tCoolOuter = float(1).sub(dustZone.mul(0.12).mul(dustContrast.add(0.25)))
+  // Vertical atmosphere: high-|z| gas cooler than midplane photosphere
+  const tAtm = float(0.7).add(dVert.mul(0.3))
   let TK = max(
     float(E.tColorMinK),
-    min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tCoolOuter)),
+    min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tCoolOuter).mul(tAtm)),
   )
 
   // --- Structured surface: advected spirals + flow filaments + plasma + dust ---
