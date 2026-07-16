@@ -138,9 +138,59 @@ export const DISK_TEXTURE = {
   scaleHeight: 0.085,
   /** Fine flow-aligned filament strength (reference streamlines) */
   streamContrast: 0.55,
-  /** Secondary m=8 streamline harmonic weight */
+  /** Secondary streamline harmonic weight */
   streamHarmonic: 0.45,
+  /**
+   * Kerr frame-drag spiral wind (dimensionless).
+   * Phase add: dragGain · a★ · (M/r) — arms twist more near the hole for high spin.
+   */
+  frameDragGain: 1.85,
+  /**
+   * Log-normal MRI dens variance σ (unit-mean: exp(σ·ξ − σ²/2), ξ∈[-1,1] from noise).
+   */
+  mriSigma: 0.55,
+  /**
+   * Photon-ring silk: multi-wrap intensity boost near r~r_ph (display; still physical g).
+   */
+  photonRingBoost: 0.48,
 } as const
+
+/**
+ * Unit-mean log-normal factor from unit noise n∈[0,1].
+ * ξ = 2n−1 ∈ [-1,1]; f = exp(σ ξ − σ²/2).
+ */
+export function logNormalUnitMean(n: number, sigma: number): number {
+  const s = Math.max(0, Math.min(1.5, sigma))
+  const xi = 2 * Math.min(1, Math.max(0, n)) - 1
+  return Math.exp(s * xi - 0.5 * s * s)
+}
+
+/**
+ * Kerr spiral frame-drag phase (radians-ish display units).
+ * δφ ≈ gain · a★ · (M/r) — stronger near horizon for spinning holes.
+ */
+export function frameDragPhase(aStar: number, rhoOverM: number, gain = DISK_TEXTURE.frameDragGain): number {
+  const a = Math.min(0.998, Math.max(0, aStar))
+  const rm = Math.max(rhoOverM, 1.05)
+  return gain * a * (1 / rm)
+}
+
+/**
+ * Photon-ring multi-wrap silk factor (≥1).
+ * wrapHits: cumulative volume/plane hit count (0 = first contact).
+ * rhoOverM: cylindrical radius in units of M.
+ */
+export function photonRingSilk(
+  wrapHits: number,
+  rhoOverM: number,
+  boost = DISK_TEXTURE.photonRingBoost,
+): number {
+  const wrap = Math.max(0, wrapHits)
+  // Peak near Schwarzschild photon sphere ~3M (also good for Kerr order-of-magnitude)
+  const prox = Math.exp(-1.15 * Math.abs(rhoOverM - 3))
+  const silk = 1 + Math.min(wrap, 3.5) * 0.28 + prox * Math.min(wrap, 2.5) * boost
+  return Math.min(2.4, silk)
+}
 
 export type DiskTextureOptions = {
   arms?: number
@@ -157,6 +207,8 @@ export type DiskTextureOptions = {
   /** Shear animation rate multiplier */
   shearRate?: number
   streamContrast?: number
+  /** Dimensionless spin for Kerr spiral frame-drag */
+  aStar?: number
 }
 
 /**
@@ -199,10 +251,14 @@ export function diskTextureFactor(
   const OmegaDim = Math.pow(rhoM, -1.5)
   const sense = prograde ? 1 : -1
   const shear = sense * shearRate * T.shearGain * OmegaDim * time
+  // Kerr frame-drag: static spiral wind + slow time wind with spin
+  const aStarOpt = opts.aStar ?? 0
+  const drag = frameDragPhase(aStarOpt, rhoM)
+  const shearTot = shear + drag * (1 + 0.12 * time)
 
   // Advect material frame: rotate (c,s) by shear (differential with r)
-  const csh = Math.cos(shear)
-  const ssh = Math.sin(shear)
+  const csh = Math.cos(shearTot)
+  const ssh = Math.sin(shearTot)
   const cx = cphi * csh - sphi * ssh
   const sx = cphi * ssh + sphi * csh
 
@@ -215,7 +271,7 @@ export function diskTextureFactor(
     cm = nc
     sm = ns
   }
-  const alpha = -arms * pitch * lnR + phase0
+  const alpha = -arms * pitch * lnR + phase0 + drag
   const ca = Math.cos(alpha)
   const sa = Math.sin(alpha)
   const armWave = 0.5 + 0.5 * (cm * ca + sm * sa)
@@ -228,8 +284,8 @@ export function diskTextureFactor(
   const s4 = 2 * c2 * s2
   const c8 = c4 * c4 - s4 * s4
   const s8 = 2 * c4 * s4
-  const a2 = -2 * 0.22 * lnR + phase0 * 0.7
-  const a8 = -8 * 0.12 * lnR + phase0 * 1.3
+  const a2 = -2 * 0.22 * lnR + phase0 * 0.7 + drag * 0.5
+  const a8 = -8 * 0.12 * lnR + phase0 * 1.3 + drag * 0.8
   const stream2 = 0.5 + 0.5 * (c2 * Math.cos(a2) + s2 * Math.sin(a2))
   const stream8 = 0.5 + 0.5 * (c8 * Math.cos(a8) + s8 * Math.sin(a8))
   const streams =
@@ -237,17 +293,19 @@ export function diskTextureFactor(
     Math.pow(Math.max(stream8, 1e-4), 1.8) * T.streamHarmonic
 
   // Multi-scale turbulence in *advected* frame (moves with gas)
-  const turb = turbulenceSeamless(cx * 1.65, sx * 1.65, lnR + 0.05 * shear, 4)
+  const turb = turbulenceSeamless(cx * 1.65, sx * 1.65, lnR + 0.05 * shearTot, 4)
   const clump = turbulenceSeamless(cx * 3.1, sx * 3.1, lnR * 1.15, 3)
   const fine = turbulenceSeamless(cx * 6.2, sx * 6.2, lnR * 1.4, 2)
+  // Log-normal MRI dens proxy (unit mean)
+  const mri = logNormalUnitMean(0.45 * turb + 0.35 * clump + 0.2 * fine, T.mriSigma)
 
   // Radial dust lanes / rings (φ-independent → seamless)
-  const dustWave = 0.5 + 0.5 * Math.sin(lnR * 5.4 + 0.4 + 0.15 * shear)
+  const dustWave = 0.5 + 0.5 * Math.sin(lnR * 5.4 + 0.4 + 0.15 * shearTot)
   const dustOuter = Math.min(1, Math.max(0, (lnR - 0.65) / 2.0))
   const dust = 1 - dustContrast * dustOuter * (0.5 + 0.5 * dustWave)
 
   // Fine radial ripple (settling rings)
-  const ripple = 0.5 + 0.5 * Math.sin(lnR * 4.8 + 0.3 * shear)
+  const ripple = 0.5 + 0.5 * Math.sin(lnR * 4.8 + 0.3 * shearTot)
 
   // Soft radial edges
   const softIn = Math.min(1, Math.max(0, (rho / M - 5.5) / 2.5))
@@ -261,10 +319,12 @@ export function diskTextureFactor(
   f *=
     1 -
     turbContrast +
-    turbContrast * (0.22 + 0.55 * turb + 0.28 * clump + 0.2 * fine)
+    turbContrast * (0.18 + 0.5 * turb + 0.25 * clump + 0.15 * fine + 0.35 * (mri - 0.5))
   f *= dust
   f *= 0.86 + 0.28 * ripple
   f *= 0.82 + 0.18 * edgeIn * edgeOut
+  // Mild log-normal dens imprint on brightness
+  f *= 0.82 + 0.18 * mri
 
   return Math.min(T.texMax, Math.max(T.texMin, f))
 }

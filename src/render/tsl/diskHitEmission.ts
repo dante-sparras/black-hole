@@ -164,18 +164,25 @@ export function accumulateDiskHit(p) {
     .mul(float(TX.shearGain))
     .mul(OmegaDim)
     .mul(uTime)
+  // Kerr frame-drag spiral wind: δφ ∝ a★ (M/r) — stronger near the hole
+  const drag = aStar.mul(float(TX.frameDragGain)).div(max(rhoM, float(1.05)))
+  const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12))))
 
-  // Rotate (cφ,sφ) into material frame — pattern advects with gas
-  const csh = cos(shear)
-  const ssh = sin(shear)
+  // Rotate (cφ,sφ) into material frame — Kepler + frame-drag
+  const csh = cos(shearTot)
+  const ssh = sin(shearTot)
   const cx = cphi.mul(csh).sub(sphi.mul(ssh))
   const sx = cphi.mul(ssh).add(sphi.mul(csh))
 
-  // m=2 log spiral in advected frame
+  // m=2 log spiral in advected frame (twisted by spin)
   const c2a = cx.mul(cx).sub(sx.mul(sx))
   const s2a = cx.mul(sx).mul(2)
   const armsN = float(TX.arms)
-  const alpha = armsN.mul(float(-TX.pitch)).mul(lnR).add(float(TX.phase0))
+  const alpha = armsN
+    .mul(float(-TX.pitch))
+    .mul(lnR)
+    .add(float(TX.phase0))
+    .add(drag)
   const armWave = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))),
   )
@@ -184,12 +191,20 @@ export function accumulateDiskHit(p) {
     .sub(armContrast)
     .add(armContrast.mul(float(0.16).add(armsBright.mul(1.1))))
 
-  // m=2 + m=4 filaments (skip m=8 for perf — similar look at lower cost)
+  // m=2 + m=4 filaments
   const c4a = c2a.mul(c2a).sub(s2a.mul(s2a))
   const s4a = c2a.mul(s2a).mul(2)
   const zPhase = float(1).sub(dVert).mul(1.8)
-  const a2s = float(-0.44).mul(lnR).add(float(TX.phase0).mul(0.7)).add(zPhase.mul(0.4))
-  const a4s = float(-0.72).mul(lnR).add(float(TX.phase0).mul(1.1)).add(zPhase.mul(0.85))
+  const a2s = float(-0.44)
+    .mul(lnR)
+    .add(float(TX.phase0).mul(0.7))
+    .add(zPhase.mul(0.4))
+    .add(drag.mul(0.5))
+  const a4s = float(-0.72)
+    .mul(lnR)
+    .add(float(TX.phase0).mul(1.1))
+    .add(zPhase.mul(0.85))
+    .add(drag.mul(0.8))
   const stream2 = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(a2s)).add(s2a.mul(sin(a2s)))),
   )
@@ -199,7 +214,6 @@ export function accumulateDiskHit(p) {
   const streams = stream2
     .mul(float(1).sub(float(TX.streamHarmonic)))
     .add(pow(max(stream4, float(1e-4)), float(1.6)).mul(float(TX.streamHarmonic)))
-  // Stronger filaments in denser midplane gas
   const streamStr = float(TX.streamContrast)
     .mul(uStructure)
     .mul(float(0.85).add(dVert.mul(0.5)))
@@ -208,7 +222,7 @@ export function accumulateDiskHit(p) {
     .add(streamStr.mul(float(0.15).add(streams.mul(1.15))))
 
   // Turbulence in advected frame — z-slice so atmosphere ≠ extruded midplane
-  const turbDomainZ = lnR.add(shear.mul(0.04)).add(zPhase.mul(0.25))
+  const turbDomainZ = lnR.add(shearTot.mul(0.04)).add(zPhase.mul(0.25))
   const nUVx = cx.mul(1.65).add(turbDomainZ.mul(0.12)).add(dVert.mul(0.4))
   const nUVy = sx.mul(1.65).add(turbDomainZ.mul(0.11)).add(float(1).sub(dVert).mul(0.65))
   const ix1 = floor(nUVx)
@@ -247,22 +261,28 @@ export function accumulateDiskHit(p) {
     .mul(float(1).sub(uy2))
     .add(m01.mul(float(1).sub(ux2)).add(m11.mul(ux2)).mul(uy2))
 
-  // 2 octaves only (3rd was ~+40% texture ALU for little look)
   const turb = turb1.mul(0.62).add(turb2.mul(0.38))
+  // Log-normal MRI dens proxy: f = exp(σ ξ − σ²/2), ξ=2n−1
+  const sigma = float(TX.mriSigma).mul(float(0.55).add(turbContrast.mul(0.7)))
+  const xi = turb.mul(2).sub(1)
+  const mriLn = exp(xi.mul(sigma).sub(sigma.mul(sigma).mul(0.5)))
   const plasmaClump = pow(max(turb2, float(1e-4)), float(1.75)).mul(plasmaZone)
 
   const turbFac = float(1)
     .sub(turbContrast)
     .add(
       turbContrast.mul(
-        float(0.18).add(turb.mul(0.85)).add(plasmaClump.mul(0.75).mul(plasmaZone.add(0.35))),
+        float(0.14)
+          .add(turb.mul(0.55))
+          .add(plasmaClump.mul(0.55).mul(plasmaZone.add(0.35)))
+          .add(mriLn.mul(0.35)),
       ),
     )
-  const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.8).add(shear.mul(0.25)))))
+  const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.8).add(shearTot.mul(0.25)))))
 
   // Outer dust lanes stronger in dust zone
   const dustWave = float(0.5).add(
-    float(0.5).mul(sin(lnR.mul(5.4).add(0.55).add(shear.mul(0.12)))),
+    float(0.5).mul(sin(lnR.mul(5.4).add(0.55).add(shearTot.mul(0.12)))),
   )
   const dust = float(1).sub(
     dustContrast
@@ -270,7 +290,6 @@ export function accumulateDiskHit(p) {
       .mul(float(0.4).add(dustWave.mul(0.6)))
       .mul(float(0.55).add(uStructure.mul(0.45))),
   )
-  // Plasma: boost clump contrast; dust: mute arms a bit
   const armZone = float(1).sub(dustZone.mul(0.35)).add(plasmaZone.mul(0.15))
   let texFac = armFac
     .mul(armZone)
@@ -279,6 +298,7 @@ export function accumulateDiskHit(p) {
     .mul(dust)
     .mul(float(0.84).add(ripple.mul(0.32)))
     .mul(edgeFac)
+    .mul(float(0.82).add(mriLn.mul(0.18)))
   texFac = max(float(TX.texMin), min(float(TX.texMax), texFac))
 
   // Plasma hotspots / cooler dust: T jitter (still blackbody)
@@ -302,8 +322,15 @@ export function accumulateDiskHit(p) {
   const bMax = max(br, max(bg, bb))
   const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-  // Lensed multi-hit: secondary/far-side bridge over the shadow
-  const bounce = float(1).add(max(min(hits, float(5)).sub(1), float(0)).mul(0.28))
+  // Photon-ring silk: multi-wrap boost near r~r_ph (nested lensed ring)
+  const wrap = max(hits.sub(float(1)), float(0))
+  const photonProx = exp(abs(rhoM.sub(float(3))).mul(-1.15))
+  const silk = min(
+    float(2.35),
+    float(1)
+      .add(min(wrap, float(3.5)).mul(0.28))
+      .add(photonProx.mul(min(wrap, float(2.5))).mul(float(TX.photonRingBoost))),
+  )
   const mdotBright = float(E.mdotBrightBase).add(
     pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
       E.mdotBrightScale,
@@ -322,7 +349,7 @@ export function accumulateDiskHit(p) {
     .add(plasmaZone.mul(0.55))
     .add(gasZone.mul(0.08))
     .sub(dustZone.mul(0.35).mul(dustContrast.add(0.3)))
-  const raw = iFlux.mul(beam).mul(texFac).mul(bounce).mul(w).mul(zoneEmit)
+  const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w).mul(zoneEmit)
   const softI = raw.div(float(1).add(raw.mul(0.32)))
   const emit = chroma.mul(softI)
 

@@ -454,16 +454,19 @@ export function createGeodesicTracer(): GeodesicTracer {
         .mul(float(28))
         .mul(OmegaDim)
         .mul(uTime)
-      const csh = cos(shear)
-      const ssh = sin(shear)
+      // Kerr frame-drag: arms wind more near the hole for high a★
+      const drag = aStar.mul(float(1.85)).div(max(rhoM, float(1.05)))
+      const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12))))
+      const csh = cos(shearTot)
+      const ssh = sin(shearTot)
       const cx = cphiV.mul(csh).sub(sphiV.mul(ssh))
       const sx = cphiV.mul(ssh).add(sphiV.mul(csh))
       const c2 = cx.mul(cx).sub(sx.mul(sx))
       const s2 = cx.mul(sx).mul(2)
       const lnR = log(rhoM)
-      // m=2 log spiral density wave (gas arms)
+      // m=2 log spiral density wave (gas arms) + frame-drag twist
       const pitch = float(0.55)
-      const armPh = float(-2).mul(pitch).mul(lnR).add(float(0.35))
+      const armPh = float(-2).mul(pitch).mul(lnR).add(float(0.35)).add(drag)
       const armWave = float(0.5).add(
         float(0.5).mul(c2.mul(cos(armPh)).add(s2.mul(sin(armPh)))),
       )
@@ -471,9 +474,24 @@ export function createGeodesicTracer(): GeodesicTracer {
       // Flow-aligned filaments (m=4 in material frame)
       const c4 = c2.mul(c2).sub(s2.mul(s2))
       const s4 = c2.mul(s2).mul(2)
-      const filPh = float(-0.85).mul(lnR).add(float(1.1))
+      const filPh = float(-0.85).mul(lnR).add(float(1.1)).add(drag.mul(0.6))
       const fil = float(0.5).add(float(0.5).mul(c4.mul(cos(filPh)).add(s4.mul(sin(filPh)))))
       const filDens = float(0.72).add(pow(max(fil, float(1e-4)), float(1.7)).mul(0.55))
+      // GRMHD-like multi-scale dens: 2 octaves → log-normal MRI
+      const nA = fract(
+        sin(cx.mul(5.7).add(sx.mul(4.1)).add(lnR.mul(1.9))).mul(43758.5453),
+      )
+      const nB = fract(
+        sin(cx.mul(11.3).add(sx.mul(9.7)).add(lnR.mul(3.1)).add(19.1)).mul(43758.5453),
+      )
+      const nMix = nA.mul(0.58).add(nB.mul(0.42))
+      const sigmaM = float(0.55).mul(float(0.5).add(uClumps.mul(0.55)).add(uStructure.mul(0.2)))
+      const xiM = nMix.mul(2).sub(1)
+      const mriDens = exp(xiM.mul(sigmaM).sub(sigmaM.mul(sigmaM).mul(0.5)))
+      // Vertical MRI channel (z-corrugation modulated)
+      const chan = float(0.85).add(
+        float(0.15).mul(sin(sx.mul(3.5).add(lnR.mul(1.2)).add(drag))),
+      )
       // Irregular outer rim (m=3 lab frame — fixed relative to inertial)
       const c3 = cphiV.mul(cphiV.mul(cphiV).sub(sphiV.mul(sphiV).mul(3)))
       const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
@@ -511,11 +529,14 @@ export function createGeodesicTracer(): GeodesicTracer {
       const densGas = float(1)
         .sub(struct.mul(0.55))
         .add(struct.mul(spiralDens.mul(gasW.add(0.35)).mul(0.55).add(filDens.mul(0.45))))
+      // Combine: sech² × radial × zones × GRMHD-like MRI dens
       const dens = densZ
         .mul(radialGate)
         .mul(densPlasma)
         .mul(densDust)
         .mul(densGas)
+        .mul(float(0.72).add(mriDens.mul(0.4)))
+        .mul(chan)
       const sphR = pos.length()
 
       // Only skip deep inside capture — keep photon-ring / far-side bridge
