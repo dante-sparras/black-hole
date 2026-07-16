@@ -13,6 +13,7 @@ import {
   float,
   fract,
   int,
+  log,
   max,
   min,
   pow,
