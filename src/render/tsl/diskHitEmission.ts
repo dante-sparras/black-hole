@@ -107,25 +107,25 @@ export function accumulateDiskHit(p) {
   const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
   const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
 
-  // Soft radial edges: plasma fades at ISCO; irregular outer rim (not a perfect circle)
+  // Soft radial edges: plasma fades at ISCO; soft outer limb (not a hard cylinder wall)
   const softIn = min(
     float(1),
     max(float(0), hitR.sub(rin).div(max(rin.mul(0.4), M.mul(0.45)))),
   )
-  // Azimuthal rim irregularity (seamless m=3) — real disks are not round cutouts
+  // Azimuthal rim irregularity (seamless m=3)
   const c3 = cphi.mul(cphi.mul(cphi).sub(sphi.mul(sphi).mul(3)))
   const s3 = sphi.mul(cphi.mul(cphi).mul(3).sub(sphi.mul(sphi)))
-  // c3 = cos3φ, s3 = sin3φ from (c,s)
-  const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
-  const routEff = rout.mul(float(0.9).add(rimWobble.mul(0.12)))
+  const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.65).add(s3.mul(0.35))))
+  const routEff = rout.mul(float(0.88).add(rimWobble.mul(0.14)))
+  // Wider outer fade so edge-on tips round off instead of flat ends
   const softOut = min(
     float(1),
-    max(float(0), routEff.sub(hitR).div(max(rout.sub(rin).mul(0.32), M.mul(1.2)))),
+    max(float(0), routEff.sub(hitR).div(max(rout.sub(rin).mul(0.16), M.mul(1.4)))),
   )
   const edgeIn = softIn.mul(softIn).mul(float(3).sub(softIn.mul(2)))
   const edgeOut = softOut.mul(softOut).mul(float(3).sub(softOut.mul(2)))
-  // Mild: mid-disk ≈ 1, edges dip without vanishing
-  const edgeFac = float(0.62).add(float(0.38).mul(edgeIn.mul(edgeOut)))
+  // Stronger outer limb fade
+  const edgeFac = float(0.45).add(float(0.55).mul(edgeIn.mul(edgeOut)))
 
   // Finite scale-height residual (volume path mainly in weight)
   // Removed old pathFac block conflict — pathFac set near emit

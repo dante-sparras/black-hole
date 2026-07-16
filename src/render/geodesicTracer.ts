@@ -409,29 +409,54 @@ export function createGeodesicTracer(): GeodesicTracer {
 
       // Continuous 3D thin-disk volume (isothermal-like sech² + flared H)
       // dens ∝ sech²(y/H), H = h₀ ρ (ρ/ρ_ref)^ψ  — Beer's law τ stops edge-on slash.
+      // Outer limb: soft radial fade + H taper so edge-on ends are rounded, not flat walls.
       const hxV = pos.x
       const hzV = pos.z
       const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
-      // Flare: H/R grows gently outward (illuminated outer disk looks thicker)
+      // Flare: H/R grows gently outward
       const rRef = M.mul(10)
       const flare = float(0.3)
       const hOverR = uScaleH.mul(pow(max(rhoV.div(rRef), float(0.4)), flare))
-      const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.035))
-      // sech²(z/H) hydrostatic vertical structure (smoother than Gaussian wings)
+      // Soft outer edge (not a hard cylinder cut) — fade over ~12% of radial span
+      const fadeW = max(rout.sub(rin).mul(0.14), M.mul(1.2))
+      // Azimuthal rim wobble so the cutoff isn't a perfect circle either
+      const invRhoV = float(1).div(max(rhoV, float(1e-5)))
+      const cphiV = hxV.mul(invRhoV)
+      const sphiV = hzV.mul(invRhoV)
+      const c3 = cphiV.mul(cphiV.mul(cphiV).sub(sphiV.mul(sphiV).mul(3)))
+      const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
+      const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.65).add(s3.mul(0.35))))
+      const routEff = rout.mul(float(0.88).add(rimWobble.mul(0.14)))
+      // smoothstep-ish outer: 0 outside, 1 well inside
+      const outerX = routEff.sub(rhoV).div(fadeW)
+      const outerClamped = min(float(1), max(float(0), outerX))
+      const outerSoft = outerClamped.mul(outerClamped).mul(float(3).sub(outerClamped.mul(2)))
+      // Soft inner edge near ISCO
+      const fadeIn = max(rin.mul(0.35), M.mul(0.5))
+      const innerX = rhoV.sub(rin).div(fadeIn)
+      const innerClamped = min(float(1), max(float(0), innerX))
+      const innerSoft = innerClamped.mul(innerClamped).mul(float(3).sub(innerClamped.mul(2)))
+      const radialGate = outerSoft.mul(innerSoft)
+      // H tapers at outer limb → rounded tips edge-on (not blunt cylinder ends)
+      const Hloc = max(
+        hOverR.mul(max(rhoV, M.mul(2))).mul(float(0.35).add(outerSoft.mul(0.65))),
+        M.mul(0.028),
+      )
+      // sech²(z/H) hydrostatic vertical structure
       const zNorm = abs(pos.y).div(Hloc.mul(1.15))
       const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
-      const dens = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
+      const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
+      const dens = densZ.mul(radialGate)
       const sphR = pos.length()
-      // Finer sampling near midplane where most mass sits
       const strideOk = dens
-        .greaterThan(0.45)
+        .greaterThan(0.4)
         .select(stepCount.mod(int(1)).equal(int(0)), stepCount.mod(int(2)).equal(int(0)))
 
       If(
         dens
-          .greaterThan(0.03)
-          .and(rhoV.greaterThanEqual(rin))
-          .and(rhoV.lessThanEqual(rout.mul(1.04)))
+          .greaterThan(0.02)
+          .and(rhoV.greaterThan(rin.mul(0.85)))
+          .and(rhoV.lessThan(rout.mul(1.12)))
           .and(sphR.greaterThan(rCapture.mul(1.12)))
           .and(diskTau.lessThan(3.0))
           .and(transm.greaterThan(0.04))
@@ -441,14 +466,13 @@ export function createGeodesicTracer(): GeodesicTracer {
           const dsH = min(ds.div(Hloc), float(1.05))
           const dTau = dens.mul(dsH).mul(0.7)
           const beer = exp(diskTau.mul(-1))
-          // Slightly boost midplane (optically thicker photosphere feel)
-          const w = dens.mul(dsH).mul(beer).mul(float(0.95).add(dens.mul(0.25)))
-          If(w.greaterThan(0.018), () => {
+          const w = dens.mul(dsH).mul(beer).mul(float(0.95).add(densZ.mul(0.25)))
+          If(w.greaterThan(0.015), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,
               weight: w,
-              densVert: dens,
+              densVert: densZ,
               M,
               a,
               aStar,
