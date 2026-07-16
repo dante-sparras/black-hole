@@ -686,11 +686,11 @@ export function createGeodesicTracer(): GeodesicTracer {
       const mz = max(float(1).sub(abs(uz.mul(2).sub(1))), float(0))
       const boxMask = mx.mul(my).mul(mz)
       // Peak dens ~1 in cube; scale for volume RT weight parity with analytic
-      const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.65))
+      const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.85))
       const densCube = max(cubeRaw, float(0)).mul(boxMask)
-      // Mild analytic detail when cube active (filaments stay alive)
+      // Cube-led dens with residual analytic filaments for fine structure
       const dens = densAnalytic
-        .mul(float(1).sub(uGrmhdMix.mul(0.88)))
+        .mul(float(1).sub(uGrmhdMix.mul(0.78)))
         .add(densCube.mul(uGrmhdMix))
       const sphR = pos.length()
 
@@ -723,9 +723,10 @@ export function createGeodesicTracer(): GeodesicTracer {
           })
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
           const beer = exp(diskTau.mul(float(-RT.beerSoft)))
-          const sec = hits.greaterThan(1.2).select(float(1.08), float(1))
-          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.88)).mul(sec)
-          If(w.greaterThan(0.016), () => {
+          // Secondary multi-path: slightly higher weight after first wrap
+          const sec = hits.greaterThan(1.2).select(float(1.12), float(1))
+          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.92)).mul(sec)
+          If(w.greaterThan(0.012), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,

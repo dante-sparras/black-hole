@@ -137,18 +137,18 @@ export const DISK_TEXTURE = {
   /** H/R scale-height used for path-length thickness (edge-on look) */
   scaleHeight: 0.09,
   /** Fine flow-aligned filament strength (reference streamlines) */
-  streamContrast: 0.72,
+  streamContrast: 0.78,
   /** Secondary streamline harmonic weight */
-  streamHarmonic: 0.55,
+  streamHarmonic: 0.58,
   /**
    * Kerr frame-drag spiral wind (dimensionless).
    * Phase add: dragGain · a★ · (M/r) — arms twist more near the hole for high spin.
    */
-  frameDragGain: 2.1,
+  frameDragGain: 2.25,
   /**
    * Log-normal MRI dens variance σ (unit-mean: exp(σ·ξ − σ²/2), ξ∈[-1,1] from noise).
    */
-  mriSigma: 0.68,
+  mriSigma: 0.72,
   /**
    * Photon-ring silk: multi-wrap intensity boost near r~r_ph.
    * 0 = honest (only true multi-hit accumulation); >0 is display boost.

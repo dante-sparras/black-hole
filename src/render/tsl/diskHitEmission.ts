@@ -422,9 +422,10 @@ export function accumulateDiskHit(p) {
     .mul(E.intensityGain)
     .mul(pathFac)
     .mul(max(limb, float(0.12)))
-  const imageW = hits.greaterThan(1.5).select(float(1.12), float(1))
+  const imageW = hits.greaterThan(1.5).select(float(1.18), float(1))
   const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w).mul(imageW)
-  const softI = raw.div(float(1).add(raw.mul(0.16)))
+  // Milder soft-knee — keep hot ISCO / Doppler punch without milk-glass
+  const softI = raw.div(float(1).add(raw.mul(0.11)))
   // 5-band blackbody chroma (R,Y,G,C,B → RGB)
   const planckC2 = float(PLANCK_C2_NM_K)
   const TKc = max(TK, float(E.tColorMinK))
@@ -466,8 +467,8 @@ export function accumulateDiskHit(p) {
 
   If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.01)), () => {
     col.addAssign(emit.mul(transm))
-    // Multi-image isolation: less extinction after first hit so secondary survives
-    const ext = hits.greaterThan(1.5).select(float(0.04), float(0.07))
-    transm.mulAssign(max(float(0.93), float(1).sub(w.mul(ext))))
+    // Multi-image isolation: leave more room for lensed far side / photon ring
+    const ext = hits.greaterThan(1.5).select(float(0.03), float(0.055))
+    transm.mulAssign(max(float(0.94), float(1).sub(w.mul(ext))))
   })
 }

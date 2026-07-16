@@ -202,26 +202,26 @@ export const DISK_EMISSION = {
    * Physical Wien shift uses ~1; slightly soft so high-spin faces stay readable.
    */
   gColorExponent: 1.0,
-  gColorFloor: 0.12,
+  gColorFloor: 0.1,
   /** Optical color temperature clamp [K] for max-norm chroma */
-  tColorMinK: 1600,
-  tColorMaxK: 48_000,
+  tColorMinK: 1500,
+  tColorMaxK: 52_000,
   beamExponent: 2.0,
   beamExponentIdeal: 3.0,
-  beamFloor: 0.15,
-  beamFloorIdeal: 0.1,
+  beamFloor: 0.12,
+  beamFloorIdeal: 0.08,
   /** fluxVis = fluxRel^{fluxVisPower} — 1 = true NT radial profile */
   fluxVisPower: 1.0,
-  fluxVisFloor: 0.02,
+  fluxVisFloor: 0.015,
   /** Overall HDR gain into ACES (not a fake fill of the shadow) */
-  intensityGain: 1.75,
+  intensityGain: 2.05,
   /**
    * Brightness vs ṁ: closer to F∝ṁ (power→1) with mild base so low-ṁ not pure black.
    */
-  mdotBrightBase: 0.12,
-  mdotBrightScale: 1.15,
-  mdotBrightPower: 0.85,
-  mdotBrightFloor: 0.008,
+  mdotBrightBase: 0.1,
+  mdotBrightScale: 1.28,
+  mdotBrightPower: 0.88,
+  mdotBrightFloor: 0.006,
   /** NT peak radius ≈ (49/36) r_in */
   ntPeakOverRin: 49 / 36,
 } as const
@@ -302,9 +302,9 @@ export function autoExposureFromPhysics(
 ): number {
   const eta = novikovThorneEfficiency(aStar, prograde)
   const power = eta * Math.max(mdot, 1e-4)
-  // Map power ~0.005..0.4 → exposure ~1.15..0.7
-  const e = 1.05 - 0.35 * Math.log10(1 + 40 * power)
-  return Math.min(1.35, Math.max(0.55, e))
+  // Map power ~0.005..0.4 → exposure ~1.2..0.75 (slightly brighter default)
+  const e = 1.12 - 0.32 * Math.log10(1 + 40 * power)
+  return Math.min(1.4, Math.max(0.6, e))
 }
 
 /**

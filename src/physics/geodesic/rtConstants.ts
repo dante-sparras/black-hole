@@ -8,28 +8,28 @@ export const RT = {
   /** Hard loop ceiling (GPU). Effective steps clamped by uMaxSteps quality. */
   maxSteps: 720,
   /** Default effective max steps (med quality) */
-  defaultMaxSteps: 500,
-  baseStepM: 0.13,
-  adaptFloor: 0.22,
-  adaptMax: 1.9,
-  adaptScale: 11,
+  defaultMaxSteps: 540,
+  baseStepM: 0.12,
+  adaptFloor: 0.21,
+  adaptMax: 1.85,
+  adaptScale: 10.5,
   /**
    * Extra refinement near photon sphere: adaptFloor *= (1 − phRefine * nearPh).
    * nearPh peaks at r≈3M — enables nested rings from geometry, not fake glow.
    */
-  phRefine: 0.5,
+  phRefine: 0.58,
   phCenterM: 3.0,
-  phWidthM: 2.2,
+  phWidthM: 2.0,
   captureMargin: 1.02,
   escapeCamFactor: 3,
   stalledCaptureM: 3.2,
-  diskOuterM: 22,
+  diskOuterM: 24,
   iscoHorizonMargin: 1.05,
-  volumeStride: 3,
-  beerSoft: 0.75,
-  tauSampleMax: 3.0,
+  volumeStride: 2,
+  beerSoft: 0.72,
+  tauSampleMax: 3.2,
   /** Allow more multi-wrap disk samples (secondary images) */
-  maxDiskHits: 16,
+  maxDiskHits: 18,
 } as const
 
 /** Adaptive step size in geometric units (CPU twin). */

@@ -19,25 +19,26 @@ export type QualityConfig = {
 
 export const QUALITY_PRESETS: Record<QualityLevel, Omit<QualityConfig, 'level'>> = {
   low: {
-    maxSteps: 320,
-    dpr: 0.75,
+    maxSteps: 340,
+    dpr: 0.8,
     volumeStride: 4,
-    baseStepM: 0.16,
+    baseStepM: 0.15,
   },
   med: {
     maxSteps: RT.defaultMaxSteps,
     dpr: 1,
-    volumeStride: 3,
-    baseStepM: 0.13,
+    volumeStride: 2,
+    baseStepM: 0.12,
   },
   high: {
-    maxSteps: 640,
-    dpr: 1.25,
-    volumeStride: 2,
-    baseStepM: 0.11,
+    maxSteps: 660,
+    dpr: 1.15,
+    volumeStride: 1,
+    baseStepM: 0.1,
   },
 }
 
+/** Default: high-looking med — denser volume, still interactive */
 export const QUALITY_DEFAULT: QualityLevel = 'med'
 
 type Listener = (q: QualityConfig) => void
