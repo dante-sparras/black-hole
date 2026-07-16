@@ -546,21 +546,25 @@ export function createGeodesicTracer(): GeodesicTracer {
           .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01)))),
         () => {
           const dsH = min(ds.div(Hloc), float(0.75))
-          // Opacity: plasma denser (Thomson-ish); dust more opaque per mass but cooler emit
-          const kappa = float(0.1)
-            .add(plasmaW.mul(0.28))
-            .add(densZ.mul(0.16))
-            .add(dustW.mul(0.12))
-            .mul(float(0.75).add(struct.mul(0.35)))
+          // Opacity: electron scattering (inner/hot) vs Kramers-like (outer/cool)
+          // κ_es ~ const (Thomson); κ_K rises outward / in dusty cooler gas
+          const fEs = min(
+            float(1),
+            plasmaW.mul(0.75).add(gasW.mul(0.4)).add(float(0.12)),
+          )
+          const kappaEs = float(0.26).mul(float(0.65).add(densZ.mul(0.55)))
+          const kappaKr = float(0.08)
+            .add(dustW.mul(0.42))
+            .add(pow(xRad.add(0.08), float(1.1)).mul(0.28))
+          const kappa = kappaEs
+            .mul(fEs)
+            .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
+            .mul(float(0.8).add(struct.mul(0.25)))
           const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(RT.volumeStride))
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
           const beer = exp(diskTau.mul(float(-RT.beerSoft)))
-          // Brightness: plasma hot path, dust dim
-          const zoneBright = float(0.42)
-            .add(plasmaW.mul(0.65))
-            .add(gasW.mul(0.12))
-            .sub(dustW.mul(0.18))
-          const w = dens.mul(dsH).mul(beer).mul(zoneBright).mul(strideF.mul(0.85))
+          // Emission weight follows dens · path · e^{−τ} (not fake zone film)
+          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.88))
           If(w.greaterThan(0.016), () => {
             processDiskVolumeSample({
               hx: hxV,

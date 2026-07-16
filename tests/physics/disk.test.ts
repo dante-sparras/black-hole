@@ -3,10 +3,12 @@ import {
   colorRedshiftFactor,
   diskIsco,
   DISK_EMISSION,
+  kerrCircularEnergy,
   mdotDisplayBrightness,
   mdotFluxScale,
   mdotFromSlider,
   mdotTemperatureScale,
+  novikovThorneEfficiency,
   novikovThorneFluxFactor,
   novikovThornePeakRadius,
   novikovThorneTemperature,
@@ -92,6 +94,18 @@ describe('Novikov–Thorne flux / temperature', () => {
     expect(F).toBeGreaterThan(0)
     expect(Number.isFinite(F)).toBe(true)
     expect(pageThorneFluxFactor(rIsco * 0.9, 1, 0.9, rIsco)).toBe(0)
+  })
+
+  test('novikovThorneEfficiency Schw ~5.7%, rises with spin', () => {
+    const eta0 = novikovThorneEfficiency(0, true)
+    const eta9 = novikovThorneEfficiency(0.9, true)
+    const etaExt = novikovThorneEfficiency(0.998, true)
+    expect(eta0).toBeGreaterThan(0.05)
+    expect(eta0).toBeLessThan(0.07)
+    expect(eta9).toBeGreaterThan(eta0)
+    expect(etaExt).toBeGreaterThan(eta9)
+    expect(etaExt).toBeLessThanOrEqual(0.42)
+    expect(kerrCircularEnergy(6, 0)).toBeCloseTo(1 - eta0, 3)
   })
 
   test('peak radius is outside ISCO', () => {

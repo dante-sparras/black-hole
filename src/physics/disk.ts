@@ -140,6 +140,36 @@ export function pageThorneFluxFactor(
 }
 
 /**
+ * Specific energy Ẽ of a circular equatorial Kerr geodesic (M = 1 units).
+ * rOverM = r/M, aStar = a/M signed (+ prograde L, − retrograde L).
+ * Bardeen / Page–Thorne.
+ */
+export function kerrCircularEnergy(rOverM: number, aStar: number): number {
+  const r = Math.max(rOverM, 1.05)
+  const a = Math.max(-0.998, Math.min(0.998, aStar))
+  const s = Math.sqrt(r)
+  // Ẽ = (r^{3/2} − 2 r^{1/2} + a) / ( r^{3/4} √(r^{3/2} − 3 r^{1/2} + 2a) )
+  const num = r * s - 2 * s + a
+  const denIn = r * s - 3 * s + 2 * a
+  if (!(denIn > 1e-12) || !(num > 0)) return 1
+  const den = Math.pow(r, 0.75) * Math.sqrt(denIn)
+  return Math.max(0, Math.min(1, num / den))
+}
+
+/**
+ * Novikov–Thorne radiative efficiency η = 1 − Ẽ_ISCO.
+ * prograde = fluid L ‖ hole J. Schw → ~5.7%; near-extremal pro → ~42%.
+ */
+export function novikovThorneEfficiency(aStar: number, prograde = true): number {
+  const aAbs = Math.min(0.998, Math.max(0, Math.abs(aStar)))
+  const { coRotating, counterRotating } = coRotatingIscoRadii(1, aAbs)
+  const rIscoM = prograde ? coRotating : counterRotating
+  const aSigned = prograde ? aAbs : -aAbs
+  const E = kerrCircularEnergy(rIscoM, aSigned)
+  return Math.max(0, Math.min(0.42, 1 - E))
+}
+
+/**
  * Peak effective temperature [K] at the NT flux maximum (optical viz scale).
  *
  * T_PEAK_REF_K is an optical visualization reference (~9000 K), not the
