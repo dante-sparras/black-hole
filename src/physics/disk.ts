@@ -66,9 +66,9 @@ export function diskIsco(params: BlackHoleParams, coRotating = true): number {
 }
 
 /**
- * Novikov–Thorne / zero-torque flux factor (shape only):
+ * Novikov–Thorne / zero-torque flux factor (Schwarzschild shape):
  *   F̃(r) = r⁻³ (1 − √(r_in / r))   for r > r_in
- * Physical flux F ∝ ṁ · F̃.
+ * Prefer pageThorneFluxFactor for Kerr.
  */
 export function novikovThorneFluxFactor(r: number, rIsco: number): number {
   if (!(r > rIsco) || rIsco <= 0) return 0
@@ -78,13 +78,74 @@ export function novikovThorneFluxFactor(r: number, rIsco: number): number {
 }
 
 /**
- * Peak effective temperature [K] at the NT flux maximum (look-dev scale).
+ * Page–Thorne (1974) / Novikov–Thorne Kerr flux shape.
+ * aStarSigned: +a★ prograde, −a★ retrograde (L sense vs hole spin).
+ * Returns F̃(r) > 0 for r > r_ISCO; physical F ∝ ṁ · F̃.
+ * a→0 reduces to the classic Schw factor.
+ */
+export function pageThorneFluxFactor(
+  r: number,
+  mass: number,
+  aStarSigned: number,
+  rIsco: number,
+): number {
+  const M = Math.max(mass, 1e-12)
+  if (!(r > rIsco) || rIsco <= 0) return 0
+  const a = Math.max(-0.998, Math.min(0.998, aStarSigned))
+  if (Math.abs(a) < 1e-5) {
+    return novikovThorneFluxFactor(r, rIsco)
+  }
+
+  const x = Math.sqrt(r / M)
+  const x0 = Math.sqrt(rIsco / M)
+  // Cubic roots (Page & Thorne)
+  const th = Math.acos(Math.max(-1, Math.min(1, a)))
+  const x1 = 2 * Math.cos((th - Math.PI) / 3)
+  const x2 = 2 * Math.cos((th + Math.PI) / 3)
+  const x3 = -2 * Math.cos(th / 3)
+
+  const B = 1 + a / (x * x * x)
+  const C = 1 - 3 / (x * x) + (2 * a) / (x * x * x)
+  if (!(B > 0) || !(C > 0)) return 0
+
+  const ln = (num: number, den: number): number => {
+    if (!(num > 0) || !(den > 0)) return 0
+    return Math.log(num / den)
+  }
+
+  const term = (xi: number, xj: number, xk: number): number => {
+    const den = xi * (xi - xj) * (xi - xk)
+    if (Math.abs(den) < 1e-14) return 0
+    const argNum = x - xi
+    const argDen = x0 - xi
+    if (!(argNum * argDen > 0)) return 0 // same sign required for real log of ratio if both negative OK
+    // Use abs carefully: Page–Thorne uses ln((x-xi)/(x0-xi))
+    const ratio = argNum / argDen
+    if (!(ratio > 0)) return 0
+    return (3 * (xi - a) * (xi - a) * Math.log(ratio)) / den
+  }
+
+  const Q =
+    x -
+    x0 -
+    1.5 * a * ln(x, x0) -
+    term(x1, x2, x3) -
+    term(x2, x1, x3) -
+    term(x3, x1, x2)
+
+  if (!(Q > 0)) return 0
+  // F ∝ Q / (r³ B √C)  with r = M x²
+  const shape = Q / (B * Math.sqrt(C))
+  return shape / (r * r * r)
+}
+
+/**
+ * Peak effective temperature [K] at the NT flux maximum (optical viz scale).
  *
  * T_PEAK_REF_K is an optical visualization reference (~9000 K), not the
  * keV-scale T_eff of a stellar-mass X-ray binary.
  *
- * Higher spin → smaller r_ISCO → hotter via T ∝ r_in^{-3/4} only
- * (no extra spinEta factor — that double-counted).
+ * Higher spin → smaller r_ISCO → hotter via T ∝ r_in^{-3/4} only.
  *
  * Reference: ṁ = 0.1, r_ISCO = 6M (Schw), a★ = 0 → T_peak = T_PEAK_REF_K.
  */
@@ -168,8 +229,9 @@ export function diskPeakTemperatureK(
 }
 
 /**
- * Rest-frame effective temperature [K] from NT profile:
+ * Rest-frame effective temperature [K] from Page–Thorne / NT profile:
  *   T(r) = T_peak · (F̃(r) / F̃_peak)^{1/4}
+ * @param aStarSigned — +a★ prograde, −a★ retrograde
  */
 export function diskTemperatureK(
   r: number,
@@ -177,11 +239,13 @@ export function diskTemperatureK(
   mdot: number,
   spinStar = 0,
   mass = 1,
+  prograde = true,
 ): number {
-  const F = novikovThorneFluxFactor(r, rIsco)
+  const a = prograde ? spinStar : -spinStar
+  const F = pageThorneFluxFactor(r, mass, a, rIsco)
   if (F <= 0) return 0
   const rPeak = novikovThornePeakRadius(rIsco)
-  const Fmax = novikovThorneFluxFactor(rPeak, rIsco)
+  const Fmax = pageThorneFluxFactor(rPeak, mass, a, rIsco)
   if (!(Fmax > 0)) return 0
   const rIscoOverM = rIsco / Math.max(mass, 1e-12)
   const Tpeak = diskPeakTemperatureK(mdot, rIscoOverM, spinStar)

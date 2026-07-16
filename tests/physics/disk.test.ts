@@ -10,6 +10,7 @@ import {
   novikovThorneFluxFactor,
   novikovThornePeakRadius,
   novikovThorneTemperature,
+  pageThorneFluxFactor,
   rnIsco,
   sliderFromMdot,
 } from '../../src/physics/disk'
@@ -75,6 +76,22 @@ describe('Novikov–Thorne flux / temperature', () => {
     const near = novikovThorneFluxFactor(10, 6)
     const far = novikovThorneFluxFactor(40, 6)
     expect(far).toBeLessThan(near)
+  })
+
+  test('pageThorne a→0 matches Schw NT shape', () => {
+    for (const r of [7, 10, 20, 40]) {
+      const a0 = pageThorneFluxFactor(r, 1, 0, 6)
+      const schw = novikovThorneFluxFactor(r, 6)
+      expect(a0).toBeCloseTo(schw, 10)
+    }
+  })
+
+  test('pageThorne Kerr is finite and positive outside ISCO', () => {
+    const rIsco = diskIsco({ mass: 1, spinStar: 0.9, charge: 0 }, true)
+    const F = pageThorneFluxFactor(rIsco * 1.5, 1, 0.9, rIsco)
+    expect(F).toBeGreaterThan(0)
+    expect(Number.isFinite(F)).toBe(true)
+    expect(pageThorneFluxFactor(rIsco * 0.9, 1, 0.9, rIsco)).toBe(0)
   })
 
   test('peak radius is outside ISCO', () => {

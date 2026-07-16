@@ -11,6 +11,7 @@
  */
 import {
   abs,
+  acos,
   cos,
   exp,
   float,
@@ -98,34 +99,111 @@ export function accumulateDiskHit(p) {
     .select(float(E.beamFloorIdeal), float(E.beamFloor))
   const beam = pow(max(freq, beamFl), beamExp)
 
-  // NT flux shape
-  const gap = max(float(1).sub(sqrt(rin.div(max(hitR, rin.mul(1.0001))))), float(0))
-  const Ftilde = gap.div(hitR.mul(hitR).mul(hitR).add(1e-12))
+  // NT / Page–Thorne flux shape (Kerr when |a★|>0) — no nested helpers (TSL)
+  const aEff = uPrograde.greaterThan(0.5).select(aStar, aStar.mul(-1))
+  const x = sqrt(max(hitR.div(max(M, float(1e-8))), float(1.05)))
+  const x0 = sqrt(max(rin.div(max(M, float(1e-8))), float(1.05)))
+  const gapSchw = max(float(1).sub(sqrt(rin.div(max(hitR, rin.mul(1.0001))))), float(0))
+  const Fschw = gapSchw.div(hitR.mul(hitR).mul(hitR).add(1e-12))
+  const th = acos(max(float(-1), min(float(1), aEff)))
+  const x1 = float(2).mul(cos(th.sub(float(Math.PI)).div(3)))
+  const x2 = float(2).mul(cos(th.add(float(Math.PI)).div(3)))
+  const x3 = float(-2).mul(cos(th.div(3)))
+  const Bpt = float(1).add(aEff.div(x.mul(x).mul(x).add(1e-12)))
+  const Cpt = float(1)
+    .sub(float(3).div(x.mul(x).add(1e-12)))
+    .add(aEff.mul(2).div(x.mul(x).mul(x).add(1e-12)))
+  // Page–Thorne log terms (inlined)
+  const r1 = x.sub(x1).div(x0.sub(x1).add(1e-14))
+  const r2 = x.sub(x2).div(x0.sub(x2).add(1e-14))
+  const r3 = x.sub(x3).div(x0.sub(x3).add(1e-14))
+  const t1 = float(3)
+    .mul(x1.sub(aEff))
+    .mul(x1.sub(aEff))
+    .div(x1.mul(x1.sub(x2)).mul(x1.sub(x3)).add(1e-14))
+    .mul(log(max(r1, float(1e-12))))
+    .mul(r1.greaterThan(0).select(float(1), float(0)))
+  const t2 = float(3)
+    .mul(x2.sub(aEff))
+    .mul(x2.sub(aEff))
+    .div(x2.mul(x2.sub(x1)).mul(x2.sub(x3)).add(1e-14))
+    .mul(log(max(r2, float(1e-12))))
+    .mul(r2.greaterThan(0).select(float(1), float(0)))
+  const t3 = float(3)
+    .mul(x3.sub(aEff))
+    .mul(x3.sub(aEff))
+    .div(x3.mul(x3.sub(x1)).mul(x3.sub(x2)).add(1e-14))
+    .mul(log(max(r3, float(1e-12))))
+    .mul(r3.greaterThan(0).select(float(1), float(0)))
+  const Qpt = x
+    .sub(x0)
+    .sub(aEff.mul(1.5).mul(log(max(x.div(max(x0, float(1e-6))), float(1e-12)))))
+    .sub(t1)
+    .sub(t2)
+    .sub(t3)
+  const Fkerr = max(Qpt, float(0)).div(
+    max(Bpt, float(1e-6))
+      .mul(sqrt(max(Cpt, float(1e-8))))
+      .mul(hitR.mul(hitR).mul(hitR).add(1e-12)),
+  )
+  const Ftilde = abs(aEff).lessThan(1e-4).select(Fschw, Fkerr)
   const rPeak = rin.mul(E.ntPeakOverRin)
-  const gapPeak = max(float(1).sub(sqrt(rin.div(max(rPeak, rin.mul(1.0001))))), float(0))
-  const FtildeMax = gapPeak.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
+  const xP = sqrt(max(rPeak.div(max(M, float(1e-8))), float(1.05)))
+  const gapP = max(float(1).sub(sqrt(rin.div(max(rPeak, rin.mul(1.0001))))), float(0))
+  const FschwP = gapP.div(rPeak.mul(rPeak).mul(rPeak).add(1e-12))
+  const Bp = float(1).add(aEff.div(xP.mul(xP).mul(xP).add(1e-12)))
+  const Cp = float(1)
+    .sub(float(3).div(xP.mul(xP).add(1e-12)))
+    .add(aEff.mul(2).div(xP.mul(xP).mul(xP).add(1e-12)))
+  const rp1 = xP.sub(x1).div(x0.sub(x1).add(1e-14))
+  const rp2 = xP.sub(x2).div(x0.sub(x2).add(1e-14))
+  const rp3 = xP.sub(x3).div(x0.sub(x3).add(1e-14))
+  const tp1 = float(3)
+    .mul(x1.sub(aEff))
+    .mul(x1.sub(aEff))
+    .div(x1.mul(x1.sub(x2)).mul(x1.sub(x3)).add(1e-14))
+    .mul(log(max(rp1, float(1e-12))))
+    .mul(rp1.greaterThan(0).select(float(1), float(0)))
+  const tp2 = float(3)
+    .mul(x2.sub(aEff))
+    .mul(x2.sub(aEff))
+    .div(x2.mul(x2.sub(x1)).mul(x2.sub(x3)).add(1e-14))
+    .mul(log(max(rp2, float(1e-12))))
+    .mul(rp2.greaterThan(0).select(float(1), float(0)))
+  const tp3 = float(3)
+    .mul(x3.sub(aEff))
+    .mul(x3.sub(aEff))
+    .div(x3.mul(x3.sub(x1)).mul(x3.sub(x2)).add(1e-14))
+    .mul(log(max(rp3, float(1e-12))))
+    .mul(rp3.greaterThan(0).select(float(1), float(0)))
+  const Qp = xP
+    .sub(x0)
+    .sub(aEff.mul(1.5).mul(log(max(xP.div(max(x0, float(1e-6))), float(1e-12)))))
+    .sub(tp1)
+    .sub(tp2)
+    .sub(tp3)
+  const FkerrP = max(Qp, float(0)).div(
+    max(Bp, float(1e-6))
+      .mul(sqrt(max(Cp, float(1e-8))))
+      .mul(rPeak.mul(rPeak).mul(rPeak).add(1e-12)),
+  )
+  const FtildeMax = abs(aEff).lessThan(1e-4).select(FschwP, FkerrP)
   const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
   const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
 
-  // Soft radial edges — sharper ISCO plasma edge; long dusty outer power-law fade
+  // Soft radial edges — physical ISCO taper; power-law outer
   const softIn = min(
     float(1),
-    max(float(0), hitR.sub(rin).div(max(rin.mul(0.25), M.mul(0.35)))),
+    max(float(0), hitR.sub(rin).div(max(rin.mul(0.22), M.mul(0.3)))),
   )
-  const c3 = cphi.mul(cphi.mul(cphi).sub(sphi.mul(sphi).mul(3)))
-  const s3 = sphi.mul(cphi.mul(cphi).mul(3).sub(sphi.mul(sphi)))
-  const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
-  const routEff = rout.mul(float(0.9).add(rimWobble.mul(0.12)))
-  // Power-law outer (not bullet smoothstep)
   const outerLin = min(
     float(1),
-    max(float(0), routEff.sub(hitR).div(max(rout.sub(rin).mul(0.22), M.mul(1.6)))),
+    max(float(0), rout.sub(hitR).div(max(rout.sub(rin).mul(0.2), M.mul(1.5)))),
   )
-  const softOut = pow(outerLin, float(1.7))
-  const edgeIn = pow(softIn, float(0.9))
-  const edgeFac = float(0.4).add(float(0.6).mul(edgeIn.mul(softOut)))
+  const softOut = pow(outerLin, float(1.65))
+  const edgeFac = float(0.42).add(float(0.58).mul(pow(softIn, float(0.9)).mul(softOut)))
 
-  // Zones relative to ISCO–outer (clear plasma / gas / dust)
+  // Zones relative to ISCO–outer
   const spanR = max(rout.sub(rin), M.mul(4))
   const xRad = min(float(1), max(float(0), hitR.sub(rin).div(spanR)))
   const plasmaZone = exp(xRad.mul(-5.0))
@@ -333,12 +411,15 @@ export function accumulateDiskHit(p) {
       E.mdotBrightScale,
     ),
   )
-  const nY = max(pathAbsY, float(0.18))
-  const pathFac = min(float(1.08), uScaleH.div(nY).mul(0.2).add(0.92))
+  // Path length + linear limb darkening (optically thick atmosphere μ = |n·ẑ|)
+  const mu = min(float(1), max(pathAbsY, float(0.04)))
+  const limb = float(0.5).add(float(0.5).mul(pow(mu, float(0.7))))
+  const pathFac = min(float(1.1), uScaleH.div(max(mu, float(0.12))).mul(0.18).add(0.9))
   const iFlux = max(fluxVis, float(E.fluxVisFloor))
     .mul(mdotBright)
     .mul(E.intensityGain)
     .mul(pathFac)
+    .mul(limb)
   // Mild ACES pre-soft only (not milk-glass)
   const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w)
   const softI = raw.div(float(1).add(raw.mul(0.18)))
