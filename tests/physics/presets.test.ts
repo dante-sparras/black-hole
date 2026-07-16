@@ -34,7 +34,7 @@ describe('presets', () => {
   test('all presets have unique ids', () => {
     const ids = listPresetIds()
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids.length).toBe(8)
+    expect(ids.length).toBe(9)
   })
 
   test('getPresetById finds interstellar', () => {
@@ -44,8 +44,8 @@ describe('presets', () => {
   test('every preset declares full no-hair + disk snapshot', () => {
     for (const p of ALL_PRESETS) {
       expect(p.params.mass).toBeGreaterThan(0)
-      expect(p.params.spinStar).toBeGreaterThanOrEqual(0)
-      expect(p.params.spinStar).toBeLessThanOrEqual(0.998)
+      expect(p.params.spinStar).toBeGreaterThanOrEqual(-0.998)
+            expect(p.params.spinStar).toBeLessThanOrEqual(0.998)
       expect(p.disk.mdot).toBeGreaterThan(0)
       expect(p.disk.outerM).toBeGreaterThan(6)
       expect(Number.isFinite(p.params.charge)).toBe(true)
@@ -126,8 +126,8 @@ describe('presets', () => {
       applyPreset(p)
       const phys = getParams()
       expect(phys.mass).toBeGreaterThan(0)
-      expect(phys.spinStar).toBeGreaterThanOrEqual(0)
-      expect(phys.spinStar).toBeLessThanOrEqual(0.998)
+      expect(phys.spinStar).toBeGreaterThanOrEqual(-0.998)
+            expect(phys.spinStar).toBeLessThanOrEqual(0.998)
       expect(getDisk().mdot).toBeGreaterThan(0)
       const a = phys.spinStar * phys.mass
       expect(phys.mass * phys.mass).toBeGreaterThanOrEqual(

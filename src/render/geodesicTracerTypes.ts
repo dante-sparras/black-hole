@@ -22,6 +22,14 @@ export type SpacetimeTraceParams = {
   shearRate: number
   /** 1 = animate shear with time */
   animate: boolean
+  /** Disk midplane tilt (rad) vs BH spin (+Y) */
+  tiltRad: number
+  /** Line of nodes (rad) about +Y */
+  tiltNodeRad: number
+  /** Optional jet power 0…1 */
+  jetPower: number
+  /** MRI dens variance scale from plasma β (1 = default) */
+  mriTurbScale: number
 }
 
 export type CameraTraceParams = {

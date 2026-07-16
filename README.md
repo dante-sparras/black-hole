@@ -6,10 +6,10 @@ Best-effort general-relativistic black hole visualization in the browser
 ## No-hair core
 
 1. **Mass \(M\)** — scale  
-2. **Spin \(a_\star\)** — \(0\) … \(0.998\)  
+2. **Spin \(a_★\)** — **signed** \(-0.998\) … \(+0.998\) (default **\(+0.9\)**)  
 3. **Charge \(Q\)** — default \(0\)
 
-**Not hair:** camera, \(\dot{m}\), texture, bloom, presets, **scale-free toggle**.
+**Not hair:** camera, \(\dot{m}\), tilt, jets, texture, bloom, presets, **scale-free toggle**.
 
 Geometric units: \(G = c = 1\).
 
@@ -25,26 +25,34 @@ bun run test:ref  # write tmp/cpu-ref.ppm + print counts
 bun run build
 ```
 
+## GUI (base physics)
+
+| Section | Controls |
+|---------|----------|
+| Black hole | \(M\), signed \(a_★\), \(Q\) |
+| Disk | \(\dot m\), \(r_\mathrm{out}/M\), orbit, **tilt** + node |
+| Jets | power 0…1 (off by default; \(\propto a_★^2 \dot m\)) |
+| Expert | \(\Gamma\) (4/3 \| 5/3), plasma \(\beta\) |
+| Observer | distance/\(M\), incl, azim, FOV |
+| Numerics | Quality, Density source |
+
+Derived HUD: \(r_+\), \(r_\mathrm{ph}\), ISCO, \(\eta_\mathrm{NT}\), H/R, \(b_c^\pm\), …
+
+See [docs/controls-physics-map.md](docs/controls-physics-map.md) and [docs/limitations.md](docs/limitations.md).
+
 ## Architecture
 
 ```
 src/
   physics/                 # pure TS (no Three) — bun test
-    observer.ts            # camera defaults (shared)
-    metricFamily.ts        # schw/kerr/rn/kn routing
-    disk.ts                # ISCO, NT, DISK_EMISSION
-    geodesic/
-      rtConstants.ts       # step floor, steps, escape (GPU↔CPU)
-      cpuRef.ts            # topology reference rasterizer
-      kerrNull.ts          # knNullAccel + RK4
-  state/                   # params, camera, look, presets, scene facade
+  state/                   # params, disk, camera, look, presets
   app/sceneBridge.ts       # scene → GPU uniforms
   render/                  # TSL geodesicTracer + bloom
-  ui/                      # controls, hud, format, orbit
+  ui/                      # controls, hud, orbit
   main.ts                  # WebGPU boot only
 ```
 
-**Data flow:** UI → state (`getScene`) → sceneBridge → GPU → bloom → canvas  
+**Data flow:** UI → state → sceneBridge → GPU → bloom → canvas  
 
 **Lockstep:** `RT` + `DISK_EMISSION` + `OBSERVER_DEFAULTS` shared by CPU ref and GPU.
 
@@ -53,11 +61,16 @@ src/
 | Feature | State |
 |---------|--------|
 | Four families on rays | ✅ |
+| Signed spin UI + default +0.9 | ✅ |
 | NT disk + ṁ + blackbody | ✅ |
-| Bloom + presets | ✅ |
+| Disk tilt | ✅ |
+| Optional jets | ✅ |
+| Expert Γ / β | ✅ |
+| Bloom + presets (incl. retrograde) | ✅ |
 | CPU ref topology tests | ✅ |
-| CPU BL Kerr nulls (Phase 1) | ✅ critical-curve validated |
-| BL camera → (E,Lz,Q) (Phase 2) | ✅ OBSERVER_DEFAULTS rays |
-| BL disk hits + cpuRef `bl` (Phase 3) | ✅ θ=π/2 + orbiting g |
-| Live GPU BL + stats tags (Phase 4) | ✅ RT/BL toggle · `*-BL` tags |
-| Scale-free camera toggle | ✅ ON: \(D\propto M\); OFF: fixed \(D\), mass affects lensing |
+| Live GPU BL | ✅ |
+| Scale-free camera | ✅ |
+
+## Safety branch
+
+`safety/pre-goal-plan-eae1eef` — snapshot before goal-control expansion.

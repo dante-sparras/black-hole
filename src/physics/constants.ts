@@ -2,12 +2,16 @@
 export const G = 1 as const
 export const C = 1 as const
 
-/** Soft max |spin★| for numerical stability (near-extremal Kerr). */
+/**
+ * Soft max |a★| for numerical stability (near-extremal Kerr).
+ * Free spin range is signed: a★ ∈ [−MAX_SPIN_STAR, +MAX_SPIN_STAR].
+ */
 export const MAX_SPIN_STAR = 0.998
 
-/** Default no-hair parameters (Schwarzschild of unit mass). */
+/** Default no-hair parameters — high prograde Kerr for strong default visuals. */
 export const DEFAULT_MASS = 1
-export const DEFAULT_SPIN_STAR = 0
+/** Default dimensionless spin a★ = +0.9 (signed; UI allows ±MAX_SPIN_STAR). */
+export const DEFAULT_SPIN_STAR = 0.9
 export const DEFAULT_CHARGE = 0
 
 /**

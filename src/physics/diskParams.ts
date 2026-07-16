@@ -5,6 +5,9 @@
  *   - ṁ sets accretion power (NT flux ∝ ṁ, T ∝ ṁ^{1/4})
  *   - outerM is the emission cutoff in units of M (model truncation)
  *   - prograde: orbital sense L ‖ J (co-rotating) vs counter-rotating
+ *   - tiltRad / tiltNodeRad: midplane inclination vs BH spin (+Y)
+ *   - jetPower: optional bipolar funnel (0 = off)
+ *   - gamma / plasmaBeta: expert EOS + MRI dens proxy
  *   - structure knobs: gas/plasma/dust look (not hair)
  *   - inner edge is derived: family ISCO for that sense (not a free slider)
  *
@@ -48,6 +51,21 @@ export type DiskParams = {
   readonly shearRate: number
   /** Animate structure with differential rotation */
   readonly animate: boolean
+  /** Disk midplane tilt vs BH spin axis (radians, main free param) */
+  readonly tiltRad: number
+  /** Line-of-nodes azimuth for tilt (radians, about +Y) */
+  readonly tiltNodeRad: number
+  /** Optional jet power 0…1 (0 = off) */
+  readonly jetPower: number
+  /**
+   * Adiabatic index Γ (expert). Drives derived thin-disk H/R.
+   * Typical: 5/3 (non-rel gas) or 4/3 (radiation-dominated).
+   */
+  readonly gamma: number
+  /**
+   * Plasma β = P_gas/P_mag proxy (expert). Lower β → stronger MRI dens variance.
+   */
+  readonly plasmaBeta: number
 }
 
 export const DEFAULT_DISK: DiskParams = {
@@ -61,6 +79,11 @@ export const DEFAULT_DISK: DiskParams = {
   scaleHeight: DISK_TEXTURE.scaleHeight,
   shearRate: DISK_TEXTURE.shearRate,
   animate: true,
+  tiltRad: 0,
+  tiltNodeRad: 0,
+  jetPower: 0,
+  gamma: 5 / 3,
+  plasmaBeta: 10,
 }
 
 export const DISK_LIMITS = {
@@ -73,6 +96,13 @@ export const DISK_LIMITS = {
   dust: { min: 0, max: 1 },
   scaleHeight: { min: 0.02, max: 0.18 },
   shearRate: { min: 0, max: 4 },
+  /** Tilt up to ~40° — dramatic but still thin-disk-ish */
+  tiltRad: { min: 0, max: (40 * Math.PI) / 180 },
+  tiltNodeRad: { min: 0, max: Math.PI * 2 },
+  jetPower: { min: 0, max: 1 },
+  gamma: { min: 4 / 3, max: 5 / 3 },
+  /** Log-friendly range: strongly magnetized → weakly magnetized */
+  plasmaBeta: { min: 0.1, max: 100 },
 } as const
 
 export type DiskInput = Partial<DiskParams>
@@ -134,6 +164,40 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
   )
   const animate =
     typeof input.animate === 'boolean' ? input.animate : DEFAULT_DISK.animate
+  const tiltRad = clamp(
+    Number.isFinite(input.tiltRad as number)
+      ? (input.tiltRad as number)
+      : DEFAULT_DISK.tiltRad,
+    DISK_LIMITS.tiltRad.min,
+    DISK_LIMITS.tiltRad.max,
+  )
+  let tiltNodeRad = Number.isFinite(input.tiltNodeRad as number)
+    ? (input.tiltNodeRad as number)
+    : DEFAULT_DISK.tiltNodeRad
+  // wrap to [0, 2π)
+  const twoPi = Math.PI * 2
+  tiltNodeRad = ((tiltNodeRad % twoPi) + twoPi) % twoPi
+  const jetPower = clamp(
+    Number.isFinite(input.jetPower as number)
+      ? (input.jetPower as number)
+      : DEFAULT_DISK.jetPower,
+    DISK_LIMITS.jetPower.min,
+    DISK_LIMITS.jetPower.max,
+  )
+  const gamma = clamp(
+    Number.isFinite(input.gamma as number)
+      ? (input.gamma as number)
+      : DEFAULT_DISK.gamma,
+    DISK_LIMITS.gamma.min,
+    DISK_LIMITS.gamma.max,
+  )
+  const plasmaBeta = clamp(
+    Number.isFinite(input.plasmaBeta as number)
+      ? (input.plasmaBeta as number)
+      : DEFAULT_DISK.plasmaBeta,
+    DISK_LIMITS.plasmaBeta.min,
+    DISK_LIMITS.plasmaBeta.max,
+  )
   return {
     mdot,
     outerM,
@@ -145,12 +209,18 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
     scaleHeight,
     shearRate,
     animate,
+    tiltRad,
+    tiltNodeRad,
+    jetPower,
+    gamma,
+    plasmaBeta,
   }
 }
 
 /**
  * Effective texture contrasts after master structure mix.
  * structure=0 → smooth; structure=1 → full arms/clumps/dust settings.
+ * plasmaBeta scales turb contrast (low β → more MRI dens variance).
  */
 export function effectiveDiskStructure(d: DiskParams): {
   armContrast: number
@@ -159,16 +229,30 @@ export function effectiveDiskStructure(d: DiskParams): {
   scaleHeight: number
   shearRate: number
   animate: boolean
+  mriTurbScale: number
 } {
   const s = d.structure
+  const mriTurbScale = plasmaBetaToMriScale(d.plasmaBeta)
   return {
     armContrast: s * d.arms,
-    turbContrast: s * d.clumps,
+    turbContrast: s * d.clumps * mriTurbScale,
     dustContrast: s * d.dust,
     scaleHeight: d.scaleHeight,
     shearRate: d.animate ? d.shearRate : 0,
     animate: d.animate,
+    mriTurbScale,
   }
+}
+
+/**
+ * Map plasma β → MRI dens variance scale.
+ * β=10 (default) → 1; lower β (stronger B) → up to ~2.2; high β → down to ~0.45.
+ */
+export function plasmaBetaToMriScale(plasmaBeta: number): number {
+  const b = Math.max(plasmaBeta, 0.05)
+  // ∝ 1/√(β/10) clipped
+  const s = Math.sqrt(10 / b)
+  return Math.min(2.2, Math.max(0.45, s))
 }
 
 function clamp(v: number, lo: number, hi: number): number {

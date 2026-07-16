@@ -35,7 +35,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 | Param | Code | Range (UI) | Notes |
 | ----- | ---- | ---------- | ----- |
 | Mass \(M\) | `mass` | \(0.1\)–\(10\) (default \(1\)) | Scale; angular image invariant if scale-free ON |
-| Dimensionless spin \(a_\star = J/M^2\) | `spinStar` | \(0\)–\(0.998\) | Kerr length \(a = a_\star M\) — **affects rays** |
+| Dimensionless spin \(a_\star = J/M^2\) | `spinStar` | **−0.998…+0.998** (default **+0.9**) | Kerr length \(a = a_\star M\) — **affects rays** (signed) |
 | Charge \(Q\) | `charge` | default 0 | Affects rays (RN/KN) |
 
 **Extremality:** \(M^2 \ge a^2 + Q^2\). Prefer reducing \(Q\) so spin stays the visual lever.
@@ -51,9 +51,14 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 | Gas arms | `arms` | \(0\)–\(1\) | Spiral filament contrast (× structure) |
 | Plasma clumps | `clumps` | \(0\)–\(1\) | Turbulence contrast |
 | Dust lanes | `dust` | \(0\)–\(1\) | Outer dust contrast + cooler outer T |
-| H/R | `scaleHeight` | \(0.02\)–\(0.18\) | Path-length thickness (edge-on) |
+| H/R | `scaleHeight` | \(0.02\)–\(0.18\) | Path-length thickness (edge-on); **derived from ṁ+Γ in bridge** |
 | Shear speed | `shearRate` | \(0\)–\(1.2\) | Keplerian pattern wind |
 | Animate | `animate` | on/off | Differential rotation animation |
+| Tilt | `tiltRad` | \(0\)–\(~40°\) | Midplane vs BH spin (+Y) |
+| Tilt node | `tiltNodeRad` | \(0\)–\(2\pi\) | Line of nodes |
+| Jet power | `jetPower` | \(0\)–\(1\) | Optional bipolar funnel (0 = off) |
+| \(\Gamma\) | `gamma` | \(4/3\) or \(5/3\) | Expert EOS → derived H/R |
+| Plasma \(\beta\) | `plasmaBeta` | \(0.1\)–\(100\) | Expert MRI dens variance |
 
 **Not free (realism):** inner edge (locked to ISCO), film palette as primary color.
 

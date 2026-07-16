@@ -47,8 +47,8 @@ const DISK_DEFAULT: Pick<DiskParams, 'mdot' | 'outerM'> = {
 export const PRESET_DEFAULT: ScenePreset = {
   id: 'default',
   label: 'Default',
-  hint: 'a★=0.7 · ṁ=0.1 · balanced Kerr',
-  params: { mass: 1, spinStar: 0.7, charge: 0 },
+  hint: 'a★=+0.9 · ṁ=0.1 · high prograde Kerr',
+  params: { mass: 1, spinStar: 0.9, charge: 0 },
   disk: { ...DISK_DEFAULT, mdot: 0.1 },
   camera: { ...CAMERA_DEFAULTS },
   look: { ...LOOK_DEFAULTS },
@@ -155,6 +155,17 @@ export const PRESET_NT_SMOOTH: ScenePreset = {
   look: { bloomEnabled: false, exposure: 0.95 },
 }
 
+/** Retrograde high |spin| — larger co-rot ISCO sense via orbit + negative a★ */
+export const PRESET_RETROGRADE: ScenePreset = {
+  id: 'retrograde',
+  label: 'Retrograde',
+  hint: 'a★=−0.9 · co-rot disk · weak jets · flipped frame-drag',
+  params: { mass: 1, spinStar: -0.9, charge: 0 },
+  disk: { ...DISK_DEFAULT, mdot: 0.12, prograde: true },
+  camera: { ...CAMERA_DEFAULTS },
+  look: { ...LOOK_SOFT, bloomStrength: 0.26, exposure: 0.98 },
+}
+
 export const ALL_PRESETS: readonly ScenePreset[] = [
   PRESET_DEFAULT,
   PRESET_INTERSTELLAR,
@@ -164,6 +175,7 @@ export const ALL_PRESETS: readonly ScenePreset[] = [
   PRESET_EXTREMAL,
   PRESET_RN,
   PRESET_NT_SMOOTH,
+  PRESET_RETROGRADE,
 ] as const
 
 export function getPresetById(id: string): ScenePreset | undefined {
@@ -188,6 +200,11 @@ export function applyPreset(preset: ScenePreset | string): ScenePreset {
       ...(typeof p.disk.arms === 'number' ? { arms: p.disk.arms } : {}),
       ...(typeof p.disk.clumps === 'number' ? { clumps: p.disk.clumps } : {}),
       ...(typeof p.disk.dust === 'number' ? { dust: p.disk.dust } : {}),
+      ...(typeof p.disk.prograde === 'boolean' ? { prograde: p.disk.prograde } : {}),
+      ...(typeof p.disk.tiltRad === 'number' ? { tiltRad: p.disk.tiltRad } : {}),
+      ...(typeof p.disk.jetPower === 'number' ? { jetPower: p.disk.jetPower } : {}),
+      ...(typeof p.disk.gamma === 'number' ? { gamma: p.disk.gamma } : {}),
+      ...(typeof p.disk.plasmaBeta === 'number' ? { plasmaBeta: p.disk.plasmaBeta } : {}),
     })
     setCamera({ ...CAMERA_DEFAULTS })
     setLook({

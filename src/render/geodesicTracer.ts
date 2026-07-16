@@ -88,6 +88,13 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uScaleH = uniform(DEFAULT_DISK.scaleHeight)
   const uShearRate = uniform(DEFAULT_DISK.shearRate)
   const uAnim = uniform(DEFAULT_DISK.animate ? 1 : 0)
+  /** Disk midplane tilt (rad) + line of nodes about +Y */
+  const uTilt = uniform(0)
+  const uTiltNode = uniform(0)
+  /** Jet power 0…1 (off by default) */
+  const uJetPower = uniform(0)
+  /** MRI dens variance scale from plasma β */
+  const uMriTurb = uniform(1)
   const uStarDensity = uniform(SKY_DEFAULTS.starDensity)
   const uStarBright = uniform(SKY_DEFAULTS.starBrightness)
   const uNebula = uniform(SKY_DEFAULTS.nebula)
@@ -548,11 +555,23 @@ export function createGeodesicTracer(): GeodesicTracer {
       const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
       vel.assign(vec3(vx, vel.y, vz))
 
+      // Disk-frame coords (tilt about line of nodes; tilt=0 → identity)
+      const cN = cos(uTiltNode)
+      const sN = sin(uTiltNode)
+      const x1 = pos.x.mul(cN).add(pos.z.mul(sN))
+      const z1 = pos.z.mul(cN).sub(pos.x.mul(sN))
+      const y1 = pos.y
+      const cT = cos(uTilt)
+      const sT = sin(uTilt)
+      const diskX = x1
+      const diskY = y1.mul(cT).sub(z1.mul(sT))
+      const diskZ = y1.mul(sT).add(z1.mul(cT))
+      const diskPos = vec3(diskX, diskY, diskZ)
       // Cheap reject before heavy dens (most steps outside the slab)
-      const hxV = pos.x
-      const hzV = pos.z
+      const hxV = diskX
+      const hzV = diskZ
       const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
-      const absY = abs(pos.y)
+      const absY = abs(diskY)
       const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(5), M.mul(0.4))
       // Sample denser near midplane (stride 1–2) so thin far-side isn't skipped
       const midStride = absY.lessThan(roughH.mul(1.1)).select(int(1), int(uVolumeStride))
@@ -630,7 +649,7 @@ export function createGeodesicTracer(): GeodesicTracer {
         ),
       )
       const nMix = nA.mul(0.4).add(nB.mul(0.3)).add(nCurl.mul(0.3))
-      const sigmaM = float(0.42).mul(float(0.5).add(uClumps.mul(0.35)).add(uStructure.mul(0.2)))
+      const sigmaM = float(0.42).mul(float(0.5).add(uClumps.mul(0.35)).add(uStructure.mul(0.2))).mul(uMriTurb)
       const xiM = nMix.mul(2).sub(1)
       const mriDens = exp(xiM.mul(sigmaM).sub(sigmaM.mul(sigmaM).mul(0.5)))
       // Mild vertical corrugation (low freq)
@@ -655,7 +674,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       const warpAmp = Hloc.mul(float(0.08)).mul(uStructure.add(0.35))
       const midY = s2.mul(warpAmp).add(c2.mul(warpAmp.mul(0.3)))
       const zWob = sx.mul(0.1).add(cx.mul(0.05)).mul(Hloc)
-      const zNorm = abs(pos.y.sub(midY).sub(zWob)).div(Hloc.mul(float(1.05).add(dustW.mul(0.3))))
+      const zNorm = abs(diskY.sub(midY).sub(zWob)).div(Hloc.mul(float(1.05).add(dustW.mul(0.3))))
       const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
       const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
       // Plasma clumps — large scale only
@@ -691,7 +710,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       // Cube dens — soft edges (no high edge boost)
       const xAdv = cx.mul(rhoV)
       const zAdv = sx.mul(rhoV)
-      const yAdv = pos.y.div(max(M, float(1e-8)))
+      const yAdv = diskY.div(max(M, float(1e-8)))
       const ux = xAdv.sub(uCubeOx).div(max(uCubeEx, float(1e-6)))
       const uy = yAdv.sub(uCubeOy).div(max(uCubeEy, float(1e-6)))
       const uz = zAdv.sub(uCubeOz).div(max(uCubeEz, float(1e-6)))
@@ -726,7 +745,7 @@ export function createGeodesicTracer(): GeodesicTracer {
           const w = dens.mul(dsH).mul(beer).mul(float(1.4))
           If(w.greaterThan(0.004), () => {
             singularityDiskComposite({
-              pos,
+              pos: diskPos,
               M,
               rCapture,
               rout,
@@ -791,6 +810,34 @@ export function createGeodesicTracer(): GeodesicTracer {
               nRay: vel.normalize(),
             })
           })
+        },
+      )
+      // Optional bipolar jets along ±spin (lab Y); power ∝ jetPower · a★² · ṁ
+      If(
+        uJetPower
+          .greaterThan(0.01)
+          .and(transm.greaterThan(0.08))
+          .and(stepCount.mod(int(3)).equal(int(0))),
+        () => {
+          const rLab = max(pos.length(), float(1e-5))
+          const rhoJet = pos.x.mul(pos.x).add(pos.z.mul(pos.z)).sqrt()
+          const muJet = abs(pos.y).div(rLab)
+          const core = M.mul(0.45)
+          const radial = exp(rhoJet.div(max(core, float(1e-5))).mul(rhoJet.div(max(core, float(1e-5)))).mul(-1))
+          const polar = max(float(0), muJet.sub(0.45).div(0.55))
+          const away = min(float(1), abs(pos.y).div(max(M.mul(1.5), float(1e-5))))
+          const a2 = min(float(1), aStar.mul(aStar))
+          const jEff = uJetPower.mul(a2).mul(pow(max(mdot, float(0.01)).div(0.1), float(0.4)))
+          const jw = radial.mul(polar).mul(polar).mul(away).mul(jEff).mul(0.12).mul(ds.div(max(M, float(0.1))))
+          If(
+            jw.greaterThan(0.002).and(rLab.greaterThan(rCapture.mul(1.08))),
+            () => {
+              const jc = vec3(0.62, 0.78, 0.98).mul(jw).mul(transm)
+              col.addAssign(jc)
+              transm.mulAssign(max(float(0.15), float(1).sub(jw.mul(0.35))))
+              hits.addAssign(0.05)
+            },
+          )
         },
       )
       }) // end RT path (useBl.not)
@@ -911,6 +958,10 @@ export function createGeodesicTracer(): GeodesicTracer {
       uScaleH.value = p.scaleHeight
       uShearRate.value = p.shearRate
       uAnim.value = p.animate ? 1 : 0
+      uTilt.value = p.tiltRad
+      uTiltNode.value = p.tiltNodeRad
+      uJetPower.value = p.jetPower
+      uMriTurb.value = p.mriTurbScale
     },
     setCamera: (c) => {
       uCamDistM.value = c.distanceM

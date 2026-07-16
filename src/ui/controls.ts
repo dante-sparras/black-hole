@@ -5,7 +5,7 @@ import {
   sliderFromMdot as sliderFromMdotRange,
 } from '../physics/disk'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
-import type { DiskParams } from '../physics/diskParams'
+import { DISK_LIMITS, type DiskParams } from '../physics/diskParams'
 import { withBatch } from '../state/batch'
 import {
   degToRad,
@@ -46,10 +46,24 @@ function sliderFromMdot(mdot: number): number {
   return sliderFromMdotRange(mdot, MDOT_MIN, MDOT_MAX)
 }
 
+/** Log-space 0…1000 ↔ plasma β ∈ [β_min, β_max]. */
+function betaFromSlider(t: number): number {
+  const lo = Math.log10(DISK_LIMITS.plasmaBeta.min)
+  const hi = Math.log10(DISK_LIMITS.plasmaBeta.max)
+  const u = Math.min(1, Math.max(0, t / 1000))
+  return 10 ** (lo + u * (hi - lo))
+}
+
+function sliderFromBeta(beta: number): number {
+  const lo = Math.log10(DISK_LIMITS.plasmaBeta.min)
+  const hi = Math.log10(DISK_LIMITS.plasmaBeta.max)
+  const b = Math.log10(Math.max(beta, DISK_LIMITS.plasmaBeta.min))
+  return Math.min(1000, Math.max(0, ((b - lo) / (hi - lo)) * 1000))
+}
+
 /**
- * Base-parameter panel only.
- * Locks physics/display laws that must not be free knobs:
- *   scale-free ON, ideal I∝g³ ON, disk structure/H/R/shear at model defaults.
+ * Base-parameter panel + optional jets + expert Γ/β.
+ * Locks: scale-free ON, ideal I∝g³ ON, structure/shear model defaults.
  */
 export function mountControls(
   root: HTMLElement,
@@ -57,7 +71,6 @@ export function mountControls(
 ): void {
   root.innerHTML = buildControlsHtml()
 
-  // Fixed model laws (not user free parameters)
   setScaleFree(true)
   setIdealBeam(true)
 
@@ -67,12 +80,23 @@ export function mountControls(
   const mdotInput = qs<HTMLInputElement>(root, '#d-mdot')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
   const orbitSelect = qs<HTMLSelectElement>(root, '#d-orbit')
+  const tiltInput = qs<HTMLInputElement>(root, '#d-tilt')
+  const tiltNodeInput = qs<HTMLInputElement>(root, '#d-tilt-node')
+  const jetInput = qs<HTMLInputElement>(root, '#d-jet')
+  const gammaSelect = qs<HTMLSelectElement>(root, '#d-gamma')
+  const betaInput = qs<HTMLInputElement>(root, '#d-beta')
+
   const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
   const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
   const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
   const mdotVal = qs<HTMLElement>(root, '[data-val="mdot"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
   const orbitVal = qs<HTMLElement>(root, '[data-val="orbit"]')
+  const tiltVal = qs<HTMLElement>(root, '[data-val="tilt"]')
+  const tiltNodeVal = qs<HTMLElement>(root, '[data-val="tiltNode"]')
+  const jetVal = qs<HTMLElement>(root, '[data-val="jet"]')
+  const gammaVal = qs<HTMLElement>(root, '[data-val="gamma"]')
+  const betaVal = qs<HTMLElement>(root, '[data-val="beta"]')
 
   const distInput = qs<HTMLInputElement>(root, '#c-dist')
   const incInput = qs<HTMLInputElement>(root, '#c-inc')
@@ -117,12 +141,25 @@ export function mountControls(
     setRangeValue(mdotInput, sliderFromMdot(d.mdot))
     setRangeValue(outerInput, d.outerM)
     if (orbitSelect) orbitSelect.value = d.prograde ? 'pro' : 'ret'
+    setRangeValue(tiltInput, radToDeg(d.tiltRad))
+    setRangeValue(tiltNodeInput, radToDeg(d.tiltNodeRad))
+    setRangeValue(jetInput, d.jetPower)
+    setRangeValue(betaInput, sliderFromBeta(d.plasmaBeta))
+    if (gammaSelect) {
+      // snap to 5/3 or 4/3
+      gammaSelect.value = d.gamma < 1.5 ? '1.3333' : '1.6667'
+    }
     if (mdotVal) {
       const tScale = mdotTemperatureScale(d.mdot)
       mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
     }
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
     setText(orbitVal, d.prograde ? 'pro' : 'ret')
+    setText(tiltVal, fmt(radToDeg(d.tiltRad), 1))
+    setText(tiltNodeVal, fmt(radToDeg(d.tiltNodeRad), 0))
+    setText(jetVal, fmt(d.jetPower, 2))
+    setText(gammaVal, d.gamma < 1.5 ? '4/3' : '5/3')
+    setText(betaVal, fmt(d.plasmaBeta, 2))
   }
 
   function syncCameraInputs(c: CameraState): void {
@@ -140,7 +177,6 @@ export function mountControls(
     if (derivedRoot) renderDerivedHud(derivedRoot, getParams(), d, getDisk())
   }
 
-  // --- Bind free base parameters only ---
   bindRange(massInput, (v) => {
     onUserTweaked()
     setParams({ mass: v })
@@ -164,6 +200,26 @@ export function mountControls(
   bindSelect(orbitSelect, (v) => {
     onUserTweaked()
     setDisk({ prograde: v === 'pro' })
+  })
+  bindRange(tiltInput, (v) => {
+    onUserTweaked()
+    setDisk({ tiltRad: degToRad(v) })
+  })
+  bindRange(tiltNodeInput, (v) => {
+    onUserTweaked()
+    setDisk({ tiltNodeRad: degToRad(v) })
+  })
+  bindRange(jetInput, (v) => {
+    onUserTweaked()
+    setDisk({ jetPower: v })
+  })
+  bindSelect(gammaSelect, (v) => {
+    onUserTweaked()
+    setDisk({ gamma: Number(v) })
+  })
+  bindRange(betaInput, (v) => {
+    onUserTweaked()
+    setDisk({ plasmaBeta: betaFromSlider(v) })
   })
   bindRange(distInput, (v) => {
     onUserTweaked()
@@ -236,7 +292,6 @@ export function mountControls(
   })
   subscribeCamera(syncCameraInputs)
 
-  // Initial sync
   syncPhysicsInputs(getParams())
   syncDiskInputs(getDisk())
   syncCameraInputs(getCamera())

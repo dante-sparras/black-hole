@@ -466,12 +466,16 @@ export function mdotFluxScale(mdot: number): number {
 
 /**
  * Thin-disk scale-height H/R from ṁ and r_ISCO/M (α-disk inspired).
- *
- * Gas-pressure branch (low ṁ): H/R ∼ ṁ^{1/8} · (r_in/6M)^{-1/5}
+ * Gas-pressure branch (low ṁ): H/R ∼ ṁ^{1/8} · (r_in/6M)^{-1/5}.
  * Radiation-pressure tendency (high ṁ): slightly thicker.
+ * Γ (adiabatic index): stiffer EOS (higher Γ) → slightly thinner disk.
  * Clamped to thin-disk regime [0.03, 0.14].
  */
-export function thinDiskScaleHeight(mdot: number, rIscoOverM: number): number {
+export function thinDiskScaleHeight(
+  mdot: number,
+  rIscoOverM: number,
+  gamma = 5 / 3,
+): number {
   const m = Math.max(mdot, 1e-4)
   const rinM = Math.max(rIscoOverM, 1.2)
   // Gas-pressure base
@@ -483,6 +487,9 @@ export function thinDiskScaleHeight(mdot: number, rIscoOverM: number): number {
   if (m > 0.3) {
     h *= 1 + 0.25 * Math.log10(m / 0.3)
   }
+  // Γ: 5/3 baseline; 4/3 → ~12% thicker (softer EOS)
+  const g = Math.min(5 / 3, Math.max(4 / 3, gamma))
+  h *= Math.pow(5 / 3 / g, 0.45)
   return Math.min(0.14, Math.max(0.03, h))
 }
 

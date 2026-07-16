@@ -22,20 +22,25 @@ export function renderDerivedHud(
   const m = Math.max(params.mass, 1e-12)
   const orbit = disk.prograde ? 'prograde (co-rot)' : 'retrograde (counter)'
   const eta = novikovThorneEfficiency(params.spinStar, disk.prograde)
-  const hOverR = thinDiskScaleHeight(disk.mdot, diag.rIscoOverM)
+  const hOverR = thinDiskScaleHeight(disk.mdot, diag.rIscoOverM, disk.gamma)
+  const tiltDeg = (disk.tiltRad * 180) / Math.PI
   root.innerHTML = `
       <div class="diag-title">Black hole (no-hair)</div>
       <div><dt>family</dt><dd>${derived.family}</dd></div>
+      <div><dt>a★</dt><dd>${fmt(params.spinStar, 3)} <span class="dim">(signed)</span></dd></div>
       <div><dt>r₊</dt><dd>${fmt(derived.rPlus)} <span class="dim">(${fmt(diag.rPlusOverM, 2)} M)</span></dd></div>
       <div><dt>r₋</dt><dd>${fmt(derived.rMinus)}</dd></div>
       <div><dt>r_ph</dt><dd>${fmt(derived.rPhotonSphere)} <span class="dim">(${fmt(diag.rPhotonOverM, 2)} M)</span></dd></div>
       <div class="diag-title">Disk (not hair · derived)</div>
       <div><dt>orbit</dt><dd>${orbit}</dd></div>
+      <div><dt>tilt</dt><dd>${fmt(tiltDeg, 1)}° <span class="dim">(vs spin)</span></dd></div>
       <div><dt>r_ISCO</dt><dd>${fmt(diag.rIsco)} <span class="dim">(${fmt(diag.rIscoOverM, 2)} M)</span></dd></div>
       <div><dt>η_NT</dt><dd>${(eta * 100).toFixed(2)}% <span class="dim">(1−Ẽ_ISCO)</span></dd></div>
       <div><dt>ṁ</dt><dd>${fmtMdot(disk.mdot)} ṁ_Edd</dd></div>
       <div><dt>r_out</dt><dd>${fmt(disk.outerM, 1)} M</dd></div>
-      <div><dt>H/R</dt><dd>${fmt(hOverR, 3)} <span class="dim">(thin-disk)</span></dd></div>
+      <div><dt>H/R</dt><dd>${fmt(hOverR, 3)} <span class="dim">(Γ=${disk.gamma < 1.5 ? '4/3' : '5/3'})</span></dd></div>
+      <div><dt>jet</dt><dd>${fmt(disk.jetPower, 2)} <span class="dim">(user · ×a★²ṁ)</span></dd></div>
+      <div><dt>β</dt><dd>${fmt(disk.plasmaBeta, 2)} <span class="dim">(expert)</span></dd></div>
       <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
       <div class="diag-title">Shadow / critical curve (analytic HUD)</div>
       <div><dt>b_c⁺</dt><dd>${fmt(diag.bCritPro)} <span class="dim">(${fmt(diag.bCritProOverM, 2)} M · co-rot)</span></dd></div>

@@ -4,17 +4,22 @@ import { isExtremalOk, normalizeParams } from '../../src/physics/validate'
 import { DEFAULT_DISK, DISK_LIMITS, normalizeDisk } from '../../src/physics/diskParams'
 
 describe('normalizeParams (no-hair only)', () => {
-  test('defaults to Schwarzschild unit mass', () => {
-    const p = normalizeParams({})
-    expect(p.mass).toBe(DEFAULT_MASS)
-    expect(p.spinStar).toBe(DEFAULT_SPIN_STAR)
-    expect(p.charge).toBe(0)
-  })
+  test('defaults to unit mass with default signed spin', () => {
+      const p = normalizeParams({})
+      expect(p.mass).toBe(DEFAULT_MASS)
+      expect(p.spinStar).toBe(DEFAULT_SPIN_STAR)
+      expect(p.charge).toBe(0)
+    })
 
-  test('clamps spinStar to MAX_SPIN_STAR', () => {
-    const p = normalizeParams({ spinStar: 2 })
-    expect(p.spinStar).toBe(MAX_SPIN_STAR)
-  })
+    test('clamps spinStar to MAX_SPIN_STAR', () => {
+      const p = normalizeParams({ spinStar: 2 })
+      expect(p.spinStar).toBe(MAX_SPIN_STAR)
+    })
+
+    test('clamps spinStar to −MAX_SPIN_STAR', () => {
+      const p = normalizeParams({ spinStar: -5 })
+      expect(p.spinStar).toBe(-MAX_SPIN_STAR)
+    })
 
   test('clamps charge so M² ≥ a² + Q²', () => {
     const p = normalizeParams({ mass: 1, spinStar: 0.9, charge: 10 })

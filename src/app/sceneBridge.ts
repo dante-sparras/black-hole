@@ -5,6 +5,7 @@
  */
 import { getDebug, subscribeDebug } from '../debug/state'
 import { diskIsco, thinDiskScaleHeight, autoExposureFromPhysics } from '../physics/disk'
+import { plasmaBetaToMriScale } from '../physics/diskParams'
 import { resolveCameraDistance } from '../physics/observer'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
@@ -73,8 +74,9 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const disk = getDisk()
     const rIsco = diskIsco(p, disk.prograde)
     const rinM = rIscoOverM(rIsco, p.mass)
-    // H/R from thin-disk scaling (not a free UI look knob)
-    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM)
+    // H/R from thin-disk scaling + expert Γ (not a free look knob)
+    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM, disk.gamma)
+    const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta)
     tracer.setSpacetime({
       mass: p.mass,
       spinStar: p.spinStar,
@@ -90,6 +92,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       scaleHeight,
       shearRate: disk.shearRate,
       animate: disk.animate,
+      tiltRad: disk.tiltRad,
+      tiltNodeRad: disk.tiltNodeRad,
+      jetPower: disk.jetPower,
+      mriTurbScale,
     })
     // Exposure from η·ṁ (physics), not a film slider
     setLook({
