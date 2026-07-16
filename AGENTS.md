@@ -22,10 +22,11 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 
 ## Preferences
 
+- **Realism first** — default to physical behavior over film look. Soft display hacks are optional toggles, not defaults (e.g. ideal \(I\propto g^3\) ON; soft \(g^2\) is opt-out). Prefer GR root-causes over bloom/fill/fake rings.
 - Write Test-Driven Code — add unit tests for new features and bug fixes. Use `bun test` to run them.
 - Geometric units: \(G = c = 1\). Schwarzschild: \(r_s = 2M\), \(r_{ph} = 3M\), \(b_c = 3\sqrt{3}\,M\). Kerr: \(r_+=M+\sqrt{M^2-a^2}\); prograde ISCO/photon sphere shrink with \(a_\star\).
-- Prefer real physics root-causes over visual workarounds once GR starts.
-- Pure-black voids for captured rays (no fake fill).
+- Pure-black voids for captured rays (no fake fill). Blackbody disk color (not film palette as primary).
+- Subtle bloom so the shadow stays readable.
 - TSL geodesic materials may need `// @ts-nocheck` (TS 7 + three/tsl type graphs can non-terminate).
 
 ## No-hair parameters (core)
