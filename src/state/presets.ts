@@ -73,16 +73,16 @@ export const PRESET_INTERSTELLAR: ScenePreset = {
 export const PRESET_HOT: ScenePreset = {
   id: 'hot',
   label: 'Hot',
-  hint: 'ṁ=1.5 · hottest multi-color BB',
+  hint: 'ṁ=1.5 · hottest multi-color BB · thin photosphere',
   params: { mass: 1, spinStar: 0.92, charge: 0 },
   disk: { ...DISK_DEFAULT, mdot: 1.5 },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
-    bloomStrength: 0.3,
-    bloomRadius: 0.38,
-    bloomThreshold: 0.78,
-    exposure: 0.92,
+    bloomStrength: 0.22,
+    bloomRadius: 0.36,
+    bloomThreshold: 0.82,
+    exposure: 0.88,
   },
 }
 

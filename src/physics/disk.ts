@@ -484,13 +484,15 @@ export function thinDiskScaleHeight(
     Math.pow(m / T_PEAK_MDOT_REF, 0.125) *
     Math.pow(R_ISCO_SCHW_OVER_M / rinM, 0.2)
   // Mild radiation-pressure thickening above ~0.3 ṁ_Edd
+  // Keep weak — large H + volume RT → polar hourglass at high ṁ (Hot preset)
   if (m > 0.3) {
-    h *= 1 + 0.25 * Math.log10(m / 0.3)
+    h *= 1 + 0.12 * Math.log10(m / 0.3)
   }
   // Γ: 5/3 baseline; 4/3 → ~12% thicker (softer EOS)
   const g = Math.min(5 / 3, Math.max(4 / 3, gamma))
   h *= Math.pow(5 / 3 / g, 0.45)
-  return Math.min(0.14, Math.max(0.03, h))
+  // Visual thin-disk ceiling (was 0.14 — too puffy for volume dens at ṁ≳1)
+  return Math.min(0.09, Math.max(0.03, h))
 }
 
 /**

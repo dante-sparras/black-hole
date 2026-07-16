@@ -732,21 +732,34 @@ export function createGeodesicTracer(): GeodesicTracer {
       const densCube = max(cubeRaw, float(0))
         .mul(boxMask)
         .mul(float(0.78).add(min(densEdge, float(1.0)).mul(0.4)))
-      // Thin photosphere densZ² — gate only (look is singularity noise/α)
-      const densZPhot = densZ.mul(densZ)
-      const densEnv = densZ.mul(radialGate).mul(densZPhot)
+      // High-ṁ factor: 0 below ~0.35 Edd, ~1 near super-Edd (Hot preset ṁ=1.5)
+      // Kills milk-glass hourglass: thick sech² + long polar chords stack white funnels
+      const mdotHi = min(
+        float(1),
+        max(float(0), mdot.sub(float(0.35)).div(float(1.15))),
+      )
+      // Photosphere: densZ³ base, densZ^(3+2*mdotHi) at high ṁ → razor midplane
+      const densZPow = float(2).add(mdotHi.mul(2.2))
+      const densZPhot = pow(max(densZ, float(1e-6)), densZPow)
+      // Extra off-midplane kill (polar hourglass)
+      const zKill = exp(zNorm.mul(zNorm).mul(float(-0.35).sub(mdotHi.mul(1.8))))
+      const densEnv = densZ
+        .mul(radialGate)
+        .mul(densZPhot)
+        .mul(zKill)
+        .mul(float(1).sub(mdotHi.mul(0.25))) // overall dens soft-cap at high ṁ
       // Torus dens peak from ℓ̃ (rPeak) — Gaussian envelope in log-r
       const rPeak = max(uRPeakM.mul(M), rin.mul(1.05))
       const lnPeak = log(max(rhoV.div(rPeak), float(1e-4)))
       const peakEnv = exp(lnPeak.mul(lnPeak).mul(-1.1))
-      // Mag geometry dens modulation (proxy topology)
+      // Mag geometry dens modulation (proxy topology) — never thicken with |y|
       const magMod = uMagGeom
         .lessThan(0.5)
         .select(
           float(1),
           uMagGeom
             .lessThan(1.5)
-            .select(float(0.88).add(c2.mul(0.18)), float(0.9).add(abs(diskY).div(max(Hloc, M.mul(0.05))).mul(0.12))),
+            .select(float(0.88).add(c2.mul(0.18)), float(0.92).add(c2.mul(0.08))),
         )
       const dens = densEnv
         .mul(float(1.2).add(uGrmhdMix.mul(densCube.mul(0.4))))
@@ -763,10 +776,20 @@ export function createGeodesicTracer(): GeodesicTracer {
           .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01))))
           .and(transm.greaterThan(0.03)),
         () => {
-          const dsH = min(ds.div(max(Hloc, M.mul(0.05))), float(0.5))
-          // Path weight: thin band + soft beer (not milky stack)
-          const beer = exp(diskTau.mul(float(-0.55)))
-          const w = dens.mul(dsH).mul(beer).mul(float(1.4)).mul(sqrt(max(uPolyT, float(0.2))))
+          // Tighter path Δs at high ṁ — less volume stack per step
+          const dsHCap = float(0.5).mul(float(1).sub(mdotHi.mul(0.45)))
+          const dsH = min(ds.div(max(Hloc, M.mul(0.05))), max(dsHCap, float(0.18)))
+          // Harder Beer at high ṁ (photosphere saturates, no white funnel)
+          const beerK = float(0.55).add(mdotHi.mul(0.85))
+          const beer = exp(diskTau.mul(beerK.mul(-1)))
+          // Compressive ṁ weight (not linear dens stack)
+          const mdotW = float(1).div(float(1).add(mdotHi.mul(1.4)))
+          const w = dens
+            .mul(dsH)
+            .mul(beer)
+            .mul(float(1.25))
+            .mul(sqrt(max(uPolyT, float(0.2))))
+            .mul(mdotW)
           If(w.greaterThan(0.004), () => {
             singularityDiskComposite({
               pos: diskPos,
@@ -781,24 +804,25 @@ export function createGeodesicTracer(): GeodesicTracer {
               weight: w,
               beam: float(1),
             })
-            diskTau.addAssign(w.mul(0.35))
+            diskTau.addAssign(w.mul(float(0.35).add(mdotHi.mul(0.45))))
           })
         },
       )
         },
       )
-      // Hot dilute corona above inner disk (optical proxy for soft X-ray region)
+      // Hot dilute corona — KEEP WEAK; was ∝ mdot and drew polar hourglass
       If(
         rhoV
           .greaterThan(rin.mul(0.95))
           .and(rhoV.lessThan(rin.mul(5)))
-          .and(absY.greaterThan(roughH.mul(0.9)))
-          .and(absY.lessThan(roughH.mul(5)))
-          .and(transm.greaterThan(0.15))
+          .and(absY.greaterThan(roughH.mul(1.2)))
+          .and(absY.lessThan(roughH.mul(3.5)))
+          .and(transm.greaterThan(0.25))
+          .and(mdotHi.lessThan(0.55)) // disable corona contribution at high ṁ (Hot)
           .and(stepCount.mod(int(4)).equal(int(0))),
         () => {
           const cFall = exp(absY.div(max(roughH.mul(2.5), M.mul(0.2))).mul(-1))
-          const wC = cFall.mul(0.04).mul(mdot.add(0.05))
+          const wC = cFall.mul(0.018).mul(float(0.2).add(mdot.mul(0.04)))
           If(wC.greaterThan(0.008), () => {
             processDiskVolumeSample({
               hx: hxV,
