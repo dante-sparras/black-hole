@@ -38,9 +38,21 @@ True science cubes need an offline convert:
 
 `scripts/convert-harm-stub.ts` documents the roundtrip; full HDF5 conversion is usually **Python + h5py** (not in the browser).
 
-## GPU
+## GPU (WebGPU)
 
-`Data3DTexture` R32F + TSL `texture3D` at `pos/M` → UVW. Outside the box dens = 0 for the cube channel.
+`Data3DTexture` as **R8 UNORM** (not R32F — float filter often black-screens).
+
+TSL sample (required form):
+
+```js
+const cubeNode = texture3D(data3DTexture)
+const dens = cubeNode.sample(uvw).r
+```
+
+Boot loads `/cubes/demo.bhcm` with **mix=0** (analytic). Numerics → **GRMHD cube** sets mix=1.
+
+Soft box mask: \(\max(1-|2u-1|,0)\) product — no `greaterThanEqual` chains.
+
 
 ## Honesty
 

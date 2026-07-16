@@ -20,6 +20,7 @@ import {
   screenSize,
   sin,
   sqrt,
+  texture3D,
   uniform,
   uv,
   vec2,
@@ -100,7 +101,7 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uMaxSteps = uniform(RT.defaultMaxSteps)
   const uVolumeStride = uniform(RT.volumeStride)
   const uBaseStepM = uniform(RT.baseStepM)
-  /** GRMHD dens cube meta (GPU texture sample re-enable later) */
+  /** GRMHD dens cube: mix 0 = analytic, 1 = pure cube (R8 3D texture) */
   const uGrmhdMix = uniform(0)
   const uCubeOx = uniform(-40)
   const uCubeOy = uniform(-12)
@@ -113,6 +114,8 @@ export function createGeodesicTracer(): GeodesicTracer {
   stubCube.data.fill(0)
   let gpuGrmhd: GrmhdGpuTexture | null = createGrmhdTexture(stubCube)
   const stubTex = gpuGrmhd.texture
+  // Official TSL API: texture3D(tex).sample(uvw) — see TextureHelperGPU
+  const cubeTexNode = texture3D(stubTex)
 
   const STEPS = RT.maxSteps
 
@@ -668,8 +671,22 @@ export function createGeodesicTracer(): GeodesicTracer {
         .mul(densGas)
         .mul(float(0.65).add(mriDens.mul(0.5)))
         .mul(chan)
-      // dens = analytic (GPU texture3D cube sampling disabled — was black-screening)
+      // GRMHD cube dens — always sample (uniform CF); mix blends with analytic.
+      // R8 UNORM 3D tex + soft box mask (no greaterThanEqual chains).
+      const pM = pos.div(max(M, float(1e-8)))
+      const ux = pM.x.sub(uCubeOx).div(max(uCubeEx, float(1e-6)))
+      const uy = pM.y.sub(uCubeOy).div(max(uCubeEy, float(1e-6)))
+      const uz = pM.z.sub(uCubeOz).div(max(uCubeEz, float(1e-6)))
+      const uvw = vec3(ux, uy, uz)
+      const mx = max(float(1).sub(abs(ux.mul(2).sub(1))), float(0))
+      const my = max(float(1).sub(abs(uy.mul(2).sub(1))), float(0))
+      const mz = max(float(1).sub(abs(uz.mul(2).sub(1))), float(0))
+      const boxMask = mx.mul(my).mul(mz)
+      const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.45))
+      const densCube = max(cubeRaw, float(0)).mul(boxMask)
       const dens = densAnalytic
+        .mul(float(1).sub(uGrmhdMix))
+        .add(densCube.mul(uGrmhdMix))
       const sphR = pos.length()
 
       // Only skip deep inside capture — keep photon-ring / far-side bridge
@@ -929,10 +946,11 @@ export function createGeodesicTracer(): GeodesicTracer {
       uVolumeStride.value = q.volumeStride
       uBaseStepM.value = q.baseStepM
     },
-    setGrmhdCube: (gpu, _mix) => {
+    setGrmhdCube: (gpu, mix) => {
       if (gpu) {
         const prev = gpuGrmhd
         gpuGrmhd = gpu
+        cubeTexNode.value = gpu.texture
         uCubeOx.value = gpu.origin.x
         uCubeOy.value = gpu.origin.y
         uCubeOz.value = gpu.origin.z
@@ -940,8 +958,7 @@ export function createGeodesicTracer(): GeodesicTracer {
         uCubeEy.value = gpu.extent.y
         uCubeEz.value = gpu.extent.z
         uCubeScale.value = gpu.densScale
-        // dens sampling not wired in shader yet — stay analytic
-        uGrmhdMix.value = 0
+        uGrmhdMix.value = Math.min(1, Math.max(0, mix))
         if (prev && prev.texture !== gpu.texture && prev.texture !== stubTex) {
           try {
             prev.texture.dispose()
@@ -951,6 +968,7 @@ export function createGeodesicTracer(): GeodesicTracer {
         }
       } else {
         uGrmhdMix.value = 0
+        cubeTexNode.value = stubTex
       }
     },
   }

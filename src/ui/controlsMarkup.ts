@@ -110,6 +110,6 @@ export function buildControlsHtml(): string {
       </select>
       <span class="ctrl-val" data-val="grmhd"></span>
     </label>
-    <p class="ctrl-hint">Steps / DPR / dens field · cube = 3D dens texture (.bhcm)</p>
+    <p class="ctrl-hint">Analytic = sech² model · GRMHD cube = 3D dens (.bhcm R8) · toggle if image ok</p>
   `
 }

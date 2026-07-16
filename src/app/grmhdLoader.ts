@@ -41,20 +41,21 @@ export function applyGrmhdCube(
   setGrmhd({
     cube,
     enabled: enable,
-    mix,
+    mix: enable ? mix : 0,
     label,
     error: null,
   })
-  tracer.setGrmhdCube(enable ? gpu : null, enable ? mix : 0)
+  // Always bind texture so sample is valid; mix=0 keeps analytic dens
+  tracer.setGrmhdCube(gpu, enable ? mix : 0)
 }
 
 export function syncGrmhdToTracer(tracer: GeodesicTracer): void {
   const s = getGrmhd()
-  if (s.enabled && s.cube) {
+  if (s.cube) {
     if (!lastGpu) {
       lastGpu = createGrmhdTexture(s.cube)
     }
-    tracer.setGrmhdCube(lastGpu, s.mix)
+    tracer.setGrmhdCube(lastGpu, s.enabled ? s.mix : 0)
   } else {
     tracer.setGrmhdCube(null, 0)
   }
@@ -62,10 +63,11 @@ export function syncGrmhdToTracer(tracer: GeodesicTracer): void {
 
 export function setGrmhdEnabled(tracer: GeodesicTracer, enabled: boolean): void {
   const s = getGrmhd()
-  setGrmhd({ enabled })
-  if (enabled && s.cube) {
+  const mix = enabled ? (s.mix > 0 ? s.mix : 1) : 0
+  setGrmhd({ enabled, mix: enabled ? mix : 0 })
+  if (s.cube) {
     if (!lastGpu) lastGpu = createGrmhdTexture(s.cube)
-    tracer.setGrmhdCube(lastGpu, s.mix)
+    tracer.setGrmhdCube(lastGpu, enabled ? mix : 0)
   } else {
     tracer.setGrmhdCube(null, 0)
   }

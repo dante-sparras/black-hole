@@ -202,7 +202,10 @@ export function mountControls(
       if (grmhdSelect) grmhdSelect.value = 'analytic'
       return
     }
-    setGrmhd({ enabled: wantCube, mix: wantCube ? 1 : 0 })
+    setGrmhd({
+      enabled: wantCube,
+      mix: wantCube ? 1 : 0,
+    })
   })
   subscribeGrmhd((s) => {
     const mode = s.enabled && s.cube ? 'cube' : 'analytic'
