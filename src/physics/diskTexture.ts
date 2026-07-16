@@ -114,7 +114,7 @@ export const DISK_TEXTURE = {
   /** Log-spiral pitch (tighter = more wound, GRMHD-like) */
   pitch: 0.82,
   /** Arm vs inter-arm contrast (gas filaments) — high for reference-still look */
-  armContrast: 0.9,
+  armContrast: 0.95,
   /** Multi-scale plasma / eddy contrast */
   turbContrast: 0.78,
   /** Outer dusty lanes — cooler, darker annuli */
@@ -130,13 +130,13 @@ export const DISK_TEXTURE = {
    * Uses Ω̃=(M/r)^{3/2} (not geometric Ω∝1/M) so scale-free mass does not freeze the disk.
    */
   shearGain: 32,
-  texMin: 0.14,
-  texMax: 2.55,
+  texMin: 0.12,
+  texMax: 2.7,
   /** Mild T jitter from clumping */
-  tempJitterAmp: 0.22,
+  tempJitterAmp: 0.14,
   /** H/R scale-height used for path-length thickness (edge-on look) */
   scaleHeight: 0.09,
-  armContrast: 0.95,
+  /** Fine flow-aligned filament strength (reference streamlines) */
   streamContrast: 0.82,
   /** Secondary streamline harmonic weight */
   streamHarmonic: 0.6,
@@ -145,12 +145,12 @@ export const DISK_TEXTURE = {
    * Phase add: dragGain · a★ · (M/r) — arms twist tighter near hole.
    */
   frameDragGain: 1.35,
-  /** Multi-wrap silk (0 = path accumulation only; no fake ring paint) */
-  photonRingBoost: 0,
-  texMin: 0.12,
-  texMax: 2.7,
-  tempJitterAmp: 0.14,
+  /**
+   * Log-normal MRI dens variance σ (unit-mean: exp(σ·ξ − σ²/2), ξ∈[-1,1] from noise).
+   */
   mriSigma: 0.78,
+  /**
+   * Photon-ring silk: multi-wrap intensity boost near r~r_ph.
    * 0 = honest (only true multi-hit accumulation); >0 is display boost.
    */
   photonRingBoost: 0,
