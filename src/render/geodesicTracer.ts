@@ -581,6 +581,11 @@ export function createGeodesicTracer(): GeodesicTracer {
       const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(5), M.mul(0.4))
       // Sample denser near midplane (stride 1–2) so thin far-side isn't skipped
       const midStride = absY.lessThan(roughH.mul(1.1)).select(int(1), int(uVolumeStride))
+      // High-ṁ factor in RT scope (corona + dens both need it — never nest-only)
+      const mdotHi = min(
+        float(1),
+        max(float(0), mdot.sub(float(0.35)).div(float(1.15))),
+      )
       If(
         rhoV
           .greaterThan(rin.mul(0.9))
@@ -732,13 +737,8 @@ export function createGeodesicTracer(): GeodesicTracer {
       const densCube = max(cubeRaw, float(0))
         .mul(boxMask)
         .mul(float(0.78).add(min(densEdge, float(1.0)).mul(0.4)))
-      // High-ṁ factor: 0 below ~0.35 Edd, ~1 near super-Edd (Hot preset ṁ=1.5)
-      // Kills milk-glass hourglass: thick sech² + long polar chords stack white funnels
-      const mdotHi = min(
-        float(1),
-        max(float(0), mdot.sub(float(0.35)).div(float(1.15))),
-      )
-      // Photosphere: densZ³ base, densZ^(3+2*mdotHi) at high ṁ → razor midplane
+      // High-ṁ photosphere (mdotHi from RT scope): kill polar hourglass
+      // Photosphere: densZ^(2+…) → razor midplane at high ṁ
       const densZPow = float(2).add(mdotHi.mul(2.2))
       const densZPhot = pow(max(densZ, float(1e-6)), densZPow)
       // Extra off-midplane kill (polar hourglass)
