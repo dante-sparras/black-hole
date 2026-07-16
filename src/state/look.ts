@@ -23,12 +23,12 @@ export type LookState = {
  * a mid threshold so the pure-black shadow stays readable.
  */
 export const LOOK_DEFAULTS: LookState = {
-  /** Soft default glow (singularity-style cinematic without crushing physics) */
+  /** Singularity-like soft bloom (str~0.22, r~0, low thresh) */
   bloomEnabled: true,
-  bloomStrength: 0.3,
-  bloomRadius: 0.12,
-  bloomThreshold: 0.36,
-  exposure: 0.98,
+  bloomStrength: 0.24,
+  bloomRadius: 0.02,
+  bloomThreshold: 0.08,
+  exposure: 1.05,
 }
 
 export const LOOK_LIMITS = {

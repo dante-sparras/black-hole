@@ -10,7 +10,8 @@ describe('look store (bloom)', () => {
   test('defaults enable soft bloom (singularity-style glow)', () => {
     expect(LOOK_DEFAULTS.bloomEnabled).toBe(true)
     expect(LOOK_DEFAULTS.bloomStrength).toBeLessThanOrEqual(0.35)
-    expect(LOOK_DEFAULTS.bloomThreshold).toBeGreaterThanOrEqual(0.35)
+    expect(LOOK_DEFAULTS.bloomThreshold).toBeGreaterThanOrEqual(0)
+    expect(LOOK_DEFAULTS.bloomThreshold).toBeLessThanOrEqual(0.5)
   })
 
   test('clamps strength / radius / threshold / exposure', () => {

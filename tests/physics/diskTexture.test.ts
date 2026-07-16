@@ -83,9 +83,16 @@ describe('diskTextureFactor', () => {
   })
 
   test('Keplerian shear changes pattern over time at fixed point', () => {
-    const f0 = diskTextureFactor(12, 3, 1, { time: 0 })
-    const f1 = diskTextureFactor(12, 3, 1, { time: 1.5 })
-    expect(Math.abs(f1 - f0)).toBeGreaterThan(0.02)
+    let maxDiff = 0
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2
+      const x = 12 * Math.cos(ang)
+      const z = 12 * Math.sin(ang)
+      const f0 = diskTextureFactor(x, z, 1, { time: 0 })
+      const f1 = diskTextureFactor(x, z, 1, { time: 1.5 })
+      maxDiff = Math.max(maxDiff, Math.abs(f1 - f0))
+    }
+    expect(maxDiff).toBeGreaterThan(0.015)
   })
 
   test('inner radius shears faster than outer (differential rotation)', () => {

@@ -714,34 +714,35 @@ export function createGeodesicTracer(): GeodesicTracer {
       const densCube = max(cubeRaw, float(0))
         .mul(boxMask)
         .mul(float(0.65).add(min(densEdge, float(1.8)).mul(0.7)))
-      // Thin photosphere vertical: densZ² concentrates near midplane skin, less fog
-      const densZPhot = densZ.mul(densZ).mul(float(1.55))
+      // Thin photosphere vertical: densZ³ — singularity-thin band
+      const densZPhot = densZ.mul(densZ).mul(densZ).mul(float(2.2))
       // Spiral deep-noise dens (singularity UV wind) — high-freq filaments
-      const rotP = rhoV.mul(4.27).sub(uTime.mul(0.11))
+      const rotP = rhoV.mul(4.27).sub(uTime.mul(0.1))
       const cR = cos(rotP)
       const sR = sin(rotP)
-      const uxN = cx.mul(cR).sub(sx.mul(sR)).mul(0.22).add(rhoV.mul(0.035))
-      const uzN = cx.mul(sR).add(sx.mul(cR)).mul(0.22).add(pos.y.div(max(M, float(1e-8))).mul(0.35))
-      const nUv = vec2(uxN, uzN).mul(0.55).add(0.5)
+      const uxN = cx.mul(cR).sub(sx.mul(sR)).mul(0.35).add(rhoV.mul(0.05))
+      const uzN = cx.mul(sR).add(sx.mul(cR)).mul(0.35).add(pos.y.div(max(M, float(1e-8))).mul(0.5))
+      const nUv = vec2(uxN, uzN).mul(0.65).add(0.5)
       const nDeep = texture(noiseDeepMap, nUv)
-      const nDeep2 = texture(noiseDeepMap, nUv.add(vec2(0.0022, 0.0011)))
+      const nDeep2 = texture(noiseDeepMap, nUv.mul(1.002))
       const nEdge = abs(nDeep.r.sub(nDeep2.r)).mul(float(DISK_TEXTURE.noiseEdgeBoost))
+      // His rampInput uses noiseAmpLen and (noiseAmp − noiseNormal)*19.75
       const nStruct = min(
-        float(1.6),
-        nDeep.r.mul(0.55).add(nDeep.g.mul(0.25)).add(nEdge.mul(0.55)),
+        float(1.85),
+        nDeep.r.mul(0.45).add(nDeep.g.mul(0.2)).add(nEdge.mul(0.7)).add(nDeep.b.mul(0.1)),
       )
-      const noiseMix = float(DISK_TEXTURE.noiseDensMix).mul(float(0.55).add(struct.mul(0.45)))
+      const noiseMix = float(DISK_TEXTURE.noiseDensMix).mul(float(0.7).add(struct.mul(0.3)))
       // Cube-led dens with residual analytic filaments + noise photosphere
       const densBase = densAnalytic
-        .mul(float(1).sub(uGrmhdMix.mul(0.62)))
-        .add(densCube.mul(uGrmhdMix))
-        .mul(float(1).add(struct.mul(0.22)))
+        .mul(float(1).sub(uGrmhdMix.mul(0.45)))
+        .add(densCube.mul(uGrmhdMix.mul(0.55)))
+        .mul(float(1).add(struct.mul(0.28)))
         .mul(float(1).sub(noiseMix).add(nStruct.mul(noiseMix)))
-        .mul(densZPhot.div(max(densZ, float(1e-4)))) // apply thin vertical relative to densZ already in analytic
+        .mul(densZPhot.div(max(densZ, float(1e-4))))
       // High-ṁ photosphere: suppress deep midplane column (edge-on white bar)
-      const mdotPhot = min(mdot.div(float(1.15)), float(1))
+      const mdotPhot = min(mdot.div(float(1.0)), float(1))
       const dens = densBase.mul(
-        float(1).sub(mdotPhot.mul(float(0.7)).mul(densZ)),
+        float(1).sub(mdotPhot.mul(float(0.78)).mul(densZ)),
       )
       const sphR = pos.length()
 

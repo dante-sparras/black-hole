@@ -31,8 +31,14 @@ Asset: `public/noise_deep.png` (from singularity static textures).
 | **Sky** | denser/brighter stars, less muddy nebula |
 | **Dual dens edges** | higher boost |
 
-## Honesty
+## Singularity push (defaults)
 
-- Film grade is **display** (hybrid), not SI bolometric.
-- Noise dens is **structure**, not HARM data.
-- Geodesics remain physical; we do **not** use fake \(1/r^2\) bend.
+Defaults now lean hard into his look:
+
+- `filmGrade` **0.88** + `filmEmission` **2.0** + his exact ramp colors  
+- H/R **0.032**, densZ³, beer **0.95**  
+- noise dens mix **0.92**, edge boost **19.5**  
+- bloom str **0.24**, radius **0.02**, thresh **0.08**  
+
+Geodesics still physical; color is largely cinematic display grade.
+

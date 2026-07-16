@@ -114,11 +114,11 @@ export const DISK_TEXTURE = {
   /** Log-spiral pitch (tighter = more wound, GRMHD-like) */
   pitch: 0.82,
   /** Arm vs inter-arm contrast (gas filaments) — high for reference-still look */
-  armContrast: 0.95,
+  armContrast: 0.98,
   /** Multi-scale plasma / eddy contrast */
-  turbContrast: 0.78,
+  turbContrast: 0.85,
   /** Outer dusty lanes — cooler, darker annuli */
-  dustContrast: 0.58,
+  dustContrast: 0.65,
   phase0: 0.35,
   /**
    * UI shear multiplier (default ~1.25). Combined with shearGain for visible wind.
@@ -130,26 +130,25 @@ export const DISK_TEXTURE = {
    * Uses Ω̃=(M/r)^{3/2} (not geometric Ω∝1/M) so scale-free mass does not freeze the disk.
    */
   shearGain: 32,
-  texMin: 0.12,
-  texMax: 2.7,
+  texMin: 0.08,
+  texMax: 2.9,
   /** Mild T jitter from clumping */
   tempJitterAmp: 0.14,
-  /** H/R scale-height used for path-length thickness (edge-on look).
-   * Thin like singularity photosphere (~surface), not milk-glass volume. */
-  scaleHeight: 0.055,
+  /** H/R scale-height — singularity-thin photosphere (~surface disk). */
+  scaleHeight: 0.032,
   /** Fine flow-aligned filament strength (reference streamlines) */
-  streamContrast: 0.88,
+  streamContrast: 0.95,
   /** Secondary streamline harmonic weight */
-  streamHarmonic: 0.65,
+  streamHarmonic: 0.72,
   /**
    * Kerr frame-drag spiral wind (dimensionless).
    * Phase add: dragGain · a★ · (M/r) — arms twist tighter near hole.
    */
-  frameDragGain: 1.5,
+  frameDragGain: 1.8,
   /**
    * Log-normal MRI dens variance σ (unit-mean: exp(σ·ξ − σ²/2), ξ∈[-1,1] from noise).
    */
-  mriSigma: 0.85,
+  mriSigma: 0.95,
   /**
    * Photon-ring silk: multi-wrap intensity boost near r~r_ph.
    * 0 = honest (only true multi-hit accumulation); >0 is display boost.
@@ -159,15 +158,15 @@ export const DISK_TEXTURE = {
    * Mild midplane warp amplitude as fraction of local H (m=2).
    * Real disks warp under LT + MRI channels — not a free look knob.
    */
-  warpAmp: 0.08,
+  warpAmp: 0.06,
   /**
    * Outer rim raggedness: fractional radius modulation (irregular truncation).
    */
-  rimRagged: 0.18,
-  /** Noise dens layer weight (singularity-style deep noise) */
-  noiseDensMix: 0.72,
-  /** Dual-sample edge boost on noise */
-  noiseEdgeBoost: 14,
+  rimRagged: 0.2,
+  /** Noise dens layer weight — near-full singularity structure */
+  noiseDensMix: 0.92,
+  /** Dual-sample edge boost on noise (his ~19.75 gradient punch) */
+  noiseEdgeBoost: 19.5,
 } as const
 
 /**
