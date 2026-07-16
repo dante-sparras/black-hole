@@ -141,12 +141,9 @@ export function accumulateDiskHit(p) {
     .mul(spinFac)
   const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
-  // Plasma hotter (+), dust much cooler (−) — clearer material zones in color
-  const tZone = float(1)
-    .add(plasmaZone.mul(0.55))
-    .sub(dustZone.mul(0.42).mul(dustContrast.add(0.55)))
-    .sub(gasZone.mul(0.06))
-  const tAtm = float(0.62).add(dVert.mul(0.38))
+  // Physical T: NT + g-redshift; mild outer dust cooling only (no fake plasma heat)
+  const tZone = float(1).sub(dustZone.mul(0.12).mul(dustContrast.add(0.25)))
+  const tAtm = float(0.75).add(dVert.mul(0.25))
   let TK = max(
     float(E.tColorMinK),
     min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tZone).mul(tAtm)),
@@ -322,35 +319,29 @@ export function accumulateDiskHit(p) {
   const bMax = max(br, max(bg, bb))
   const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-  // Photon-ring silk: multi-wrap boost near r~r_ph (nested lensed ring)
+  // Photon-ring: multi-wrap from true path accumulation only (boost=0 by default)
   const wrap = max(hits.sub(float(1)), float(0))
   const photonProx = exp(abs(rhoM.sub(float(3))).mul(-1.15))
   const silk = min(
-    float(2.35),
+    float(2.0),
     float(1)
-      .add(min(wrap, float(3.5)).mul(0.28))
-      .add(photonProx.mul(min(wrap, float(2.5))).mul(float(TX.photonRingBoost))),
+      .add(min(wrap, float(3)).mul(0.12))
+      .add(photonProx.mul(min(wrap, float(2))).mul(float(TX.photonRingBoost))),
   )
   const mdotBright = float(E.mdotBrightBase).add(
     pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
       E.mdotBrightScale,
     ),
   )
-  // pathFac mild
   const nY = max(pathAbsY, float(0.18))
-  const pathFac = min(float(1.12), uScaleH.div(nY).mul(0.25).add(0.9))
+  const pathFac = min(float(1.08), uScaleH.div(nY).mul(0.2).add(0.92))
   const iFlux = max(fluxVis, float(E.fluxVisFloor))
     .mul(mdotBright)
     .mul(E.intensityGain)
     .mul(pathFac)
-  // Soft intensity so volume paths keep chroma (not pure white)
-  // Zone-weighted emission: plasma bright, dust dim (still blackbody chroma)
-  const zoneEmit = float(0.75)
-    .add(plasmaZone.mul(0.55))
-    .add(gasZone.mul(0.08))
-    .sub(dustZone.mul(0.35).mul(dustContrast.add(0.3)))
-  const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w).mul(zoneEmit)
-  const softI = raw.div(float(1).add(raw.mul(0.32)))
+  // Mild ACES pre-soft only (not milk-glass)
+  const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w)
+  const softI = raw.div(float(1).add(raw.mul(0.18)))
   const emit = chroma.mul(softI)
 
   dbgG.assign(freq)
@@ -359,7 +350,7 @@ export function accumulateDiskHit(p) {
 
   If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.01)), () => {
     col.addAssign(emit.mul(transm))
-    // Soft extinction — leave room for multi-wrap / far-side disk
-    transm.mulAssign(max(float(0.92), float(1).sub(w.mul(0.08))))
+  // Mild multi-hit extinction only — leave room for true lensed far side
+  transm.mulAssign(max(float(0.94), float(1).sub(w.mul(0.06))))
   })
 }

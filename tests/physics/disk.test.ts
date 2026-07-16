@@ -116,15 +116,16 @@ describe('mdot scales', () => {
     expect(mdotFluxScale(0.25)).toBe(0.25)
   })
 
-  test('mdotDisplayBrightness rises softer than linear', () => {
+  test('mdotDisplayBrightness rises with ṁ (near F∝ṁ)', () => {
     const a = mdotDisplayBrightness(0.001)
     const b = mdotDisplayBrightness(0.1)
     const c = mdotDisplayBrightness(1)
     expect(b).toBeGreaterThan(a)
     expect(c).toBeGreaterThan(b)
-    // Min ṁ still has substantial floor (visible disk)
-    expect(a).toBeGreaterThan(0.35)
-    expect(b / a).toBeLessThan(10)
+    // Low ṁ still finite (ACES visibility floor), but not a huge soft floor
+    expect(a).toBeGreaterThan(0.05)
+    expect(a).toBeLessThan(0.5)
+    expect(b / a).toBeGreaterThan(2)
   })
 
   test('DISK_EMISSION powers stay physical / display-honest', () => {
@@ -132,16 +133,21 @@ describe('mdot scales', () => {
     expect(DISK_EMISSION.spinEtaNudge).toBe(0)
     expect(DISK_EMISSION.beamExponent).toBeGreaterThanOrEqual(1.5)
     expect(DISK_EMISSION.beamExponent).toBeLessThanOrEqual(3)
+    expect(DISK_EMISSION.beamExponentIdeal).toBe(3)
+    expect(DISK_EMISSION.fluxVisPower).toBeGreaterThanOrEqual(0.8)
+    expect(DISK_EMISSION.gColorExponent).toBeGreaterThanOrEqual(0.8)
+    expect(DISK_EMISSION.mdotBrightPower).toBeGreaterThanOrEqual(0.7)
     expect(DISK_EMISSION.tColorMinK).toBeGreaterThanOrEqual(1000)
     expect(DISK_EMISSION.intensityGain).toBeGreaterThan(0)
   })
 
-  test('colorRedshiftFactor softens g', () => {
+  test('colorRedshiftFactor tracks g (near-physical)', () => {
     const full = 0.5
     const soft = colorRedshiftFactor(full)
-    // soft g^0.45 > full g when g < 1 (less redshifting)
+    // g^0.9 still < 1 for g<1, closer to full g than old g^0.45
     expect(soft).toBeGreaterThan(full)
     expect(soft).toBeLessThan(1)
+    expect(soft).toBeLessThan(Math.pow(full, 0.45) + 0.01)
   })
 })
 

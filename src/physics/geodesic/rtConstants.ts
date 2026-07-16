@@ -35,9 +35,9 @@ export const RT = {
    * α < 1 keeps far-side / lensed disk visible after near-side hits.
    * α = 1 was fully blacking the top bridge over the shadow.
    */
-  beerSoft: 0.42,
-  /** τ gate for continued sampling (soft; not a hard wall) */
-  tauSampleMax: 3.2,
+  beerSoft: 0.72,
+  /** τ gate for continued sampling */
+  tauSampleMax: 2.8,
 } as const
 
 /** Adaptive step size in geometric units. */

@@ -94,52 +94,48 @@ export const T_PEAK_MDOT_REF = 0.1
 export const R_ISCO_SCHW_OVER_M = 6
 
 /**
- * Shared emission/display constants — CPU + GPU tracer must stay in lockstep.
- * Do not hardcode these in geodesicTracer.ts.
+ * Shared emission constants — CPU + GPU tracer lockstep.
  *
- * HONESTY: these are *optical display* curves for interactive GRRT, not SI
- * bolometric transfer. Physical structure (NT shape, T∝ṁ^{1/4}, orbiting g)
- * is preserved; exponents/floors are softened so cool disks stay visible and
- * high-spin faces are not wiped by full g³ + Wien cutoff.
+ * Physical structure first (NT shape, T∝ṁ^{1/4}, orbiting g, I∝g³).
+ * Display floors only prevent pure numerical black — not film grade.
  */
 export const DISK_EMISSION = {
   /** T ∝ (r_ISCO_Schw / r_ISCO)^{ISCO_HOT_POWER} — sole spin-heating channel */
   iscoHotPower: 0.75,
   /**
-   * Extra η-style spin factor: 1 + spinEtaNudge * a★.
-   * Keep 0 — r_ISCO heating already encodes higher spin → hotter disk.
-   * Non-zero re-introduces double-counting vs iscoHotPower.
+   * Extra η-style spin factor: keep 0 — r_ISCO heating already encodes spin.
    */
   spinEtaNudge: 0,
-  /** Soft g exponent on color temperature (full g over-redshifts high spin) */
-  gColorExponent: 0.45,
-  gColorFloor: 0.35,
+  /**
+   * Observed color temperature ∝ g^{gColorExponent}.
+   * Physical Wien shift uses ~1; slightly soft so high-spin faces stay readable.
+   */
+  gColorExponent: 0.9,
+  gColorFloor: 0.22,
   /** Optical color temperature clamp [K] for max-norm chroma */
-  tColorMinK: 1800,
-  tColorMaxK: 45_000,
+  tColorMinK: 1600,
+  tColorMaxK: 48_000,
   /**
    * Doppler beam I ∝ g^{beamExponent}.
-   * Default = soft display (2). Ideal bolometric GRRT uses 3 (toggle).
+   * Default soft display (2). Ideal GRRT uses 3.
    */
   beamExponent: 2.0,
-  /** Ideal invariant I_ν/ν³ → I ∝ g³ for bolometric-like display */
+  /** Ideal invariant I_ν/ν³ → I ∝ g³ */
   beamExponentIdeal: 3.0,
-  beamFloor: 0.4,
-  /** Slightly lower floor when ideal g³ so dim side is not clipped as hard */
-  beamFloorIdeal: 0.3,
-  /** Soft radial flux for display: fluxVis = fluxRel^{fluxVisPower} */
-  fluxVisPower: 0.5,
-  fluxVisFloor: 0.2,
-  /** Overall HDR gain into ACES */
-  intensityGain: 2.2,
+  beamFloor: 0.28,
+  beamFloorIdeal: 0.18,
+  /** fluxVis = fluxRel^{fluxVisPower} — closer to 1 = true NT radial profile */
+  fluxVisPower: 0.9,
+  fluxVisFloor: 0.04,
+  /** Overall HDR gain into ACES (not a fake fill of the shadow) */
+  intensityGain: 1.75,
   /**
-   * Display brightness: base + scale * (ṁ/0.1)^{power}
-   * Soft curve keeps min-ṁ disks visible (not pure F∝ṁ).
+   * Brightness vs ṁ: closer to F∝ṁ (power→1) with mild base so low-ṁ not pure black.
    */
-  mdotBrightBase: 0.4,
-  mdotBrightScale: 1.2,
-  mdotBrightPower: 0.35,
-  mdotBrightFloor: 0.01,
+  mdotBrightBase: 0.12,
+  mdotBrightScale: 1.15,
+  mdotBrightPower: 0.85,
+  mdotBrightFloor: 0.008,
   /** NT peak radius ≈ (49/36) r_in */
   ntPeakOverRin: 49 / 36,
 } as const
@@ -261,6 +257,23 @@ export function mdotDisplayBrightness(mdot: number): number {
 /** Flux / bolometric intensity scale: F ∝ ṁ. */
 export function mdotFluxScale(mdot: number): number {
   return Math.max(mdot, 1e-8)
+}
+
+/**
+ * Thin-disk scale-height H/R from ṁ and r_ISCO/M (not a free look knob).
+ *
+ * Rough α-disk gas-pressure scaling:
+ *   H/R ∼ ṁ^{1/8} · (r_in / 6M)^{-1/5}
+ * Clamped to the thin-disk regime [0.03, 0.14].
+ */
+export function thinDiskScaleHeight(mdot: number, rIscoOverM: number): number {
+  const m = Math.max(mdot, 1e-4)
+  const rinM = Math.max(rIscoOverM, 1.2)
+  const h =
+    0.055 *
+    Math.pow(m / T_PEAK_MDOT_REF, 0.125) *
+    Math.pow(R_ISCO_SCHW_OVER_M / rinM, 0.2)
+  return Math.min(0.14, Math.max(0.03, h))
 }
 
 /** Log-space slider (0…1000) ↔ ṁ ∈ [mdotMin, mdotMax]. */

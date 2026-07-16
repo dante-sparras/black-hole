@@ -150,9 +150,10 @@ export const DISK_TEXTURE = {
    */
   mriSigma: 0.55,
   /**
-   * Photon-ring silk: multi-wrap intensity boost near r~r_ph (display; still physical g).
+   * Photon-ring silk: multi-wrap intensity boost near r~r_ph.
+   * 0 = honest (only true multi-hit accumulation); >0 is display boost.
    */
-  photonRingBoost: 0.48,
+  photonRingBoost: 0,
 } as const
 
 /**
@@ -186,10 +187,10 @@ export function photonRingSilk(
   boost = DISK_TEXTURE.photonRingBoost,
 ): number {
   const wrap = Math.max(0, wrapHits)
-  // Peak near Schwarzschild photon sphere ~3M (also good for Kerr order-of-magnitude)
   const prox = Math.exp(-1.15 * Math.abs(rhoOverM - 3))
-  const silk = 1 + Math.min(wrap, 3.5) * 0.28 + prox * Math.min(wrap, 2.5) * boost
-  return Math.min(2.4, silk)
+  // boost=0 → only mild multi-hit (path stacking), no film silk
+  const silk = 1 + Math.min(wrap, 3) * 0.12 + prox * Math.min(wrap, 2) * boost
+  return Math.min(2.0, silk)
 }
 
 export type DiskTextureOptions = {

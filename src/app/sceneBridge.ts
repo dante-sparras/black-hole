@@ -4,7 +4,7 @@
  * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
-import { diskIsco } from '../physics/disk'
+import { diskIsco, thinDiskScaleHeight } from '../physics/disk'
 import { resolveCameraDistance } from '../physics/observer'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
@@ -65,19 +65,22 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const p = getParams()
     const disk = getDisk()
     const rIsco = diskIsco(p, disk.prograde)
+    const rinM = rIscoOverM(rIsco, p.mass)
+    // H/R from thin-disk scaling (not a free UI look knob)
+    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM)
     tracer.setSpacetime({
       mass: p.mass,
       spinStar: p.spinStar,
       charge: p.charge,
       mdot: disk.mdot,
-      rIscoOverM: rIscoOverM(rIsco, p.mass),
+      rIscoOverM: rinM,
       outerM: disk.outerM,
       prograde: disk.prograde,
       structure: disk.structure,
       arms: disk.arms,
       clumps: disk.clumps,
       dust: disk.dust,
-      scaleHeight: disk.scaleHeight,
+      scaleHeight,
       shearRate: disk.shearRate,
       animate: disk.animate,
     })

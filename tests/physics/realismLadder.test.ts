@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { thinDiskScaleHeight } from '../../src/physics/disk'
 import {
   DISK_TEXTURE,
   frameDragPhase,
@@ -24,16 +25,27 @@ describe('realism ladder helpers', () => {
     const zero = frameDragPhase(0, 3)
     expect(zero).toBe(0)
     expect(near).toBeGreaterThan(far)
-    expect(near).toBeCloseTo(DISK_TEXTURE.frameDragGain * 0.9 / 3, 5)
+    expect(near).toBeCloseTo((DISK_TEXTURE.frameDragGain * 0.9) / 3, 5)
   })
 
-  test('photonRingSilk boosts multi-wrap near r~3M', () => {
+  test('photonRingSilk multi-wrap mild without film boost', () => {
     const first = photonRingSilk(0, 3)
     const wrapNear = photonRingSilk(2, 3)
     const wrapFar = photonRingSilk(2, 20)
     expect(first).toBe(1)
-    expect(wrapNear).toBeGreaterThan(wrapFar)
-    expect(wrapNear).toBeGreaterThan(1.3)
-    expect(wrapNear).toBeLessThanOrEqual(2.4)
+    expect(wrapNear).toBeGreaterThan(1)
+    expect(wrapNear).toBeCloseTo(wrapFar, 5)
+    expect(wrapNear).toBeLessThanOrEqual(2.0)
+    expect(photonRingSilk(2, 3, 0.5)).toBeGreaterThan(photonRingSilk(2, 20, 0.5))
+  })
+
+  test('thinDiskScaleHeight is thin and responds to ṁ / ISCO', () => {
+    const hLo = thinDiskScaleHeight(0.01, 6)
+    const hHi = thinDiskScaleHeight(1.0, 6)
+    const hSpin = thinDiskScaleHeight(0.1, 2)
+    expect(hLo).toBeGreaterThanOrEqual(0.03)
+    expect(hHi).toBeLessThanOrEqual(0.14)
+    expect(hHi).toBeGreaterThan(hLo)
+    expect(hSpin).toBeGreaterThan(thinDiskScaleHeight(0.1, 6))
   })
 })
