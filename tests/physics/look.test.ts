@@ -7,9 +7,8 @@ import {
 } from '../../src/state/look'
 
 describe('look store (bloom)', () => {
-  test('defaults have bloom on', () => {
-    expect(LOOK_DEFAULTS.bloomEnabled).toBe(true)
-    expect(LOOK_DEFAULTS.bloomStrength).toBeGreaterThan(0)
+  test('defaults have bloom off (perf)', () => {
+    expect(LOOK_DEFAULTS.bloomEnabled).toBe(false)
   })
 
   test('clamps strength / radius / threshold / exposure', () => {

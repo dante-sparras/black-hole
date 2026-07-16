@@ -408,19 +408,27 @@ export function createGeodesicTracer(): GeodesicTracer {
       const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
       vel.assign(vec3(vx, vel.y, vz))
 
-      // 3D volume: distinct plasma (inner thin hot) / gas (mid) / dust (outer thick cool).
-      // Strong H(r) flare — not constant thickness. Soft power-law outer fade (no capsule tips).
+      // Cheap reject before heavy plasma/gas/dust dens (most steps are outside the slab)
       const hxV = pos.x
       const hzV = pos.z
       const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
+      const absY = abs(pos.y)
+      const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(2.4), M.mul(0.1))
+      If(
+        rhoV
+          .greaterThan(rin.mul(0.8))
+          .and(rhoV.lessThan(rout.mul(1.15)))
+          .and(absY.lessThan(roughH))
+          .and(transm.greaterThan(0.05))
+          .and(diskTau.lessThan(1.7))
+          .and(hits.lessThan(10))
+          .and(stepCount.mod(int(RT.volumeStride)).equal(int(0))),
+        () => {
+      // 3D volume: plasma / gas / dust + flared H
       const span = max(rout.sub(rin), M.mul(4))
-      // Radial coordinate 0 at ISCO → 1 at outer
       const xRad = min(float(1), max(float(0), rhoV.sub(rin).div(span)))
-      // Zone weights (sum not required = 1; used as blends)
-      const plasmaW = exp(xRad.mul(-5.0)) // hot inner plasma
-      const dustW = pow(max(xRad.sub(float(0.32)), float(0)).div(0.68), float(1.35)) // outer dust
-      // Strong flare: thin near ISCO, much thicker outer dust
-      // H/R ≈ h0 · (0.18 + 1.6 x^1.05 + 0.7 dust)
+      const plasmaW = exp(xRad.mul(-5.0))
+      const dustW = pow(max(xRad.sub(float(0.32)), float(0)).div(0.68), float(1.35))
       const hOverR = uScaleH.mul(
         float(0.18)
           .add(pow(xRad.add(0.04), float(1.05)).mul(1.55))
@@ -433,21 +441,17 @@ export function createGeodesicTracer(): GeodesicTracer {
       const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
       const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
       const routEff = rout.mul(float(0.9).add(rimWobble.mul(0.12)))
-      // Power-law outer fade (long dusty tail) — avoids bullet/capsule tips
       const fadeW = max(span.mul(0.22), M.mul(1.8))
       const outerLin = min(float(1), max(float(0), routEff.sub(rhoV).div(fadeW)))
       const outerSoft = pow(outerLin, float(1.75))
-      // Sharper plasma inner edge (hot truncation near ISCO)
       const fadeIn = max(rin.mul(0.22), M.mul(0.35))
       const innerLin = min(float(1), max(float(0), rhoV.sub(rin).div(fadeIn)))
       const innerSoft = pow(innerLin, float(0.85))
       const radialGate = outerSoft.mul(innerSoft)
       const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.02))
-      // sech² vertical; plasma thinner vertically (use smaller H already)
-      const zNorm = abs(pos.y).div(Hloc.mul(float(1.05).add(dustW.mul(0.25))))
+      const zNorm = absY.div(Hloc.mul(float(1.05).add(dustW.mul(0.25))))
       const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
       const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
-      // Plasma clumps (hot) vs dusty lanes (cool outer)
       const clumpN = fract(
         sin(cphiV.mul(7.1).add(sphiV.mul(5.3)).add(rhoV.div(M).mul(0.42))).mul(43758.5453),
       )
@@ -456,35 +460,17 @@ export function createGeodesicTracer(): GeodesicTracer {
       )
       const densPlasma = float(1).add(plasmaW.mul(clumpN.mul(1.1).sub(0.25)))
       const densDust = float(1).sub(dustW.mul(0.55).mul(float(0.35).add(dustLane.mul(0.65))))
-      // Gas mid: spiral-ish density modulation
-      const gasSpiral = float(0.5).add(
-        float(0.5).mul(
-          cphiV
-            .mul(cphiV)
-            .sub(sphiV.mul(sphiV))
-            .mul(cos(rhoV.div(M).mul(-0.9)))
-            .add(cphiV.mul(sphiV).mul(2).mul(sin(rhoV.div(M).mul(-0.9)))),
-        ),
+      // Cheaper gas mod (1 mul-add spiral approx)
+      const densGas = float(0.85).add(
+        cphiV.mul(sphiV).mul(0.3).mul(float(1).sub(dustW)),
       )
-      const densGas = float(0.82).add(gasSpiral.mul(0.35).mul(float(1).sub(plasmaW).sub(dustW.mul(0.5))))
-      const dens = densZ
-        .mul(radialGate)
-        .mul(densPlasma)
-        .mul(densDust)
-        .mul(densGas)
+      const dens = densZ.mul(radialGate).mul(densPlasma).mul(densDust).mul(densGas)
       const sphR = pos.length()
 
       If(
         dens
-          .greaterThan(0.02)
-          .and(rhoV.greaterThan(rin.mul(0.8)))
-          .and(rhoV.lessThan(rout.mul(1.15)))
-          .and(sphR.greaterThan(rCapture.mul(1.15)))
-          .and(diskTau.lessThan(1.7))
-          .and(transm.greaterThan(0.05))
-          .and(hits.lessThan(10))
-          // Volume every N steps — full emission is expensive; scale weight by stride
-          .and(stepCount.mod(int(RT.volumeStride)).equal(int(0))),
+          .greaterThan(0.025)
+          .and(sphR.greaterThan(rCapture.mul(1.15))),
         () => {
           const dsH = min(ds.div(Hloc), float(0.8))
           const kappa = float(0.18)
@@ -495,9 +481,8 @@ export function createGeodesicTracer(): GeodesicTracer {
           const dTau = dens.mul(dsH).mul(kappa).mul(stride)
           const beer = exp(diskTau.mul(-1))
           const zoneBright = float(0.45).add(plasmaW.mul(0.55)).sub(dustW.mul(0.12))
-          // × stride so average brightness matches denser sampling
-          const w = dens.mul(dsH).mul(beer).mul(zoneBright).mul(stride.mul(0.92))
-          If(w.greaterThan(0.02), () => {
+          const w = dens.mul(dsH).mul(beer).mul(zoneBright).mul(stride.mul(0.9))
+          If(w.greaterThan(0.025), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,
@@ -531,9 +516,11 @@ export function createGeodesicTracer(): GeodesicTracer {
               uAnim,
               nRay: vel.normalize(),
             })
-            hits.addAssign(0.12)
+            hits.addAssign(0.1)
             diskTau.addAssign(dTau)
           })
+        },
+      )
         },
       )
       }) // end RT path (useBl.not)

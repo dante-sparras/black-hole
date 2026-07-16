@@ -26,8 +26,8 @@ function showError(message: string): void {
 }
 
 const renderer = new THREE.WebGPURenderer({ antialias: false })
-// Cap DPR hard — full-screen geodesic is O(pixels × steps). 2× retina kills FPS.
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25))
+// Cap DPR at 1 — full-screen geodesic is O(pixels × steps). Retina is too costly.
+renderer.setPixelRatio(1)
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.setClearColor(0x000000, 1)
 document.body.appendChild(renderer.domElement)

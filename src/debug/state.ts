@@ -21,7 +21,7 @@ export type DebugState = {
 
 export const DEBUG_DEFAULTS: DebugState = {
   mode: DEBUG_MODES.normal,
-  healthEnabled: true,
+  healthEnabled: false,
   probeEnabled: true,
   consoleMirror: false,
 }

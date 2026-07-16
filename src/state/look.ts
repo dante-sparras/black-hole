@@ -20,7 +20,8 @@ export type LookState = {
 
 /** Subtle film glow — disk edges, not a white-out of the hole. */
 export const LOOK_DEFAULTS: LookState = {
-  bloomEnabled: true,
+  /** Off by default for FPS; enable in Look for glow */
+  bloomEnabled: false,
   bloomStrength: 0.28,
   bloomRadius: 0.4,
   bloomThreshold: 0.7,
