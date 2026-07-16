@@ -464,9 +464,11 @@ export function createGeodesicTracer(): GeodesicTracer {
           .and(strideOk),
         () => {
           const dsH = min(ds.div(Hloc), float(1.05))
-          const dTau = dens.mul(dsH).mul(0.7)
+          // Midplane photosphere more opaque (higher κ); atmosphere thinner
+          const kappa = float(0.48).add(densZ.mul(0.55))
+          const dTau = dens.mul(dsH).mul(kappa)
           const beer = exp(diskTau.mul(-1))
-          const w = dens.mul(dsH).mul(beer).mul(float(0.95).add(densZ.mul(0.25)))
+          const w = dens.mul(dsH).mul(beer).mul(float(0.9).add(densZ.mul(0.35)))
           If(w.greaterThan(0.015), () => {
             processDiskVolumeSample({
               hx: hxV,

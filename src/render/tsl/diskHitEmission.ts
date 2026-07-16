@@ -183,13 +183,14 @@ export function accumulateDiskHit(p) {
     .sub(armContrast)
     .add(armContrast.mul(float(0.16).add(armsBright.mul(1.1))))
 
-  // Fine flow-aligned filaments (m=4 + m=8) — reference streamlines
+  // Fine flow-aligned filaments (m=4 + m=8) — phase shifts with height (not extruded)
   const c4a = c2a.mul(c2a).sub(s2a.mul(s2a))
   const s4a = c2a.mul(s2a).mul(2)
   const c8a = c4a.mul(c4a).sub(s4a.mul(s4a))
   const s8a = c4a.mul(s4a).mul(2)
-  const a2s = float(-0.44).mul(lnR).add(float(TX.phase0).mul(0.7))
-  const a8s = float(-0.96).mul(lnR).add(float(TX.phase0).mul(1.3))
+  const zPhase = float(1).sub(dVert).mul(1.8) // atmosphere offset vs midplane
+  const a2s = float(-0.44).mul(lnR).add(float(TX.phase0).mul(0.7)).add(zPhase.mul(0.4))
+  const a8s = float(-0.96).mul(lnR).add(float(TX.phase0).mul(1.3)).add(zPhase.mul(1.1))
   const stream2 = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(a2s)).add(s2a.mul(sin(a2s)))),
   )
@@ -199,18 +200,16 @@ export function accumulateDiskHit(p) {
   const streams = stream2
     .mul(float(1).sub(float(TX.streamHarmonic)))
     .add(pow(max(stream8, float(1e-4)), float(1.8)).mul(float(TX.streamHarmonic)))
+  // Stronger filaments in denser midplane gas
+  const streamStr = float(TX.streamContrast).mul(uStructure).mul(float(0.75).add(dVert.mul(0.45)))
   const streamFac = float(1)
-    .sub(float(TX.streamContrast).mul(uStructure))
-    .add(
-      float(TX.streamContrast)
-        .mul(uStructure)
-        .mul(float(0.25).add(streams.mul(0.95))),
-    )
+    .sub(streamStr)
+    .add(streamStr.mul(float(0.22).add(streams.mul(1.0))))
 
-  // Turbulence in advected frame (moves with gas) — 3 octaves unrolled
-  const turbDomainZ = lnR.add(shear.mul(0.04))
-  const nUVx = cx.mul(1.65).add(turbDomainZ.mul(0.12))
-  const nUVy = sx.mul(1.65).add(turbDomainZ.mul(0.11))
+  // Turbulence in advected frame — z-slice so atmosphere ≠ extruded midplane
+  const turbDomainZ = lnR.add(shear.mul(0.04)).add(zPhase.mul(0.25))
+  const nUVx = cx.mul(1.65).add(turbDomainZ.mul(0.12)).add(dVert.mul(0.4))
+  const nUVy = sx.mul(1.65).add(turbDomainZ.mul(0.11)).add(float(1).sub(dVert).mul(0.65))
   const ix1 = floor(nUVx)
   const iy1 = floor(nUVy)
   const fx1 = nUVx.sub(ix1)
@@ -317,7 +316,8 @@ export function accumulateDiskHit(p) {
   const bMax = max(br, max(bg, bb))
   const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-  const bounce = float(1).add(max(min(hits, float(4)).sub(1), float(0)).mul(0.22))
+  // Lensed multi-hit: secondary/photon-ring paths slightly brighter (still physical g)
+  const bounce = float(1).add(max(min(hits, float(5)).sub(1), float(0)).mul(0.32))
   const mdotBright = float(E.mdotBrightBase).add(
     pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
       E.mdotBrightScale,
