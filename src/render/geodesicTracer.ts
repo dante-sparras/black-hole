@@ -707,116 +707,38 @@ export function createGeodesicTracer(): GeodesicTracer {
       const densCube = max(cubeRaw, float(0))
         .mul(boxMask)
         .mul(float(0.78).add(min(densEdge, float(1.0)).mul(0.4)))
-      // Thin photosphere densZ²
-      const densZPhot = densZ.mul(densZ).mul(float(1.7))
-      // Milder spiral wind than singularity 4.27 (tight wind → ring look on sparse samples)
-      const xyLen = min(float(1.2), rhoV.div(max(rout, M.mul(4))))
-      const rotP = xyLen.mul(1.65).sub(uTime.mul(0.08))
-      const cR = cos(rotP)
-      const sR = sin(rotP)
-      const pxN = hxV.div(max(rout, M.mul(4)))
-      const pzN = hzV.div(max(rout, M.mul(4)))
-      const rx = pxN.mul(cR).add(pzN.mul(sR))
-      const rz = pxN.mul(sR.mul(-1)).add(pzN.mul(cR))
-      // Larger UV scale → coarser noise blobs (less lace)
-      const nUv = vec2(rx.mul(1.2), rz.mul(1.2)).add(0.5)
-      const nDeep = texture(noiseDeepMap, nUv)
-      const nDeep2 = texture(noiseDeepMap, nUv.mul(1.004))
-      const nEdge = abs(nDeep.r.sub(nDeep2.r)).mul(float(8))
-      const noiseAmp = nDeep.r.mul(0.55).add(nDeep.g.mul(0.3)).add(nDeep.b.mul(0.15))
-      const noiseN = nDeep2.r.mul(0.55).add(nDeep2.g.mul(0.3)).add(nDeep2.b.mul(0.15))
-      const nStruct = min(float(1.55), noiseAmp.mul(0.9).add(nEdge.mul(0.45)))
-      // dens = envelope × noise (no analytic lace)
-      const densEnv = densZ.mul(radialGate).mul(densZPhot.div(max(densZ, float(1e-4))))
-      const densNoise = densEnv
-        .mul(float(0.35).add(nStruct.mul(0.95)))
-        .mul(float(1).add(noiseAmp.sub(noiseN).mul(3.5)))
-      const densBase = densNoise
-        .mul(float(1).sub(uGrmhdMix.mul(0.35)))
-        .add(densCube.mul(uGrmhdMix.mul(0.4)).mul(float(0.5).add(nStruct.mul(0.5))))
-        .mul(float(0.95).add(struct.mul(0.2)))
-      const mdotPhot = min(mdot.div(float(1.0)), float(1))
-      const dens = densBase.mul(float(1).sub(mdotPhot.mul(float(0.5)).mul(densZ)))
+      // Thin photosphere densZ² — gate only (look is singularity noise/α)
+      const densZPhot = densZ.mul(densZ)
+      const densEnv = densZ.mul(radialGate).mul(densZPhot)
+      const dens = densEnv.mul(float(1.2).add(uGrmhdMix.mul(densCube.mul(0.4))))
       const sphR = pos.length()
 
-      // Physics dens path
+      // Singularity look path (noise dens + dual edge + gold ramp + α)
       If(
         dens
-          .greaterThan(0.012)
-          .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01)))),
+          .greaterThan(0.008)
+          .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01))))
+          .and(transm.greaterThan(0.03)),
         () => {
-          const dsH = min(ds.div(Hloc), float(0.4))
-          const fEs = min(
-            float(1),
-            plasmaW.mul(0.75).add(gasW.mul(0.4)).add(float(0.12)),
-          )
-          const kappaEs = float(0.32).mul(float(0.65).add(densZ.mul(0.55)))
-          const kappaKr = float(0.1)
-            .add(dustW.mul(0.42))
-            .add(pow(xRad.add(0.08), float(1.1)).mul(0.28))
-          const kappa = kappaEs
-            .mul(fEs)
-            .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
-            .mul(float(0.85).add(struct.mul(0.3)))
-            .mul(float(1).add(mdot.mul(float(1.05))))
-          const strideF = absY.lessThan(Hloc.mul(0.9)).select(float(1.05), float(uVolumeStride))
-          const outSlab = absY.greaterThan(Hloc.mul(1.5))
-          If(outSlab.and(hits.greaterThan(0.5)), () => {
-            diskTau.mulAssign(0.88)
-          })
-          const beerA = float(RT.beerSoft).add(mdotPhot.mul(0.28))
-          const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
-          const beer = exp(diskTau.mul(beerA.mul(-1)))
-          const nYabs = abs(vel.y)
-          const pathKill = nYabs
-            .div(nYabs.add(float(0.22).add(mdotPhot.mul(0.28))))
-            .mul(float(0.4).add(mdotPhot.mul(0.5)))
-            .add(float(1).sub(mdotPhot).mul(0.55).add(0.4))
-          const sec = hits.greaterThan(1.2).select(float(1.12), float(1))
-          const mdotW = float(1).div(float(1).add(mdot.mul(float(0.6))))
-          const w = dens
-            .mul(dsH)
-            .mul(beer)
-            .mul(strideF.mul(0.85))
-            .mul(sec)
-            .mul(mdotW)
-            .mul(min(pathKill, float(1.1)))
-          If(w.greaterThan(0.008), () => {
-            processDiskVolumeSample({
-              hx: hxV,
-              hz: hzV,
-              weight: w,
-              densVert: densZ,
+          const dsH = min(ds.div(max(Hloc, M.mul(0.05))), float(0.5))
+          // Path weight: thin band + soft beer (not milky stack)
+          const beer = exp(diskTau.mul(float(-0.55)))
+          const w = dens.mul(dsH).mul(beer).mul(float(1.4))
+          If(w.greaterThan(0.004), () => {
+            singularityDiskComposite({
+              pos,
               M,
-              a,
-              aStar,
-              Q,
-              rs,
-              mdot,
-              rin,
+              rCapture,
               rout,
-              uRIscoM,
-              hits,
+              uTime,
+              noiseDeepMap,
               col,
               transm,
-              dbgG,
-              dbgT,
-              dbgFlux,
-              uDebugMode,
-              uIdealBeam,
-              uTime,
-              uPrograde,
-              uStructure,
-              uArms,
-              uClumps,
-              uDust,
-              uScaleH,
-              uShearRate,
-              uAnim,
-              nRay: vel.normalize(),
+              hits,
+              weight: w,
+              beam: float(1),
             })
-            hits.addAssign(0.08)
-            diskTau.addAssign(dTau)
+            diskTau.addAssign(w.mul(0.35))
           })
         },
       )
