@@ -141,12 +141,12 @@ export function accumulateDiskHit(p) {
     .mul(spinFac)
   const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
-  // Plasma hotter, dust much cooler (still blackbody path)
+  // Plasma hotter (+), dust much cooler (−) — clearer material zones in color
   const tZone = float(1)
-    .add(plasmaZone.mul(0.35))
-    .sub(dustZone.mul(0.28).mul(dustContrast.add(0.4)))
-    .sub(gasZone.mul(0.04))
-  const tAtm = float(0.68).add(dVert.mul(0.32))
+    .add(plasmaZone.mul(0.55))
+    .sub(dustZone.mul(0.42).mul(dustContrast.add(0.55)))
+    .sub(gasZone.mul(0.06))
+  const tAtm = float(0.62).add(dVert.mul(0.38))
   let TK = max(
     float(E.tColorMinK),
     min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tZone).mul(tAtm)),
@@ -317,8 +317,13 @@ export function accumulateDiskHit(p) {
     .mul(E.intensityGain)
     .mul(pathFac)
   // Soft intensity so volume paths keep chroma (not pure white)
-  const raw = iFlux.mul(beam).mul(texFac).mul(bounce).mul(w)
-  const softI = raw.div(float(1).add(raw.mul(0.35)))
+  // Zone-weighted emission: plasma bright, dust dim (still blackbody chroma)
+  const zoneEmit = float(0.75)
+    .add(plasmaZone.mul(0.55))
+    .add(gasZone.mul(0.08))
+    .sub(dustZone.mul(0.35).mul(dustContrast.add(0.3)))
+  const raw = iFlux.mul(beam).mul(texFac).mul(bounce).mul(w).mul(zoneEmit)
+  const softI = raw.div(float(1).add(raw.mul(0.32)))
   const emit = chroma.mul(softI)
 
   dbgG.assign(freq)

@@ -426,19 +426,54 @@ export function createGeodesicTracer(): GeodesicTracer {
           .and(hits.lessThan(14))
           .and(stepCount.mod(midStride).equal(int(0))),
         () => {
-      // 3D volume: plasma / gas / dust + flared H
+      // 3D volume dens: Keplerian-advected spirals + plasma/gas/dust zones
+      // dens follows orbital flow (material frame), not a frozen paint job
       const span = max(rout.sub(rin), M.mul(4))
       const xRad = min(float(1), max(float(0), rhoV.sub(rin).div(span)))
-      const plasmaW = exp(xRad.mul(-5.0))
-      const dustW = pow(max(xRad.sub(float(0.32)), float(0)).div(0.68), float(1.35))
+      // Zone weights from radial structure (physical annuli)
+      const plasmaW = exp(xRad.mul(-4.2)) // hot inner
+      const dustW = pow(max(xRad.sub(float(0.28)), float(0)).div(0.72), float(1.4))
+      const gasW = max(float(0), float(1).sub(plasmaW.mul(0.85)).sub(dustW.mul(0.55)))
       const hOverR = uScaleH.mul(
-        float(0.18)
-          .add(pow(xRad.add(0.04), float(1.05)).mul(1.55))
-          .add(dustW.mul(0.75)),
+        float(0.16)
+          .add(pow(xRad.add(0.05), float(1.1)).mul(1.6))
+          .add(dustW.mul(0.85)),
       )
       const invRhoV = float(1).div(max(rhoV, float(1e-5)))
       const cphiV = hxV.mul(invRhoV)
       const sphiV = hzV.mul(invRhoV)
+      // Keplerian material-frame shear — pattern co-moves with gas
+      // Ω̃ = (M/ρ)^{3/2} (scale-free; visible wind when Animate on)
+      const rhoM = max(rhoV.div(M), float(1e-4))
+      const OmegaDim = pow(rhoM, float(-1.5))
+      const sense = uPrograde.greaterThan(0.5).select(float(1), float(-1))
+      const shear = sense
+        .mul(uShearRate)
+        .mul(uAnim)
+        .mul(float(28))
+        .mul(OmegaDim)
+        .mul(uTime)
+      const csh = cos(shear)
+      const ssh = sin(shear)
+      const cx = cphiV.mul(csh).sub(sphiV.mul(ssh))
+      const sx = cphiV.mul(ssh).add(sphiV.mul(csh))
+      const c2 = cx.mul(cx).sub(sx.mul(sx))
+      const s2 = cx.mul(sx).mul(2)
+      const lnR = log(rhoM)
+      // m=2 log spiral density wave (gas arms)
+      const pitch = float(0.55)
+      const armPh = float(-2).mul(pitch).mul(lnR).add(float(0.35))
+      const armWave = float(0.5).add(
+        float(0.5).mul(c2.mul(cos(armPh)).add(s2.mul(sin(armPh)))),
+      )
+      const spiralDens = float(0.55).add(pow(max(armWave, float(1e-4)), float(1.45)).mul(0.9))
+      // Flow-aligned filaments (m=4 in material frame)
+      const c4 = c2.mul(c2).sub(s2.mul(s2))
+      const s4 = c2.mul(s2).mul(2)
+      const filPh = float(-0.85).mul(lnR).add(float(1.1))
+      const fil = float(0.5).add(float(0.5).mul(c4.mul(cos(filPh)).add(s4.mul(sin(filPh)))))
+      const filDens = float(0.72).add(pow(max(fil, float(1e-4)), float(1.7)).mul(0.55))
+      // Irregular outer rim (m=3 lab frame — fixed relative to inertial)
       const c3 = cphiV.mul(cphiV.mul(cphiV).sub(sphiV.mul(sphiV).mul(3)))
       const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
       const rimWobble = float(0.5).add(float(0.5).mul(c3.mul(0.7).add(s3.mul(0.3))))
@@ -451,42 +486,60 @@ export function createGeodesicTracer(): GeodesicTracer {
       const innerSoft = pow(innerLin, float(0.85))
       const radialGate = outerSoft.mul(innerSoft)
       const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.02))
-      const zNorm = absY.div(Hloc.mul(float(1.05).add(dustW.mul(0.25))))
+      // Mild vertical corrugation (MRI-ish z-wobble), shear-advected
+      const zWob = sx.mul(0.12).add(cx.mul(0.06)).mul(Hloc)
+      const zNorm = abs(absY.sub(zWob)).div(Hloc.mul(float(1.05).add(dustW.mul(0.3))))
       const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
       const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
+      // Plasma: hot clumpy inner (advected)
       const clumpN = fract(
-        sin(cphiV.mul(7.1).add(sphiV.mul(5.3)).add(rhoV.div(M).mul(0.42))).mul(43758.5453),
+        sin(cx.mul(9.3).add(sx.mul(6.1)).add(lnR.mul(2.4))).mul(43758.5453),
       )
+      const densPlasma = float(1).add(
+        plasmaW.mul(uClumps.add(0.35)).mul(clumpN.mul(1.35).sub(0.35)),
+      )
+      // Dust lanes: cool outer, darker in density (advected)
       const dustLane = float(0.5).add(
-        float(0.5).mul(sin(rhoV.div(M).mul(2.8).add(cphiV.mul(3.0)).add(sphiV.mul(1.2)))),
+        float(0.5).mul(sin(lnR.mul(3.2).add(cx.mul(2.8)).add(sx.mul(1.4)))),
       )
-      const densPlasma = float(1).add(plasmaW.mul(clumpN.mul(1.1).sub(0.25)))
-      const densDust = float(1).sub(dustW.mul(0.55).mul(float(0.35).add(dustLane.mul(0.65))))
-      const densGas = float(0.85).add(
-        cphiV.mul(sphiV).mul(0.3).mul(float(1).sub(dustW)),
+      const densDust = float(1).sub(
+        dustW.mul(uDust.add(0.4)).mul(float(0.3).add(dustLane.mul(0.7))).mul(0.7),
       )
-      const dens = densZ.mul(radialGate).mul(densPlasma).mul(densDust).mul(densGas)
+      // Gas: spiral + filament modulation (structure master)
+      const struct = uStructure
+      const densGas = float(1)
+        .sub(struct.mul(0.55))
+        .add(struct.mul(spiralDens.mul(gasW.add(0.35)).mul(0.55).add(filDens.mul(0.45))))
+      const dens = densZ
+        .mul(radialGate)
+        .mul(densPlasma)
+        .mul(densDust)
+        .mul(densGas)
       const sphR = pos.length()
 
-      // Only skip deep inside capture — 1.15 was killing photon-ring / far-side bridge
+      // Only skip deep inside capture — keep photon-ring / far-side bridge
       If(
         dens
           .greaterThan(0.02)
           .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01)))),
         () => {
           const dsH = min(ds.div(Hloc), float(0.75))
-          const kappa = float(0.12)
-            .add(plasmaW.mul(0.22))
-            .add(densZ.mul(0.14))
-            .add(dustW.mul(0.05))
-          // Effective stride for weight (midplane denser → lower stride factor)
+          // Opacity: plasma denser (Thomson-ish); dust more opaque per mass but cooler emit
+          const kappa = float(0.1)
+            .add(plasmaW.mul(0.28))
+            .add(densZ.mul(0.16))
+            .add(dustW.mul(0.12))
+            .mul(float(0.75).add(struct.mul(0.35)))
           const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(RT.volumeStride))
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
-          // Soft Beer: keep far-side / multi-wrap visible after near-side hits
           const beer = exp(diskTau.mul(float(-RT.beerSoft)))
-          const zoneBright = float(0.5).add(plasmaW.mul(0.5)).sub(dustW.mul(0.1))
+          // Brightness: plasma hot path, dust dim
+          const zoneBright = float(0.42)
+            .add(plasmaW.mul(0.65))
+            .add(gasW.mul(0.12))
+            .sub(dustW.mul(0.18))
           const w = dens.mul(dsH).mul(beer).mul(zoneBright).mul(strideF.mul(0.85))
-          If(w.greaterThan(0.018), () => {
+          If(w.greaterThan(0.016), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,
