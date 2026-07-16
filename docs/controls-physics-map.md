@@ -1,4 +1,4 @@
-# Controls ↔ physics map (thin-disk trim)
+# Controls ↔ physics map (collapsed DiskParams)
 
 ## Free controls (user)
 
@@ -12,25 +12,25 @@
 | \(\beta_0\) | `disk.plasmaBeta` |
 | \(r_\mathrm{out}/M\) | `disk.outerM` |
 | Tilt | `disk.tiltRad` |
-| Jet **boost** 0…1 | `disk.jetPower` |
+| Jet **boost** | `disk.jetBoost` |
 | Observer | camera |
 | Quality / dens source | numerics |
 
-## Derived only (HUD / model — not sliders)
+## Model defaults (store, not free UI)
+
+`structure`, `arms`, `clumps`, `dust`, `shearRate`, `animate` — presets may set (e.g. NT smooth).
+
+## Derived only (not stored as free)
 
 | Quantity | From |
 |----------|------|
-| Orbit | always **co-rotating** (L ‖ J); direction from **sign(a★)** |
-| \(r_\mathrm{in}\) | = ISCO(\(M,a_★,Q\), co-rot) |
+| Orbit | always co-rotating (L ‖ J); direction from **sign(a★)** |
+| \(r_\mathrm{in}\) | co-rot ISCO |
 | \(H/r\) | `thinDiskScaleHeight(ṁ, r_in/M, Γ=5/3)` |
-| \(\Gamma\) | fixed **5/3** |
+| \(\Gamma\) | fixed **5/3** (`DISK_GAMMA`) |
 | \(\ell\tilde{}\) | \(\sqrt{r_\mathrm{in}/M}\) |
-| \(r_\mathrm{peak}\) | from \(\ell\) |
-| SANE/MAD class | \(\beta_0 < 10\) → MAD else SANE |
+| SANE/MAD | \(\beta_0 < 10\) → MAD |
 | Perturb | from \(\beta_0\) |
-| B geometry | fixed single-loop |
-| Tilt node | fixed 0 |
-| jet_eff | \(a_★^2 \dot m^{0.4}\) · boost |
-| \(r_+\), \(r_\mathrm{ph}\), \(\eta\), \(b_c\), … | metric / NT |
+| jet_eff | \(a_★^2 \dot m^{0.4}\) · jetBoost |
 
 See [limitations.md](./limitations.md).

@@ -1,39 +1,31 @@
 import type { Mesh, MeshBasicNodeMaterial } from 'three/webgpu'
 import type { SkyState } from '../state/sky'
 
-/** GPU no-hair + disk snapshot (not full SpacetimeUniforms / derived). */
+/** GPU no-hair + disk snapshot. */
 export type SpacetimeTraceParams = {
   mass: number
   spinStar: number
   charge: number
   mdot: number
-  /** Effective r_in / M (ISCO or free) */
+  /** Effective r_in / M (ISCO) */
   rIscoOverM: number
   outerM: number
-  prograde: boolean
   structure: number
   arms: number
   clumps: number
   dust: number
-  /** Free H/r */
+  /** Derived H/r */
   scaleHeight: number
   shearRate: number
   animate: boolean
   tiltRad: number
-  tiltNodeRad: number
-  jetPower: number
+  jetBoost: number
   mriTurbScale: number
-  /** Density normalization ρ₀ */
   rho0: number
-  /** Polytropic T scale K ρ^{Γ−1} */
+  /** Relative T scale from ρ₀ */
   polyTScale: number
-  /** Dens peak radius / M from ℓ̃ */
   rPeakOverM: number
-  /** Mag geometry code: 0 single-loop, 1 multi, 2 vertical */
-  magGeom: number
-  /** MAD boost on jets 0…1 */
   madBoost: number
-  /** Perturbation amplitude */
   perturbAmp: number
 }
 

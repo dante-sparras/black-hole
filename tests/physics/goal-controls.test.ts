@@ -10,9 +10,9 @@ import {
   jetFunnelWeight,
 } from '../../src/physics/jets'
 import {
+  DISK_LIMITS,
   normalizeDisk,
   plasmaBetaToMriScale,
-  DISK_LIMITS,
 } from '../../src/physics/diskParams'
 import { thinDiskScaleHeight } from '../../src/physics/disk'
 import { normalizeParams } from '../../src/physics/validate'
@@ -33,7 +33,6 @@ describe('signed spin defaults', () => {
   test('accepts a★ = −0.9', () => {
     const p = normalizeParams({ spinStar: -0.9 })
     expect(p.spinStar).toBeCloseTo(-0.9, 10)
-    expect(p.spinStar * p.spinStar).toBeCloseTo(0.81, 5)
   })
 })
 
@@ -53,22 +52,20 @@ describe('tiltFrame', () => {
   })
 
   test('midplane height zero on tilted plane sample', () => {
-    // point on tilted midplane: after inverse, y_disk ~ 0
     const tilt = 0.3
-    // lab point with y=0, z=0 stays near midplane for small x
     expect(Math.abs(diskMidplaneHeight(5, 0, 0, tilt, 0))).toBeLessThan(1e-9)
     expect(diskCylindricalRho(5, 0, 0, 0, 0)).toBeCloseTo(5, 10)
   })
 })
 
 describe('jets helpers', () => {
-  test('jetPower=0 → effective 0', () => {
-    expect(jetEffectivePower({ jetPower: 0, spinStar: 0.9, mdot: 0.1 })).toBe(0)
+  test('jetBoost=0 → effective 0', () => {
+    expect(jetEffectivePower({ jetBoost: 0, spinStar: 0.9, mdot: 0.1 })).toBe(0)
   })
 
   test('high spin stronger than low spin', () => {
-    const hi = jetEffectivePower({ jetPower: 1, spinStar: 0.95, mdot: 0.1 })
-    const lo = jetEffectivePower({ jetPower: 1, spinStar: 0.1, mdot: 0.1 })
+    const hi = jetEffectivePower({ jetBoost: 1, spinStar: 0.95, mdot: 0.1 })
+    const lo = jetEffectivePower({ jetBoost: 1, spinStar: 0.1, mdot: 0.1 })
     expect(hi).toBeGreaterThan(lo)
   })
 
@@ -86,7 +83,7 @@ describe('jets helpers', () => {
   })
 })
 
-describe('expert Γ / β', () => {
+describe('derived Γ / β helpers', () => {
   test('Γ=4/3 thicker H/R than Γ=5/3', () => {
     const h53 = thinDiskScaleHeight(0.1, 6, 5 / 3)
     const h43 = thinDiskScaleHeight(0.1, 6, 4 / 3)
@@ -98,16 +95,14 @@ describe('expert Γ / β', () => {
     expect(plasmaBetaToMriScale(100)).toBeCloseTo(1, 5)
   })
 
-  test('normalizeDisk clamps tilt/jet/gamma/beta', () => {
+  test('normalizeDisk clamps free bases', () => {
     const d = normalizeDisk({
       tiltRad: 9,
-      jetPower: 5,
-      gamma: 9,
+      jetBoost: 5,
       plasmaBeta: 1e-6,
     })
     expect(d.tiltRad).toBeLessThanOrEqual((40 * Math.PI) / 180 + 1e-9)
-    expect(d.jetPower).toBe(1)
-    expect(d.gamma).toBeCloseTo(5 / 3, 5)
+    expect(d.jetBoost).toBe(1)
     expect(d.plasmaBeta).toBeCloseTo(DISK_LIMITS.plasmaBeta.min, 5)
   })
 })

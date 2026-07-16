@@ -7,14 +7,13 @@ import {
 } from '../../src/physics/diskParams'
 import { getDisk, setDisk } from '../../src/state/disk'
 
-describe('disk structure realism knobs', () => {
+describe('disk structure realism knobs (model defaults)', () => {
   test('defaults match texture-backed structure', () => {
     const d = normalizeDisk({})
     expect(d.structure).toBe(1)
     expect(d.arms).toBe(DEFAULT_DISK.arms)
     expect(d.clumps).toBe(DEFAULT_DISK.clumps)
     expect(d.dust).toBe(DEFAULT_DISK.dust)
-    expect(d.scaleHeight).toBe(DEFAULT_DISK.scaleHeight)
     expect(d.shearRate).toBe(DEFAULT_DISK.shearRate)
     expect(d.animate).toBe(true)
   })
@@ -25,14 +24,12 @@ describe('disk structure realism knobs', () => {
       arms: -1,
       clumps: 2,
       dust: -0.5,
-      scaleHeight: 0.001,
       shearRate: 99,
     })
     expect(d.structure).toBe(DISK_LIMITS.structure.max)
     expect(d.arms).toBe(DISK_LIMITS.arms.min)
     expect(d.clumps).toBe(DISK_LIMITS.clumps.max)
     expect(d.dust).toBe(DISK_LIMITS.dust.min)
-    expect(d.scaleHeight).toBe(DISK_LIMITS.scaleHeight.min)
     expect(d.shearRate).toBe(DISK_LIMITS.shearRate.max)
   })
 

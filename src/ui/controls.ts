@@ -132,7 +132,7 @@ export function mountControls(
     )
     setRangeValue(outerInput, d.outerM)
     setRangeValue(tiltInput, radToDeg(d.tiltRad))
-    setRangeValue(jetInput, d.jetPower)
+    setRangeValue(jetInput, d.jetBoost)
 
     if (mdotVal) {
       const tScale = mdotTemperatureScale(d.mdot)
@@ -142,7 +142,7 @@ export function mountControls(
     setText(betaVal, fmt(d.plasmaBeta, 1))
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
     setText(tiltVal, fmt(radToDeg(d.tiltRad), 1))
-    setText(jetVal, fmt(d.jetPower, 2))
+    setText(jetVal, fmt(d.jetBoost, 2))
   }
 
   function syncCameraInputs(c: CameraState): void {
@@ -196,7 +196,7 @@ export function mountControls(
   })
   bindRange(jetInput, (v) => {
     onUserTweaked()
-    setDisk({ jetPower: v })
+    setDisk({ jetBoost: v })
   })
   bindRange(distInput, (v) => {
     onUserTweaked()

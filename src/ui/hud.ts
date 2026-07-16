@@ -33,7 +33,7 @@ export function renderDerivedHud(
   const ell = keplerSpecificL(geom.rinOverM)
   const magClass = magnetClassFromBeta(disk.plasmaBeta)
   const jetEff = jetEffectivePower({
-    jetPower: disk.jetPower,
+    jetBoost: disk.jetBoost,
     spinStar: params.spinStar,
     mdot: disk.mdot,
   })
@@ -61,7 +61,7 @@ export function renderDerivedHud(
       <div><dt>ṁ</dt><dd>${fmtMdot(disk.mdot)} ṁ_Edd</dd></div>
       <div><dt>ρ₀</dt><dd>${fmt(disk.rho0, 2)} <span class="dim">(free)</span></dd></div>
       <div><dt>r_out</dt><dd>${fmt(disk.outerM, 1)} M</dd></div>
-      <div><dt>jet boost</dt><dd>${fmt(disk.jetPower, 2)} <span class="dim">(free)</span></dd></div>
+      <div><dt>jet boost</dt><dd>${fmt(disk.jetBoost, 2)} <span class="dim">(free)</span></dd></div>
       <div><dt>jet_eff</dt><dd>${fmt(jetEff, 3)} <span class="dim">∝ a★² ṁ^0.4 · boost</span></dd></div>
       <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
 

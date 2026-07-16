@@ -98,7 +98,6 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uRho0 = uniform(1)
   const uPolyT = uniform(1)
   const uRPeakM = uniform(12)
-  const uMagGeom = uniform(0)
   const uMadBoost = uniform(0)
   const uPerturb = uniform(0.35)
   const uStarDensity = uniform(SKY_DEFAULTS.starDensity)
@@ -752,20 +751,10 @@ export function createGeodesicTracer(): GeodesicTracer {
       const rPeak = max(uRPeakM.mul(M), rin.mul(1.05))
       const lnPeak = log(max(rhoV.div(rPeak), float(1e-4)))
       const peakEnv = exp(lnPeak.mul(lnPeak).mul(-1.1))
-      // Mag geometry dens modulation (proxy topology) — never thicken with |y|
-      const magMod = uMagGeom
-        .lessThan(0.5)
-        .select(
-          float(1),
-          uMagGeom
-            .lessThan(1.5)
-            .select(float(0.88).add(c2.mul(0.18)), float(0.92).add(c2.mul(0.08))),
-        )
       const dens = densEnv
         .mul(float(1.2).add(uGrmhdMix.mul(densCube.mul(0.4))))
         .mul(uRho0)
         .mul(float(0.55).add(peakEnv.mul(0.7)))
-        .mul(magMod)
         .mul(float(0.7).add(uPerturb.mul(0.6)))
       const sphR = pos.length()
 
@@ -1002,7 +991,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       uMdot.value = p.mdot
       uRIscoM.value = p.rIscoOverM
       uRoutM.value = p.outerM
-      uPrograde.value = p.prograde ? 1 : 0
+      uPrograde.value = 1 // co-rot locked
       uStructure.value = p.structure
       uArms.value = p.arms
       uClumps.value = p.clumps
@@ -1011,14 +1000,13 @@ export function createGeodesicTracer(): GeodesicTracer {
       uShearRate.value = p.shearRate
       uAnim.value = p.animate ? 1 : 0
       uTilt.value = p.tiltRad
-      uTiltNode.value = p.tiltNodeRad
-      uJetPower.value = p.jetPower
+      uTiltNode.value = 0
+      uJetPower.value = p.jetBoost
       uMriTurb.value = p.mriTurbScale
       uRho0.value = p.rho0
       uPolyT.value = p.polyTScale
       uRPeakM.value = p.rPeakOverM
-      uMagGeom.value = p.magGeom
-      uMadBoost.value = p.madBoost
+            uMadBoost.value = p.madBoost
       uPerturb.value = p.perturbAmp
     },
     setCamera: (c) => {

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { normalizeParams } from '../../src/physics/validate'
 import {
   densPeakRadiusM,
+  DISK_GAMMA,
   keplerSpecificL,
   magnetClassFromBeta,
   normalizeDisk,
@@ -9,38 +10,37 @@ import {
 } from '../../src/physics/diskParams'
 import { effectiveDiskGeom } from '../../src/physics/diskGeometry'
 import { thinDiskScaleHeight } from '../../src/physics/disk'
+import { jetEffectivePower } from '../../src/physics/jets'
 
-describe('thin-disk control policy', () => {
-  test('normalize locks rinFree, gamma, B geom, tilt node', () => {
-    const d = normalizeDisk({
-      rinFree: true,
-      gamma: 4 / 3,
-      magGeometry: 'vertical',
-      tiltNodeRad: 1.2,
-      plasmaBeta: 100,
-    })
-    expect(d.rinFree).toBe(false)
-    expect(d.gamma).toBeCloseTo(5 / 3, 5)
-    expect(d.magGeometry).toBe('single-loop')
-    expect(d.tiltNodeRad).toBe(0)
-    expect(d.magnetState).toBe('sane')
+describe('collapsed DiskParams + derived geometry', () => {
+  test('normalize has no rinFree/prograde/gamma fields', () => {
+    const d = normalizeDisk({})
+    expect('rinFree' in d).toBe(false)
+    expect('prograde' in d).toBe(false)
+    expect('gamma' in d).toBe(false)
+    expect('jetPower' in d).toBe(false)
+    expect(d.jetBoost).toBe(0)
   })
 
-  test('effective r_in is always ISCO (ignore free rinM)', () => {
+  test('effective r_in is co-rot ISCO', () => {
     const p = normalizeParams({ mass: 1, spinStar: 0, charge: 0 })
-    const d = normalizeDisk({ rinM: 12, rinFree: true })
+    const d = normalizeDisk({})
     const g = effectiveDiskGeom(p, d)
     expect(g.rinOverM).toBeCloseTo(6, 3)
+    expect(g.specificL).toBeCloseTo(Math.sqrt(6), 5)
   })
 
-  test('H/r is thin-disk derived', () => {
-    const h = thinDiskScaleHeight(0.1, 6, 5 / 3)
+  test('H/r derived with DISK_GAMMA', () => {
+    const h = thinDiskScaleHeight(0.1, 6, DISK_GAMMA)
     expect(h).toBeGreaterThan(0.02)
-    expect(h).toBeLessThan(0.2)
+    expect(h).toBeLessThan(0.1)
   })
 
-  test('ℓ̃ from r_in', () => {
+  test('ℓ̃ and dens peak', () => {
     expect(keplerSpecificL(6)).toBeCloseTo(Math.sqrt(6), 5)
+    const r = densPeakRadiusM(4, 3, 40)
+    expect(r).toBeGreaterThan(3)
+    expect(r).toBeLessThan(40)
   })
 
   test('MAD class from low β', () => {
@@ -48,10 +48,11 @@ describe('thin-disk control policy', () => {
     expect(magnetClassFromBeta(100)).toBe('sane')
   })
 
-  test('dens peak from ℓ', () => {
-    const r = densPeakRadiusM(4, 3, 40)
-    expect(r).toBeGreaterThan(3)
-    expect(r).toBeLessThan(40)
+  test('jet boost API', () => {
+    expect(jetEffectivePower({ jetBoost: 0, spinStar: 0.9, mdot: 0.1 })).toBe(0)
+    const hi = jetEffectivePower({ jetBoost: 1, spinStar: 0.95, mdot: 0.1 })
+    const lo = jetEffectivePower({ jetBoost: 1, spinStar: 0.1, mdot: 0.1 })
+    expect(hi).toBeGreaterThan(lo)
   })
 
   test('MRI scale from β', () => {

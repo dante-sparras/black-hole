@@ -6,10 +6,11 @@
 import { getDebug, subscribeDebug } from '../debug/state'
 import { autoExposureFromPhysics, thinDiskScaleHeight } from '../physics/disk'
 import {
+  DISK_GAMMA,
   magnetClassFromBeta,
   plasmaBetaToMriScale,
-  polyTemperatureScale,
   perturbFromBeta,
+  rhoTemperatureScale,
 } from '../physics/diskParams'
 import { effectiveDiskGeom } from '../physics/diskGeometry'
 import { resolveCameraDistance } from '../physics/observer'
@@ -80,12 +81,11 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const disk = getDisk()
     const geom = effectiveDiskGeom(p, disk)
     const rinM = geom.rinOverM
-    // Thin-disk: H/r derived (not free UI)
-    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM, disk.gamma)
-    const magnetState = magnetClassFromBeta(disk.plasmaBeta)
-    const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta, magnetState)
-    const polyTScale = polyTemperatureScale(1, disk.rho0, 5 / 3)
-    const madBoost = magnetState === 'mad' ? 1 : 0
+    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM, DISK_GAMMA)
+    const magnetClass = magnetClassFromBeta(disk.plasmaBeta)
+    const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta, magnetClass)
+    const polyTScale = rhoTemperatureScale(disk.rho0)
+    const madBoost = magnetClass === 'mad' ? 1 : 0
     const perturbAmp = perturbFromBeta(disk.plasmaBeta)
     tracer.setSpacetime({
       mass: p.mass,
@@ -94,7 +94,6 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       mdot: disk.mdot,
       rIscoOverM: rinM,
       outerM: disk.outerM,
-      prograde: true, // always co-rotating; a★ sign sets lab sense
       structure: disk.structure,
       arms: disk.arms,
       clumps: disk.clumps,
@@ -103,13 +102,11 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       shearRate: disk.shearRate,
       animate: disk.animate,
       tiltRad: disk.tiltRad,
-      tiltNodeRad: 0,
-      jetPower: disk.jetPower,
+      jetBoost: disk.jetBoost,
       mriTurbScale,
       rho0: disk.rho0,
       polyTScale,
       rPeakOverM: geom.rPeakOverM,
-      magGeom: 0,
       madBoost,
       perturbAmp,
     })

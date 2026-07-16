@@ -1,6 +1,5 @@
 /**
- * Effective disk geometry from free base params + BH state.
- * Pure TS — used by sceneBridge, HUD, tests.
+ * Effective disk geometry from free bases + BH state (thin-disk policy).
  */
 import type { BlackHoleParams } from './types'
 import { diskIsco } from './disk'
@@ -11,29 +10,23 @@ import { horizonPlus } from './geometry'
 import { spinLength } from './types'
 
 export type EffectiveDiskGeom = {
-  /** Inner edge used for emission (units of M) */
   readonly rinOverM: number
-  /** Absolute inner radius */
   readonly rIn: number
-  /** Family ISCO / M (always reported) */
   readonly iscoOverM: number
-  /** Dens peak cylindrical radius / M from ℓ̃ */
   readonly rPeakOverM: number
-  /** Horizon outer / M */
   readonly rPlusOverM: number
+  readonly specificL: number
 }
 
 /**
- * Resolve luminous inner edge (thin-disk policy):
- * always co-rotating family ISCO (L ‖ J), floored above ~1.05 r₊.
- * Free r_in / counter-rotating disk are not user controls.
+ * Luminous inner edge = co-rotating ISCO, floored above ~1.05 r₊.
  */
 export function effectiveDiskGeom(
   params: BlackHoleParams,
   disk: DiskParams,
 ): EffectiveDiskGeom {
   const M = Math.max(params.mass, 1e-12)
-  const isco = diskIsco(params, true) // co-rotating ISCO; a★ sign handled in helpers
+  const isco = diskIsco(params, true)
   const iscoOverM = rIscoOverM(isco, M)
   const a = spinLength(params)
   const rPlus = horizonPlus(M, a, params.charge)
@@ -43,8 +36,8 @@ export function effectiveDiskGeom(
   let rinOverM = Math.max(iscoOverM, floor)
   rinOverM = Math.min(rinOverM, disk.outerM - 0.5)
 
-  const ell = keplerSpecificL(rinOverM)
-  const rPeakOverM = densPeakRadiusM(ell, rinOverM, disk.outerM)
+  const specificL = keplerSpecificL(rinOverM)
+  const rPeakOverM = densPeakRadiusM(specificL, rinOverM, disk.outerM)
 
   return {
     rinOverM,
@@ -52,5 +45,6 @@ export function effectiveDiskGeom(
     iscoOverM,
     rPeakOverM,
     rPlusOverM,
+    specificL,
   }
 }
