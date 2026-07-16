@@ -5,7 +5,7 @@
  */
 import { emitStore } from './batch'
 
-export const IDEAL_BEAM_DEFAULT = false
+export const IDEAL_BEAM_DEFAULT = true
 
 type Listener = (ideal: boolean) => void
 

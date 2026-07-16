@@ -78,7 +78,7 @@ export function createGeodesicTracer(): GeodesicTracer {
   /** 1 = scale-free D = distanceM · M; 0 = fixed geometric D */
   const uScaleFree = uniform(1)
   /** 1 = ideal I∝g³; 0 = display I∝g² */
-  const uIdealBeam = uniform(0)
+  const uIdealBeam = uniform(1)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {

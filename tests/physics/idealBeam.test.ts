@@ -45,10 +45,10 @@ describe('bolometricBeaming dual mode', () => {
 })
 
 describe('idealBeam store (global, not per-preset)', () => {
-  test('defaults off', () => {
+  test('defaults on (ideal g³)', () => {
     setIdealBeam(IDEAL_BEAM_DEFAULT)
-    expect(getIdealBeam()).toBe(false)
-    expect(IDEAL_BEAM_DEFAULT).toBe(false)
+    expect(getIdealBeam()).toBe(true)
+    expect(IDEAL_BEAM_DEFAULT).toBe(true)
   })
 
   test('subscribe + toggle', () => {
@@ -58,18 +58,18 @@ describe('idealBeam store (global, not per-preset)', () => {
     })
     expect(n).toBeGreaterThanOrEqual(1)
     const before = n
-    setIdealBeam(true)
-    expect(getIdealBeam()).toBe(true)
-    expect(n).toBeGreaterThan(before)
     setIdealBeam(false)
+    expect(getIdealBeam()).toBe(false)
+    expect(n).toBeGreaterThan(before)
+    setIdealBeam(true)
     u()
   })
 
   test('presets do not change idealBeam', () => {
-    setIdealBeam(true)
-    applyPreset('cool')
-    expect(getIdealBeam()).toBe(true)
     setIdealBeam(false)
+    applyPreset('cool')
+    expect(getIdealBeam()).toBe(false)
+    setIdealBeam(true)
   })
 
   test('scene snapshot includes idealBeam', () => {

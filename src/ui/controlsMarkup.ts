@@ -100,10 +100,10 @@ export function buildControlsHtml(): string {
     </label>
     <label class="ctrl">
       <span class="ctrl-name">I ∝ g³ ideal</span>
-      <input type="checkbox" id="g-ideal-beam" />
+      <input type="checkbox" id="g-ideal-beam" checked />
       <span class="ctrl-val" data-val="idealBeam"></span>
     </label>
-    <p class="ctrl-hint">RT = force approx · BL = Mino · default beam g² (display); ideal g³ = bolometric science</p>
+    <p class="ctrl-hint">RT = force approx · BL = Mino · default beam g³ (bolometric); off = softer g² display</p>
 
     <div class="ctrl-section">Look</div>
     <label class="ctrl">
