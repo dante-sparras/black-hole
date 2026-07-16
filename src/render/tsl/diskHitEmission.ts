@@ -302,8 +302,8 @@ export function accumulateDiskHit(p) {
   const bMax = max(br, max(bg, bb))
   const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-  // Lensed multi-hit: modest secondary (too high → milk white rings)
-  const bounce = float(1).add(max(min(hits, float(4)).sub(1), float(0)).mul(0.2))
+  // Lensed multi-hit: secondary/far-side bridge over the shadow
+  const bounce = float(1).add(max(min(hits, float(5)).sub(1), float(0)).mul(0.28))
   const mdotBright = float(E.mdotBrightBase).add(
     pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
       E.mdotBrightScale,
@@ -327,6 +327,7 @@ export function accumulateDiskHit(p) {
 
   If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.01)), () => {
     col.addAssign(emit.mul(transm))
-    transm.mulAssign(max(float(0.88), float(1).sub(w.mul(0.12))))
+    // Soft extinction — leave room for multi-wrap / far-side disk
+    transm.mulAssign(max(float(0.92), float(1).sub(w.mul(0.08))))
   })
 }

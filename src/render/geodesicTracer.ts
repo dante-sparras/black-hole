@@ -408,21 +408,23 @@ export function createGeodesicTracer(): GeodesicTracer {
       const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
       vel.assign(vec3(vx, vel.y, vz))
 
-      // Cheap reject before heavy plasma/gas/dust dens (most steps are outside the slab)
+      // Cheap reject before heavy dens (most steps outside the slab)
       const hxV = pos.x
       const hzV = pos.z
       const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
       const absY = abs(pos.y)
-      const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(2.4), M.mul(0.1))
+      const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(2.6), M.mul(0.12))
+      // Sample denser near midplane (stride 1–2) so thin far-side isn't skipped
+      const midStride = absY.lessThan(roughH.mul(0.55)).select(int(1), int(RT.volumeStride))
       If(
         rhoV
-          .greaterThan(rin.mul(0.8))
-          .and(rhoV.lessThan(rout.mul(1.15)))
+          .greaterThan(rin.mul(0.75))
+          .and(rhoV.lessThan(rout.mul(1.18)))
           .and(absY.lessThan(roughH))
-          .and(transm.greaterThan(0.05))
-          .and(diskTau.lessThan(1.7))
-          .and(hits.lessThan(10))
-          .and(stepCount.mod(int(RT.volumeStride)).equal(int(0))),
+          .and(transm.greaterThan(0.04))
+          .and(diskTau.lessThan(float(RT.tauSampleMax)))
+          .and(hits.lessThan(14))
+          .and(stepCount.mod(midStride).equal(int(0))),
         () => {
       // 3D volume: plasma / gas / dust + flared H
       const span = max(rout.sub(rin), M.mul(4))
@@ -460,29 +462,31 @@ export function createGeodesicTracer(): GeodesicTracer {
       )
       const densPlasma = float(1).add(plasmaW.mul(clumpN.mul(1.1).sub(0.25)))
       const densDust = float(1).sub(dustW.mul(0.55).mul(float(0.35).add(dustLane.mul(0.65))))
-      // Cheaper gas mod (1 mul-add spiral approx)
       const densGas = float(0.85).add(
         cphiV.mul(sphiV).mul(0.3).mul(float(1).sub(dustW)),
       )
       const dens = densZ.mul(radialGate).mul(densPlasma).mul(densDust).mul(densGas)
       const sphR = pos.length()
 
+      // Only skip deep inside capture — 1.15 was killing photon-ring / far-side bridge
       If(
         dens
-          .greaterThan(0.025)
-          .and(sphR.greaterThan(rCapture.mul(1.15))),
+          .greaterThan(0.02)
+          .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01)))),
         () => {
-          const dsH = min(ds.div(Hloc), float(0.8))
-          const kappa = float(0.18)
-            .add(plasmaW.mul(0.35))
-            .add(densZ.mul(0.22))
-            .add(dustW.mul(0.08))
-          const stride = float(RT.volumeStride)
-          const dTau = dens.mul(dsH).mul(kappa).mul(stride)
-          const beer = exp(diskTau.mul(-1))
-          const zoneBright = float(0.45).add(plasmaW.mul(0.55)).sub(dustW.mul(0.12))
-          const w = dens.mul(dsH).mul(beer).mul(zoneBright).mul(stride.mul(0.9))
-          If(w.greaterThan(0.025), () => {
+          const dsH = min(ds.div(Hloc), float(0.75))
+          const kappa = float(0.12)
+            .add(plasmaW.mul(0.22))
+            .add(densZ.mul(0.14))
+            .add(dustW.mul(0.05))
+          // Effective stride for weight (midplane denser → lower stride factor)
+          const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(RT.volumeStride))
+          const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
+          // Soft Beer: keep far-side / multi-wrap visible after near-side hits
+          const beer = exp(diskTau.mul(float(-RT.beerSoft)))
+          const zoneBright = float(0.5).add(plasmaW.mul(0.5)).sub(dustW.mul(0.1))
+          const w = dens.mul(dsH).mul(beer).mul(zoneBright).mul(strideF.mul(0.85))
+          If(w.greaterThan(0.018), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,
@@ -516,7 +520,7 @@ export function createGeodesicTracer(): GeodesicTracer {
               uAnim,
               nRay: vel.normalize(),
             })
-            hits.addAssign(0.1)
+            hits.addAssign(0.08)
             diskTau.addAssign(dTau)
           })
         },

@@ -4,21 +4,21 @@
  *   - CPU knNull / cpuRef topology checks
  *
  * CRITICAL: step adapt floor must stay ≳ 0.2M or rays stall at the photon sphere.
- * Performance: maxSteps / baseStepM / volumeStride dominate GPU cost per pixel.
+ * Balance: enough steps for far-side/lensed disk; lean enough for ~60–100fps.
  */
 export const RT = {
-  /** Max integrator steps per ray (GPU). Lower = more FPS. */
-  maxSteps: 380,
+  /** Max integrator steps per ray (GPU). Need multi-wrap for far-side above shadow. */
+  maxSteps: 460,
   /** Base step size multiplier: ds = baseStepM * M * adapt */
-  baseStepM: 0.16,
+  baseStepM: 0.14,
   /** Adaptive ds clamp: min(adaptMax, max(adaptFloor, r/(adaptScale * M))) */
-  adaptFloor: 0.3,
-  adaptMax: 2.0,
-  adaptScale: 10,
+  adaptFloor: 0.24,
+  adaptMax: 1.85,
+  adaptScale: 11,
   /** Capture just outside r₊ */
   captureMargin: 1.02,
   /** Escape when r > escapeCamFactor * camD and outbound */
-  escapeCamFactor: 2.8,
+  escapeCamFactor: 3,
   /** Unfinished rays with minR < stalledCapture * M → treat as capture */
   stalledCaptureM: 3.2,
   /** Default disk outer radius in units of M */
@@ -26,10 +26,18 @@ export const RT = {
   /** Floor ISCO above horizon */
   iscoHorizonMargin: 1.05,
   /**
-   * Volume disk sample stride (GPU). Every Nth step when inside the slab.
-   * Higher = faster; weight scaled by stride so brightness holds.
+   * Volume disk sample stride (GPU). 3 balances FPS vs ring banding.
+   * Weight scaled by stride so brightness holds.
    */
-  volumeStride: 5,
+  volumeStride: 3,
+  /**
+   * Soft optical depth scale for Beer's law (weight ∝ e^{−α τ}).
+   * α < 1 keeps far-side / lensed disk visible after near-side hits.
+   * α = 1 was fully blacking the top bridge over the shadow.
+   */
+  beerSoft: 0.42,
+  /** τ gate for continued sampling (soft; not a hard wall) */
+  tauSampleMax: 3.2,
 } as const
 
 /** Adaptive step size in geometric units. */
