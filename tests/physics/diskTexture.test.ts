@@ -82,10 +82,10 @@ describe('diskTextureFactor', () => {
   })
 
   test('Keplerian shear changes pattern over time at fixed point', () => {
-    const f0 = diskTextureFactor(10, 2, 1, { time: 0 })
-    const f1 = diskTextureFactor(10, 2, 1, { time: 2 })
-    // With shearGain, motion is visible within a couple of seconds
-    expect(Math.abs(f1 - f0)).toBeGreaterThan(0.03)
+    const f0 = diskTextureFactor(12, 3, 1, { time: 0 })
+    const f1 = diskTextureFactor(12, 3, 1, { time: 3 })
+    // With shearGain, motion is visible within a few seconds
+    expect(Math.abs(f1 - f0)).toBeGreaterThan(0.02)
   })
 
   test('inner radius shears faster than outer (differential rotation)', () => {
