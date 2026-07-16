@@ -34,6 +34,7 @@ import type { GeodesicTracer } from './geodesicTracerTypes'
 import { applyDebugFalseColor } from './tsl/debugFalseColor'
 import { sampleDeepSpaceSky } from './tsl/deepSpaceSky'
 import { accumulateDiskHit } from './tsl/diskHitEmission'
+import { processDiskLayerHit } from './tsl/diskLayerHit'
 import { knNullAccelTsl } from './tsl/knNullAccelTsl'
 
 export type {
@@ -403,94 +404,102 @@ export function createGeodesicTracer(): GeodesicTracer {
       const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
       vel.assign(vec3(vx, vel.y, vz))
 
-      // Disk y = 0 plane crossing (finite-thickness look via pathFac in emission).
-      // Do NOT sample every step along |y|<H — that over-integrates edge-on rays into
-      // a bright horizontal slash through the shadow (see bug report).
+      // 3D thin-disk slab: midplane + upper/lower skin planes at ±H.
+      // Plane crossings only (no per-step volume) — avoids shadow midplane slash.
+      // H ≈ (H/R) * ρ_char with ρ_char ~ 10M (mid-disk); scales with uScaleH.
+      const Hslab = max(uScaleH.mul(M).mul(10), M.mul(0.06))
+      const nRay = vel.normalize()
+      const layerCtx = {
+        M,
+        a,
+        aStar,
+        Q,
+        rs,
+        mdot,
+        rin,
+        rout,
+        uRIscoM,
+        hits,
+        col,
+        transm,
+        dbgG,
+        dbgT,
+        dbgFlux,
+        uDebugMode,
+        uIdealBeam,
+        uTime,
+        uPrograde,
+        uStructure,
+        uArms,
+        uClumps,
+        uDust,
+        uScaleH,
+        uShearRate,
+        uAnim,
+        nRay,
+      }
+
+      // Midplane y = 0 (primary)
       If(
         prevY
           .mul(pos.y)
           .lessThan(0)
           .and(transm.greaterThan(0.02))
-          .and(hits.lessThan(8))
-          // Ignore numerical micro-crossings when ray skims the plane (equatorial noise)
+          .and(hits.lessThan(10))
           .and(abs(prevY).add(abs(pos.y)).greaterThan(M.mul(1e-4))),
         () => {
           const t = prevY.div(prevY.sub(pos.y))
           const hx = p0x.add(pos.x.sub(p0x).mul(t))
           const hz = p0z.add(pos.z.sub(p0z).mul(t))
-          const rho = hx.mul(hx).add(hz.mul(hz)).sqrt()
+          processDiskLayerHit({
+            ...layerCtx,
+            hx,
+            hz,
+            layerWeight: float(1),
+          })
+        },
+      )
 
-          If(rho.greaterThanEqual(rin).and(rho.lessThanEqual(rout)), () => {
-            hits.addAssign(1)
-            // Orbiting-emitter redshift: g = 1/(u^t (1 − Ω λ)), λ = ρ μ
-            const rhoSafe = max(rho, float(1e-5))
-            const sqrtM = sqrt(max(M, float(1e-8)))
-            const r32 = pow(rhoSafe, float(1.5))
-            // Ω = ±√M / (r^{3/2} ± a√M)
-            const OmegaPro = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
-            const denomR = r32.sub(a.mul(sqrtM))
-            const OmegaRet = float(-1)
-              .mul(sqrtM)
-              .div(abs(denomR).lessThan(1e-12).select(float(1e-12), denomR))
-            const Omega = uPrograde.greaterThan(0.5).select(OmegaPro, OmegaRet)
-            const g_tt = float(-1).add(rs.div(rhoSafe)).sub(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
-            const g_tphi = a.mul(M).mul(-2).div(rhoSafe)
-            const g_phiphi = rhoSafe
-              .mul(rhoSafe)
-              .add(a.mul(a))
-              .add(M.mul(2).mul(a).mul(a).div(rhoSafe))
-              .sub(a.mul(a).mul(Q).mul(Q).div(rhoSafe.mul(rhoSafe)))
-            const Xorb = g_tt
-              .mul(-1)
-              .sub(Omega.mul(2).mul(g_tphi))
-              .sub(Omega.mul(Omega).mul(g_phiphi))
-            const u_t = float(1).div(sqrt(max(Xorb, float(1e-8))))
-            // ê_φ prograde about +Y: (−z,0,x); retrograde flips
-            const tdirPro = vec3(hz.mul(-1), float(0), hx).normalize()
-            const tdirRet = vec3(hz, float(0), hx.mul(-1)).normalize()
-            const tdir = uPrograde.greaterThan(0.5).select(tdirPro, tdirRet)
-            const nObs = vel.normalize().mul(-1)
-            const mu = dot(tdir, nObs)
-            const lambda = rhoSafe.mul(mu)
-            const freq = float(1).div(
-              max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)),
-            )
-            const invRho = float(1).div(max(rhoSafe, float(1e-5)))
-            const nRay = vel.normalize()
-            // Crossing-angle weight: grazing (edge-on) gets soft path, not infinite sheet
-            const nY = abs(nRay.y)
-            const crossW = min(float(1.35), float(0.55).add(uScaleH.div(max(nY, float(0.12)))))
-            accumulateDiskHit({
-              hitR: rho,
-              freq,
-              cphi: hx.mul(invRho),
-              sphi: hz.mul(invRho),
-              M,
-              aStar,
-              mdot,
-              rin,
-              rout,
-              uRIscoM,
-              hits,
-              col,
-              transm,
-              dbgG,
-              dbgT,
-              dbgFlux,
-              uDebugMode,
-              uIdealBeam,
-              uTime,
-              uPrograde,
-              uStructure,
-              uArms,
-              uClumps,
-              uDust,
-              uScaleH,
-              uShearRate,
-              uAnim,
-              pathAbsY: nY,
-              weight: crossW,
-            })
+      // Upper skin y = +Hslab
+      If(
+        prevY
+          .sub(Hslab)
+          .mul(pos.y.sub(Hslab))
+          .lessThan(0)
+          .and(transm.greaterThan(0.03))
+          .and(hits.lessThan(12))
+          .and(abs(prevY.sub(Hslab)).add(abs(pos.y.sub(Hslab))).greaterThan(M.mul(1e-4))),
+        () => {
+          const t = prevY.sub(Hslab).div(prevY.sub(pos.y))
+          const hx = p0x.add(pos.x.sub(p0x).mul(t))
+          const hz = p0z.add(pos.z.sub(p0z).mul(t))
+          processDiskLayerHit({
+            ...layerCtx,
+            hx,
+            hz,
+            layerWeight: float(0.38),
+          })
+        },
+      )
+
+      // Lower skin y = −Hslab
+      If(
+        prevY
+          .add(Hslab)
+          .mul(pos.y.add(Hslab))
+          .lessThan(0)
+          .and(transm.greaterThan(0.03))
+          .and(hits.lessThan(12))
+          .and(abs(prevY.add(Hslab)).add(abs(pos.y.add(Hslab))).greaterThan(M.mul(1e-4))),
+        () => {
+          const t = prevY.add(Hslab).div(prevY.sub(pos.y))
+          const hx = p0x.add(pos.x.sub(p0x).mul(t))
+          const hz = p0z.add(pos.z.sub(p0z).mul(t))
+          processDiskLayerHit({
+            ...layerCtx,
+            hx,
+            hz,
+            layerWeight: float(0.38),
           })
         },
       )

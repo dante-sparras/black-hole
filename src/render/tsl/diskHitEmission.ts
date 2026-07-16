@@ -332,7 +332,7 @@ export function accumulateDiskHit(p) {
   dbgT.assign(TK.div(float(12000)))
   dbgFlux.assign(fluxVis.mul(texFac).mul(w))
 
-  If(uDebugMode.notEqual(float(8)), () => {
+  If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.02)), () => {
     col.addAssign(emit.mul(transm))
     // Fixed midplane attenuation (weight already scales intensity; avoid OD blow-up)
     transm.mulAssign(0.45)
