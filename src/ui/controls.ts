@@ -4,10 +4,8 @@ import {
   mdotTemperatureScale,
   sliderFromMdot as sliderFromMdotRange,
 } from '../physics/disk'
-import { convertDistanceOnScaleFreeToggle } from '../physics/observer'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import type { DiskParams } from '../physics/diskParams'
-import { DEFAULT_DISK } from '../physics/diskParams'
 import { withBatch } from '../state/batch'
 import {
   degToRad,
@@ -18,33 +16,11 @@ import {
   type CameraState,
 } from '../state/camera'
 import { getDisk, setDisk, subscribeDisk } from '../state/disk'
-import { getLook, setLook, subscribeLook, type LookState } from '../state/look'
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
 import { applyPreset } from '../state/presets'
+import { setIdealBeam } from '../state/idealBeam'
+import { setScaleFree } from '../state/scaleFree'
 import {
-  getGeodesicIntegrator,
-  setGeodesicIntegrator,
-  subscribeGeodesic,
-} from '../state/geodesic'
-import {
-  getIdealBeam,
-  setIdealBeam,
-  subscribeIdealBeam,
-} from '../state/idealBeam'
-import {
-  getScaleFree,
-  setScaleFree,
-  subscribeScaleFree,
-} from '../state/scaleFree'
-import {
-  getSky,
-  resetSky,
-  setSky,
-  subscribeSky,
-  type SkyState,
-} from '../state/sky'
-import {
-  bindCheckbox,
   bindRange,
   bindSelect,
   qs,
@@ -64,11 +40,20 @@ function sliderFromMdot(mdot: number): number {
   return sliderFromMdotRange(mdot, MDOT_MIN, MDOT_MAX)
 }
 
+/**
+ * Base-parameter panel only.
+ * Locks physics/display laws that must not be free knobs:
+ *   scale-free ON, ideal I∝g³ ON, disk structure/H/R/shear at model defaults.
+ */
 export function mountControls(
   root: HTMLElement,
   derivedRoot: HTMLElement | null,
 ): void {
   root.innerHTML = buildControlsHtml()
+
+  // Fixed model laws (not user free parameters)
+  setScaleFree(true)
+  setIdealBeam(true)
 
   const massInput = qs<HTMLInputElement>(root, '#p-mass')
   const spinInput = qs<HTMLInputElement>(root, '#p-spin')
@@ -76,33 +61,14 @@ export function mountControls(
   const mdotInput = qs<HTMLInputElement>(root, '#d-mdot')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
   const orbitSelect = qs<HTMLSelectElement>(root, '#d-orbit')
-  const structInput = qs<HTMLInputElement>(root, '#d-struct')
-  const armsInput = qs<HTMLInputElement>(root, '#d-arms')
-  const clumpsInput = qs<HTMLInputElement>(root, '#d-clumps')
-  const dustInput = qs<HTMLInputElement>(root, '#d-dust')
-  const hInput = qs<HTMLInputElement>(root, '#d-h')
-  const shearInput = qs<HTMLInputElement>(root, '#d-shear')
-  const animInput = qs<HTMLInputElement>(root, '#d-anim')
-  const structResetBtn = qs<HTMLButtonElement>(root, '#d-struct-reset')
   const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
   const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
   const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
   const mdotVal = qs<HTMLElement>(root, '[data-val="mdot"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
   const orbitVal = qs<HTMLElement>(root, '[data-val="orbit"]')
-  const structVal = qs<HTMLElement>(root, '[data-val="struct"]')
-  const armsVal = qs<HTMLElement>(root, '[data-val="arms"]')
-  const clumpsVal = qs<HTMLElement>(root, '[data-val="clumps"]')
-  const dustVal = qs<HTMLElement>(root, '[data-val="dust"]')
-  const hVal = qs<HTMLElement>(root, '[data-val="h"]')
-  const shearVal = qs<HTMLElement>(root, '[data-val="shear"]')
-  const animVal = qs<HTMLElement>(root, '[data-val="anim"]')
 
   const distInput = qs<HTMLInputElement>(root, '#c-dist')
-  const distName = qs<HTMLElement>(root, '#c-dist-name')
-  const scaleFreeInput = qs<HTMLInputElement>(root, '#c-scale-free')
-  const scaleFreeVal = qs<HTMLElement>(root, '[data-val="scaleFree"]')
-  const scaleHint = qs<HTMLElement>(root, '#c-scale-hint')
   const incInput = qs<HTMLInputElement>(root, '#c-inc')
   const azInput = qs<HTMLInputElement>(root, '#c-az')
   const fovInput = qs<HTMLInputElement>(root, '#c-fov')
@@ -111,34 +77,8 @@ export function mountControls(
   const azVal = qs<HTMLElement>(root, '[data-val="az"]')
   const fovVal = qs<HTMLElement>(root, '[data-val="fov"]')
 
-  const bloomOnInput = qs<HTMLInputElement>(root, '#l-bloom-on')
-  const bloomStrInput = qs<HTMLInputElement>(root, '#l-bloom-str')
-  const bloomRadInput = qs<HTMLInputElement>(root, '#l-bloom-rad')
-  const bloomThrInput = qs<HTMLInputElement>(root, '#l-bloom-thr')
-  const exposureInput = qs<HTMLInputElement>(root, '#l-exposure')
-  const bloomOnVal = qs<HTMLElement>(root, '[data-val="bloomOn"]')
-  const bloomStrVal = qs<HTMLElement>(root, '[data-val="bloomStr"]')
-  const bloomRadVal = qs<HTMLElement>(root, '[data-val="bloomRad"]')
-  const bloomThrVal = qs<HTMLElement>(root, '[data-val="bloomThr"]')
-  const exposureVal = qs<HTMLElement>(root, '[data-val="exposure"]')
-
-  const starDensInput = qs<HTMLInputElement>(root, '#s-density')
-  const starBrightInput = qs<HTMLInputElement>(root, '#s-bright')
-  const nebulaInput = qs<HTMLInputElement>(root, '#s-nebula')
-  const milkyInput = qs<HTMLInputElement>(root, '#s-milky')
-  const skyResetBtn = qs<HTMLButtonElement>(root, '#s-reset')
-  const starDensVal = qs<HTMLElement>(root, '[data-val="starDens"]')
-  const starBrightVal = qs<HTMLElement>(root, '[data-val="starBright"]')
-  const nebulaVal = qs<HTMLElement>(root, '[data-val="nebula"]')
-  const milkyVal = qs<HTMLElement>(root, '[data-val="milky"]')
-
-  const geodesicSelect = qs<HTMLSelectElement>(root, '#g-integr')
-  const geodesicVal = qs<HTMLElement>(root, '[data-val="geodesic"]')
-  const idealBeamInput = qs<HTMLInputElement>(root, '#g-ideal-beam')
-  const idealBeamVal = qs<HTMLElement>(root, '[data-val="idealBeam"]')
-
   const presetHint = qs<HTMLElement>(root, '#preset-hint')
-  const presetBtns = root.querySelectorAll<HTMLButtonElement>('.preset-btn:not(#s-reset)')
+  const presetBtns = root.querySelectorAll<HTMLButtonElement>('[data-preset]')
 
   let activePresetId: string | null = null
 
@@ -150,8 +90,7 @@ export function mountControls(
       btn.setAttribute('aria-pressed', on ? 'true' : 'false')
     }
     if (presetHint) {
-      presetHint.textContent =
-        hint ?? 'One-click scene: physics + camera + look'
+      presetHint.textContent = hint ?? 'Base-parameter scenes only'
     }
   }
 
@@ -172,26 +111,12 @@ export function mountControls(
     setRangeValue(mdotInput, sliderFromMdot(d.mdot))
     setRangeValue(outerInput, d.outerM)
     if (orbitSelect) orbitSelect.value = d.prograde ? 'pro' : 'ret'
-    setRangeValue(structInput, d.structure)
-    setRangeValue(armsInput, d.arms)
-    setRangeValue(clumpsInput, d.clumps)
-    setRangeValue(dustInput, d.dust)
-    setRangeValue(hInput, d.scaleHeight)
-    setRangeValue(shearInput, d.shearRate)
-    if (animInput) animInput.checked = d.animate
     if (mdotVal) {
       const tScale = mdotTemperatureScale(d.mdot)
       mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
     }
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
     setText(orbitVal, d.prograde ? 'pro' : 'ret')
-    setText(structVal, fmt(d.structure, 2))
-    setText(armsVal, fmt(d.arms, 2))
-    setText(clumpsVal, fmt(d.clumps, 2))
-    setText(dustVal, fmt(d.dust, 2))
-    setText(hVal, fmt(d.scaleHeight, 3))
-    setText(shearVal, fmt(d.shearRate, 2))
-    setText(animVal, d.animate ? 'on' : 'off')
   }
 
   function syncCameraInputs(c: CameraState): void {
@@ -199,69 +124,17 @@ export function mountControls(
     setRangeValue(incInput, radToDeg(c.inclination))
     setRangeValue(azInput, radToDeg(c.azimuth))
     setRangeValue(fovInput, c.fov)
-    const scaleFree = getScaleFree()
-    setText(
-      distVal,
-      scaleFree ? `${fmt(c.distanceM, 1)} M` : fmt(c.distanceM, 1),
-    )
+    setText(distVal, fmt(c.distanceM, 1))
     setText(incVal, fmt(radToDeg(c.inclination), 1))
     setText(azVal, fmt(radToDeg(c.azimuth), 1))
     setText(fovVal, fmt(c.fov, 2))
   }
 
-  function syncScaleFreeUi(on: boolean): void {
-    if (scaleFreeInput) scaleFreeInput.checked = on
-    setText(scaleFreeVal, on ? 'on' : 'off')
-    if (distName) distName.textContent = on ? 'Distance / M' : 'Distance'
-    if (scaleHint) {
-      scaleHint.textContent = on
-        ? 'D = d·M · Mass cancels angular size · zoom with Distance / FOV'
-        : 'D fixed (geom units) · Mass grows hole & lensing · drag canvas to orbit'
-    }
-    // Refresh distance readout units
-    syncCameraInputs(getCamera())
+  function syncDerived(d: DerivedGeometry): void {
+    if (derivedRoot) renderDerivedHud(derivedRoot, d, getParams(), getDisk())
   }
 
-  function syncLookInputs(l: LookState): void {
-    if (bloomOnInput) bloomOnInput.checked = l.bloomEnabled
-    setRangeValue(bloomStrInput, l.bloomStrength)
-    setRangeValue(bloomRadInput, l.bloomRadius)
-    setRangeValue(bloomThrInput, l.bloomThreshold)
-    setRangeValue(exposureInput, l.exposure)
-    setText(bloomOnVal, l.bloomEnabled ? 'on' : 'off')
-    setText(bloomStrVal, fmt(l.bloomStrength, 2))
-    setText(bloomRadVal, fmt(l.bloomRadius, 2))
-    setText(bloomThrVal, fmt(l.bloomThreshold, 2))
-    setText(exposureVal, fmt(l.exposure, 2))
-  }
-
-  function syncSkyInputs(s: SkyState): void {
-    setRangeValue(starDensInput, s.starDensity)
-    setRangeValue(starBrightInput, s.starBrightness)
-    setRangeValue(nebulaInput, s.nebula)
-    setRangeValue(milkyInput, s.milky)
-    setText(starDensVal, fmt(s.starDensity, 2))
-    setText(starBrightVal, fmt(s.starBrightness, 2))
-    setText(nebulaVal, fmt(s.nebula, 2))
-    setText(milkyVal, fmt(s.milky, 2))
-  }
-
-  function syncGeodesicUi(): void {
-    const mode = getGeodesicIntegrator()
-    if (geodesicSelect) geodesicSelect.value = mode
-    setText(geodesicVal, mode === 'bl' ? 'BL' : 'RT')
-  }
-
-  function syncIdealBeamUi(on: boolean): void {
-    if (idealBeamInput) idealBeamInput.checked = on
-    setText(idealBeamVal, on ? 'g³' : 'g²')
-  }
-
-  function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
-    if (!derivedRoot) return
-    renderDerivedHud(derivedRoot, p, d, getDisk())
-  }
-
+  // --- Bind free base parameters only ---
   bindRange(massInput, (v) => {
     onUserTweaked()
     setParams({ mass: v })
@@ -284,49 +157,8 @@ export function mountControls(
   })
   bindSelect(orbitSelect, (v) => {
     onUserTweaked()
-    setDisk({ prograde: v !== 'ret' })
+    setDisk({ prograde: v === 'pro' })
   })
-  bindRange(structInput, (v) => {
-    onUserTweaked()
-    setDisk({ structure: v })
-  })
-  bindRange(armsInput, (v) => {
-    onUserTweaked()
-    setDisk({ arms: v })
-  })
-  bindRange(clumpsInput, (v) => {
-    onUserTweaked()
-    setDisk({ clumps: v })
-  })
-  bindRange(dustInput, (v) => {
-    onUserTweaked()
-    setDisk({ dust: v })
-  })
-  bindRange(hInput, (v) => {
-    onUserTweaked()
-    setDisk({ scaleHeight: v })
-  })
-  bindRange(shearInput, (v) => {
-    onUserTweaked()
-    setDisk({ shearRate: v })
-  })
-  bindCheckbox(animInput, (checked) => {
-    onUserTweaked()
-    setDisk({ animate: checked })
-  })
-  structResetBtn?.addEventListener('click', () => {
-    onUserTweaked()
-    setDisk({
-      structure: DEFAULT_DISK.structure,
-      arms: DEFAULT_DISK.arms,
-      clumps: DEFAULT_DISK.clumps,
-      dust: DEFAULT_DISK.dust,
-      scaleHeight: DEFAULT_DISK.scaleHeight,
-      shearRate: DEFAULT_DISK.shearRate,
-      animate: DEFAULT_DISK.animate,
-    })
-  })
-
   bindRange(distInput, (v) => {
     onUserTweaked()
     setCamera({ distanceM: v })
@@ -344,111 +176,32 @@ export function mountControls(
     setCamera({ fov: v })
   })
 
-  bindCheckbox(scaleFreeInput, (checked) => {
-    const M = getParams().mass
-    const d = getCamera().distanceM
-    withBatch(() => {
-      setCamera({
-        distanceM: convertDistanceOnScaleFreeToggle(d, M, checked),
-      })
-      setScaleFree(checked)
-    })
-  })
-
-  bindCheckbox(bloomOnInput, (checked) => {
-    onUserTweaked()
-    setLook({ bloomEnabled: checked })
-  })
-  bindRange(bloomStrInput, (v) => {
-    onUserTweaked()
-    setLook({ bloomStrength: v })
-  })
-  bindRange(bloomRadInput, (v) => {
-    onUserTweaked()
-    setLook({ bloomRadius: v })
-  })
-  bindRange(bloomThrInput, (v) => {
-    onUserTweaked()
-    setLook({ bloomThreshold: v })
-  })
-  bindRange(exposureInput, (v) => {
-    onUserTweaked()
-    setLook({ exposure: v })
-  })
-
-  bindRange(starDensInput, (v) => setSky({ starDensity: v }))
-  bindRange(starBrightInput, (v) => setSky({ starBrightness: v }))
-  bindRange(nebulaInput, (v) => setSky({ nebula: v }))
-  bindRange(milkyInput, (v) => setSky({ milky: v }))
-  skyResetBtn?.addEventListener('click', () => {
-    resetSky()
-  })
-
-  bindSelect(geodesicSelect, (v) => {
-    setGeodesicIntegrator(v === 'bl' ? 'bl' : 'rt')
-  })
-
-  bindCheckbox(idealBeamInput, (checked) => {
-    setIdealBeam(checked)
-  })
-
   for (const btn of presetBtns) {
     btn.addEventListener('click', () => {
       const id = btn.dataset.preset
       if (!id) return
-      const applied = applyPreset(id)
-      setActivePresetUi(applied.id, applied.hint)
+      withBatch(() => {
+        applyPreset(id)
+        setScaleFree(true)
+        setIdealBeam(true)
+      })
+      setActivePresetUi(id, btn.title || id)
     })
   }
 
-  subscribe((p, d) => {
+  subscribe((p) => {
     syncPhysicsInputs(p)
-    syncDerived(d, p)
+    syncDerived(getDerived())
   })
-
-  subscribeDisk((disk) => {
-    syncDiskInputs(disk)
-    syncDerived(getDerived(), getParams())
+  subscribeDisk((d) => {
+    syncDiskInputs(d)
+    syncDerived(getDerived())
   })
+  subscribeCamera(syncCameraInputs)
 
-  subscribeCamera((c) => {
-    syncCameraInputs(c)
-  })
-
-  subscribeScaleFree((on) => {
-    syncScaleFreeUi(on)
-  })
-
-  subscribeLook((l) => {
-    syncLookInputs(l)
-  })
-
-  subscribeSky((s) => {
-    syncSkyInputs(s)
-  })
-
-  subscribeGeodesic(() => {
-    syncGeodesicUi()
-  })
-
-  subscribeIdealBeam((on) => {
-    syncIdealBeamUi(on)
-  })
-
-  syncGeodesicUi()
-  syncIdealBeamUi(getIdealBeam())
-
-  massInput?.addEventListener('input', () => {
-    if (!chargeInput) return
-    const m = Number(massInput.value)
-    chargeInput.max = String(Math.max(0, m * 0.99))
-  })
-
+  // Initial sync
   syncPhysicsInputs(getParams())
   syncDiskInputs(getDisk())
-  syncScaleFreeUi(getScaleFree())
   syncCameraInputs(getCamera())
-  syncLookInputs(getLook())
-  syncSkyInputs(getSky())
-  syncDerived(getDerived(), getParams())
+  syncDerived(getDerived())
 }

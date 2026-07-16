@@ -1,11 +1,19 @@
 import { MAX_SPIN_STAR } from '../physics/constants'
 import { DISK_LIMITS } from '../physics/diskParams'
 import { CAMERA_LIMITS, radToDeg } from '../state/camera'
-import { LOOK_LIMITS } from '../state/look'
 import { ALL_PRESETS } from '../state/presets'
-import { SKY_LIMITS } from '../state/sky'
 
-/** Static controls panel markup (limits inlined). */
+/**
+ * Controls = free base parameters only.
+ *
+ * Black hole (no-hair): M, a★, Q
+ * Disk (matter, not hair): ṁ, r_out/M, orbit sense
+ * Observer: distance, inclination, azimuth, FOV
+ *
+ * NOT exposed (derived or fixed physics/display defaults):
+ *   ISCO/rin, T(r), H/R, structure/arms/clumps/dust, shear,
+ *   I∝g³ (always on), integrator (RT), bloom/sky/look knobs
+ */
 export function buildControlsHtml(): string {
   const distLim = CAMERA_LIMITS.distanceM
   const incDegMin = radToDeg(CAMERA_LIMITS.inclination.min)
@@ -20,7 +28,7 @@ export function buildControlsHtml(): string {
           `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
       ).join('')}
     </div>
-    <p class="ctrl-hint" id="preset-hint">One-click scene: physics + camera + look</p>
+    <p class="ctrl-hint" id="preset-hint">Base-parameter scenes only</p>
 
     <div class="ctrl-section">Black hole (no-hair)</div>
     <label class="ctrl">
@@ -38,9 +46,9 @@ export function buildControlsHtml(): string {
       <input type="range" id="p-charge" min="0" max="0.95" step="0.01" />
       <span class="ctrl-val" data-val="charge"></span>
     </label>
-    <p class="ctrl-hint">Only M, a★, Q characterize the stationary BH (no-hair)</p>
+    <p class="ctrl-hint">Stationary BH = (M, a★, Q) only · horizon / ISCO / photon sphere are derived</p>
 
-    <div class="ctrl-section">Accretion disk (not hair)</div>
+    <div class="ctrl-section">Accretion disk (matter)</div>
     <label class="ctrl">
       <span class="ctrl-name">ṁ / ṁ_Edd</span>
       <input type="range" id="d-mdot" min="0" max="1000" step="1" />
@@ -59,55 +67,11 @@ export function buildControlsHtml(): string {
       </select>
       <span class="ctrl-val" data-val="orbit"></span>
     </label>
-    <p class="ctrl-hint">ṁ → NT flux &amp; T∝ṁ¼ · ISCO from orbit sense · Doppler L/R flips with retrograde</p>
+    <p class="ctrl-hint">ṁ sets NT power · r_in = ISCO (derived from a★ + orbit) · T(r), H/R, structure fixed by model</p>
 
-    <div class="ctrl-section">Disk structure (realism)</div>
+    <div class="ctrl-section">Observer</div>
     <label class="ctrl">
-      <span class="ctrl-name">Structure</span>
-      <input type="range" id="d-struct" min="${DISK_LIMITS.structure.min}" max="${DISK_LIMITS.structure.max}" step="0.01" />
-      <span class="ctrl-val" data-val="struct"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Gas arms</span>
-      <input type="range" id="d-arms" min="${DISK_LIMITS.arms.min}" max="${DISK_LIMITS.arms.max}" step="0.01" />
-      <span class="ctrl-val" data-val="arms"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Plasma clumps</span>
-      <input type="range" id="d-clumps" min="${DISK_LIMITS.clumps.min}" max="${DISK_LIMITS.clumps.max}" step="0.01" />
-      <span class="ctrl-val" data-val="clumps"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Dust lanes</span>
-      <input type="range" id="d-dust" min="${DISK_LIMITS.dust.min}" max="${DISK_LIMITS.dust.max}" step="0.01" />
-      <span class="ctrl-val" data-val="dust"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">H/R thickness</span>
-      <input type="range" id="d-h" min="${DISK_LIMITS.scaleHeight.min}" max="${DISK_LIMITS.scaleHeight.max}" step="0.005" />
-      <span class="ctrl-val" data-val="h"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Shear speed</span>
-      <input type="range" id="d-shear" min="${DISK_LIMITS.shearRate.min}" max="${DISK_LIMITS.shearRate.max}" step="0.01" />
-      <span class="ctrl-val" data-val="shear"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Animate</span>
-      <input type="checkbox" id="d-anim" checked />
-      <span class="ctrl-val" data-val="anim"></span>
-    </label>
-    <button type="button" class="preset-btn" id="d-struct-reset" style="margin-top:6px;width:100%">Reset structure defaults</button>
-    <p class="ctrl-hint">Structure 0 = smooth NT · arms/clumps/dust · H/R edge-on · shear uses (M/r)^{3/2} so mass does not freeze motion</p>
-
-    <div class="ctrl-section">Camera</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Scale-free</span>
-      <input type="checkbox" id="c-scale-free" checked />
-      <span class="ctrl-val" data-val="scaleFree"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name" id="c-dist-name">Distance / M</span>
+      <span class="ctrl-name">Distance / M</span>
       <input type="range" id="c-dist" min="${distLim.min}" max="${distLim.max}" step="0.5" />
       <span class="ctrl-val" data-val="dist"></span>
     </label>
@@ -126,74 +90,6 @@ export function buildControlsHtml(): string {
       <input type="range" id="c-fov" min="${fovLim.min}" max="${fovLim.max}" step="0.01" />
       <span class="ctrl-val" data-val="fov"></span>
     </label>
-    <p class="ctrl-hint" id="c-scale-hint">D = d·M · Mass cancels angular size · zoom with Distance / FOV</p>
-
-    <div class="ctrl-section">Geodesics (global)</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Integrator</span>
-      <select id="g-integr" style="flex:1;min-width:0">
-        <option value="rt">RT (Cartesian, default)</option>
-        <option value="bl">BL (Boyer–Lindquist)</option>
-      </select>
-      <span class="ctrl-val" data-val="geodesic"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">I ∝ g³ ideal</span>
-      <input type="checkbox" id="g-ideal-beam" checked />
-      <span class="ctrl-val" data-val="idealBeam"></span>
-    </label>
-    <p class="ctrl-hint">RT = force approx · BL = Mino · default beam g³ (bolometric); off = softer g² display</p>
-
-    <div class="ctrl-section">Look</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Bloom</span>
-      <input type="checkbox" id="l-bloom-on" />
-      <span class="ctrl-val" data-val="bloomOn"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Strength</span>
-      <input type="range" id="l-bloom-str" min="${LOOK_LIMITS.bloomStrength.min}" max="${LOOK_LIMITS.bloomStrength.max}" step="0.01" />
-      <span class="ctrl-val" data-val="bloomStr"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Radius</span>
-      <input type="range" id="l-bloom-rad" min="${LOOK_LIMITS.bloomRadius.min}" max="${LOOK_LIMITS.bloomRadius.max}" step="0.01" />
-      <span class="ctrl-val" data-val="bloomRad"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Threshold</span>
-      <input type="range" id="l-bloom-thr" min="${LOOK_LIMITS.bloomThreshold.min}" max="${LOOK_LIMITS.bloomThreshold.max}" step="0.01" />
-      <span class="ctrl-val" data-val="bloomThr"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Exposure</span>
-      <input type="range" id="l-exposure" min="${LOOK_LIMITS.exposure.min}" max="${LOOK_LIMITS.exposure.max}" step="0.01" />
-      <span class="ctrl-val" data-val="exposure"></span>
-    </label>
-    <p class="ctrl-hint">Unreal bloom on HDR · ACES tone map · not hair</p>
-
-    <div class="ctrl-section">Deep space (global)</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Stars</span>
-      <input type="range" id="s-density" min="${SKY_LIMITS.starDensity.min}" max="${SKY_LIMITS.starDensity.max}" step="0.05" />
-      <span class="ctrl-val" data-val="starDens"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Star bright</span>
-      <input type="range" id="s-bright" min="${SKY_LIMITS.starBrightness.min}" max="${SKY_LIMITS.starBrightness.max}" step="0.05" />
-      <span class="ctrl-val" data-val="starBright"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Nebula</span>
-      <input type="range" id="s-nebula" min="${SKY_LIMITS.nebula.min}" max="${SKY_LIMITS.nebula.max}" step="0.05" />
-      <span class="ctrl-val" data-val="nebula"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Milky lane</span>
-      <input type="range" id="s-milky" min="${SKY_LIMITS.milky.min}" max="${SKY_LIMITS.milky.max}" step="0.05" />
-      <span class="ctrl-val" data-val="milky"></span>
-    </label>
-    <button type="button" class="preset-btn" id="s-reset" style="margin-top:6px;width:100%">Reset sky defaults</button>
-    <p class="ctrl-hint">Same sky for every preset · not hair</p>
+    <p class="ctrl-hint">Scale-free D = d·M (fixed on) · drag on canvas to orbit</p>
   `
 }

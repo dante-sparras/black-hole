@@ -23,6 +23,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 ## Preferences
 
 - **Realism first** — default to physical behavior over film look. Soft display hacks are optional toggles, not defaults (e.g. ideal \(I\propto g^3\) ON; soft \(g^2\) is opt-out). Prefer GR root-causes over bloom/fill/fake rings.
+- **Base parameters only in UI** — expose free inputs the sim needs: no-hair \((M,a_★,Q)\), disk \((\dot m, r_\mathrm{out}/M,\) orbit sense\()\), observer (distance, incl, azim, FOV). Do **not** expose derived geometry (ISCO, \(r_+\), \(r_\mathrm{ph}\), \(T(r)\)) or phenomenological look knobs (structure/arms/H/R/shear/bloom) as main controls — fix them in model defaults.
 - Write Test-Driven Code — add unit tests for new features and bug fixes. Use `bun test` to run them.
 - Geometric units: \(G = c = 1\). Schwarzschild: \(r_s = 2M\), \(r_{ph} = 3M\), \(b_c = 3\sqrt{3}\,M\). Kerr: \(r_+=M+\sqrt{M^2-a^2}\); prograde ISCO/photon sphere shrink with \(a_\star\).
 - Pure-black voids for captured rays (no fake fill). Blackbody disk color (not film palette as primary).
