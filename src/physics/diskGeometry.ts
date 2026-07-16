@@ -6,7 +6,7 @@ import type { BlackHoleParams } from './types'
 import { diskIsco } from './disk'
 import { rIscoOverM } from './metricFamily'
 import type { DiskParams } from './diskParams'
-import { densPeakRadiusM } from './diskParams'
+import { densPeakRadiusM, keplerSpecificL } from './diskParams'
 import { horizonPlus } from './geometry'
 import { spinLength } from './types'
 
@@ -24,9 +24,9 @@ export type EffectiveDiskGeom = {
 }
 
 /**
- * Resolve luminous inner edge:
- * - rinFree=false → family ISCO (co/counter from disk.prograde)
- * - rinFree=true  → free rinM, floored above ~1.05 r₊
+ * Resolve luminous inner edge (thin-disk policy):
+ * always family ISCO (co/counter from disk.prograde), floored above ~1.05 r₊.
+ * Free r_in is not a user control.
  */
 export function effectiveDiskGeom(
   params: BlackHoleParams,
@@ -40,15 +40,11 @@ export function effectiveDiskGeom(
   const rPlusOverM = Number.isFinite(rPlus) ? rPlus / M : 2
   const floor = Math.max(rPlusOverM * 1.05, 1.35)
 
-  let rinOverM: number
-  if (disk.rinFree) {
-    rinOverM = Math.max(disk.rinM, floor)
-  } else {
-    rinOverM = Math.max(iscoOverM, floor)
-  }
+  let rinOverM = Math.max(iscoOverM, floor)
   rinOverM = Math.min(rinOverM, disk.outerM - 0.5)
 
-  const rPeakOverM = densPeakRadiusM(disk.specificL, rinOverM, disk.outerM)
+  const ell = keplerSpecificL(rinOverM)
+  const rPeakOverM = densPeakRadiusM(ell, rinOverM, disk.outerM)
 
   return {
     rinOverM,

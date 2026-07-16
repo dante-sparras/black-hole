@@ -2,67 +2,59 @@ import { describe, expect, test } from 'bun:test'
 import { normalizeParams } from '../../src/physics/validate'
 import {
   densPeakRadiusM,
+  keplerSpecificL,
+  magnetClassFromBeta,
   normalizeDisk,
   plasmaBetaToMriScale,
-  polyTemperatureScale,
 } from '../../src/physics/diskParams'
 import { effectiveDiskGeom } from '../../src/physics/diskGeometry'
+import { thinDiskScaleHeight } from '../../src/physics/disk'
 
-describe('torus-style disk base params', () => {
-  test('defaults include rho0, free H/r, Γ, K, ℓ, β, ISCO mode', () => {
-    const d = normalizeDisk({})
-    expect(d.rho0).toBe(1)
-    expect(d.scaleHeight).toBeGreaterThan(0)
-    expect(d.gamma).toBeCloseTo(5 / 3, 5)
-    expect(d.polyK).toBe(1)
-    expect(d.specificL).toBeCloseTo(Math.sqrt(6), 5)
-    expect(d.plasmaBeta).toBe(100)
+describe('thin-disk control policy', () => {
+  test('normalize locks rinFree, gamma, B geom, tilt node', () => {
+    const d = normalizeDisk({
+      rinFree: true,
+      gamma: 4 / 3,
+      magGeometry: 'vertical',
+      tiltNodeRad: 1.2,
+      plasmaBeta: 100,
+    })
     expect(d.rinFree).toBe(false)
+    expect(d.gamma).toBeCloseTo(5 / 3, 5)
     expect(d.magGeometry).toBe('single-loop')
+    expect(d.tiltNodeRad).toBe(0)
     expect(d.magnetState).toBe('sane')
   })
 
-  test('effective geom uses ISCO when rinFree=false', () => {
+  test('effective r_in is always ISCO (ignore free rinM)', () => {
     const p = normalizeParams({ mass: 1, spinStar: 0, charge: 0 })
-    const d = normalizeDisk({ rinFree: false, rinM: 12 })
+    const d = normalizeDisk({ rinM: 12, rinFree: true })
     const g = effectiveDiskGeom(p, d)
     expect(g.rinOverM).toBeCloseTo(6, 3)
-    expect(g.iscoOverM).toBeCloseTo(6, 3)
   })
 
-  test('effective geom uses free rin when enabled', () => {
-    const p = normalizeParams({ mass: 1, spinStar: 0, charge: 0 })
-    const d = normalizeDisk({ rinFree: true, rinM: 10 })
-    const g = effectiveDiskGeom(p, d)
-    expect(g.rinOverM).toBeCloseTo(10, 3)
+  test('H/r is thin-disk derived', () => {
+    const h = thinDiskScaleHeight(0.1, 6, 5 / 3)
+    expect(h).toBeGreaterThan(0.02)
+    expect(h).toBeLessThan(0.2)
   })
 
-  test('free rin floors above horizon for high spin', () => {
-    const p = normalizeParams({ mass: 1, spinStar: 0.98, charge: 0 })
-    const d = normalizeDisk({ rinFree: true, rinM: 1.5 })
-    const g = effectiveDiskGeom(p, d)
-    expect(g.rinOverM).toBeGreaterThan(g.rPlusOverM)
+  test('ℓ̃ from r_in', () => {
+    expect(keplerSpecificL(6)).toBeCloseTo(Math.sqrt(6), 5)
   })
 
-  test('ℓ̃ dens peak between rin and rout', () => {
+  test('MAD class from low β', () => {
+    expect(magnetClassFromBeta(1)).toBe('mad')
+    expect(magnetClassFromBeta(100)).toBe('sane')
+  })
+
+  test('dens peak from ℓ', () => {
     const r = densPeakRadiusM(4, 3, 40)
     expect(r).toBeGreaterThan(3)
     expect(r).toBeLessThan(40)
   })
 
-  test('poly T scale rises with K and ρ₀', () => {
-    const a = polyTemperatureScale(1, 1, 5 / 3)
-    const b = polyTemperatureScale(2, 2, 5 / 3)
-    expect(b).toBeGreaterThan(a)
-  })
-
-  test('MAD mri scale > SANE at same β', () => {
-    expect(plasmaBetaToMriScale(10, 'mad')).toBeGreaterThan(
-      plasmaBetaToMriScale(10, 'sane'),
-    )
-  })
-
-  test('clamps H/r up to 0.3', () => {
-    expect(normalizeDisk({ scaleHeight: 0.9 }).scaleHeight).toBe(0.3)
+  test('MRI scale from β', () => {
+    expect(plasmaBetaToMriScale(1)).toBeGreaterThan(plasmaBetaToMriScale(100))
   })
 })

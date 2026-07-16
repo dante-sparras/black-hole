@@ -151,63 +151,29 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
     DISK_LIMITS.outerM.min,
     DISK_LIMITS.outerM.max,
   )
-  const rinM = clamp(
+  const rinMRaw = clamp(
     num(input.rinM, DEFAULT_DISK.rinM),
     DISK_LIMITS.rinM.min,
     DISK_LIMITS.rinM.max,
   )
-  const rinFree =
-    typeof input.rinFree === 'boolean' ? input.rinFree : DEFAULT_DISK.rinFree
+  const rinClamped = Math.min(rinMRaw, outerM - 1)
   const prograde =
     typeof input.prograde === 'boolean' ? input.prograde : DEFAULT_DISK.prograde
-  const specificL = clamp(
-    num(input.specificL, DEFAULT_DISK.specificL),
-    DISK_LIMITS.specificL.min,
-    DISK_LIMITS.specificL.max,
-  )
   const scaleHeight = clamp(
     num(input.scaleHeight, DEFAULT_DISK.scaleHeight),
     DISK_LIMITS.scaleHeight.min,
     DISK_LIMITS.scaleHeight.max,
   )
-  const gamma = clamp(
-    num(input.gamma, DEFAULT_DISK.gamma),
-    DISK_LIMITS.gamma.min,
-    DISK_LIMITS.gamma.max,
-  )
-  const polyK = clamp(
-    num(input.polyK, DEFAULT_DISK.polyK),
-    DISK_LIMITS.polyK.min,
-    DISK_LIMITS.polyK.max,
-  )
-  let plasmaBeta = clamp(
+  const plasmaBeta = clamp(
     num(input.plasmaBeta, DEFAULT_DISK.plasmaBeta),
     DISK_LIMITS.plasmaBeta.min,
     DISK_LIMITS.plasmaBeta.max,
-  )
-  const magGeometry = parseMagGeom(input.magGeometry)
-  const magnetState = parseMagState(input.magnetState)
-  // If switching to MAD without explicit β, seed a MAD-like low β
-  if (
-    magnetState === 'mad' &&
-    input.plasmaBeta === undefined &&
-    input.magnetState === 'mad'
-  ) {
-    plasmaBeta = Math.min(plasmaBeta, 3)
-  }
-  const perturbAmp = clamp(
-    num(input.perturbAmp, DEFAULT_DISK.perturbAmp),
-    DISK_LIMITS.perturbAmp.min,
-    DISK_LIMITS.perturbAmp.max,
   )
   const tiltRad = clamp(
     num(input.tiltRad, DEFAULT_DISK.tiltRad),
     DISK_LIMITS.tiltRad.min,
     DISK_LIMITS.tiltRad.max,
   )
-  let tiltNodeRad = num(input.tiltNodeRad, DEFAULT_DISK.tiltNodeRad)
-  const twoPi = Math.PI * 2
-  tiltNodeRad = ((tiltNodeRad % twoPi) + twoPi) % twoPi
   const jetPower = clamp(
     num(input.jetPower, DEFAULT_DISK.jetPower),
     DISK_LIMITS.jetPower.min,
@@ -233,26 +199,28 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
   const animate =
     typeof input.animate === 'boolean' ? input.animate : DEFAULT_DISK.animate
 
-  // Keep rin ≤ outer − small margin
-  const rinClamped = Math.min(rinM, outerM - 1)
+  // Thin-disk locks (not free UI)
+  const magnetState = magnetClassFromBeta(plasmaBeta)
+  const perturbAmp = perturbFromBeta(plasmaBeta)
+  const specificL = keplerSpecificL(rinClamped)
 
   return {
     mdot,
     rho0,
     outerM,
     rinM: rinClamped,
-    rinFree,
+    rinFree: false,
     prograde,
     specificL,
     scaleHeight,
-    gamma,
-    polyK,
+    gamma: 5 / 3,
+    polyK: 1,
     plasmaBeta,
-    magGeometry,
+    magGeometry: 'single-loop',
     magnetState,
     perturbAmp,
     tiltRad,
-    tiltNodeRad,
+    tiltNodeRad: 0,
     jetPower,
     structure,
     arms,
@@ -348,4 +316,20 @@ function parseMagState(v: unknown): MagnetState {
     return v as MagnetState
   }
   return DEFAULT_DISK.magnetState
+}
+
+/** SANE vs MAD class from plasma β₀ (info only). */
+export function magnetClassFromBeta(plasmaBeta: number): MagnetState {
+  return plasmaBeta < 10 ? 'mad' : 'sane'
+}
+
+/** Turbulence seed from β₀ (replaces free perturb control). */
+export function perturbFromBeta(plasmaBeta: number): number {
+  const mri = plasmaBetaToMriScale(plasmaBeta, magnetClassFromBeta(plasmaBeta))
+  return Math.min(0.95, Math.max(0.2, 0.25 + 0.25 * mri))
+}
+
+/** Keplerian ℓ̃ ≈ √(r/M) at circular radius (thin-disk / Newtonian proxy). */
+export function keplerSpecificL(rinOverM: number): number {
+  return Math.sqrt(Math.max(rinOverM, 1.2))
 }

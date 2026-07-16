@@ -5,12 +5,7 @@ import {
   sliderFromMdot as sliderFromMdotRange,
 } from '../physics/disk'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
-import {
-  DISK_LIMITS,
-  type DiskParams,
-  type MagGeometry,
-  type MagnetState,
-} from '../physics/diskParams'
+import { DISK_LIMITS, type DiskParams } from '../physics/diskParams'
 import { withBatch } from '../state/batch'
 import {
   degToRad,
@@ -48,7 +43,6 @@ function mdotFromSlider(t: number): number {
 function sliderFromMdot(mdot: number): number {
   return sliderFromMdotRange(mdot, MDOT_MIN, MDOT_MAX)
 }
-
 function logFromSlider(t: number, min: number, max: number): number {
   const lo = Math.log10(min)
   const hi = Math.log10(max)
@@ -62,6 +56,7 @@ function sliderFromLog(v: number, min: number, max: number): number {
   return Math.min(1000, Math.max(0, ((x - lo) / (hi - lo)) * 1000))
 }
 
+/** Thin-disk free-base panel only. */
 export function mountControls(
   root: HTMLElement,
   derivedRoot: HTMLElement | null,
@@ -75,20 +70,10 @@ export function mountControls(
   const chargeInput = qs<HTMLInputElement>(root, '#p-charge')
   const mdotInput = qs<HTMLInputElement>(root, '#d-mdot')
   const rho0Input = qs<HTMLInputElement>(root, '#d-rho0')
-  const hrInput = qs<HTMLInputElement>(root, '#d-hr')
-  const gammaSelect = qs<HTMLSelectElement>(root, '#d-gamma')
-  const polyKInput = qs<HTMLInputElement>(root, '#d-polyk')
-  const ellInput = qs<HTMLInputElement>(root, '#d-ell')
   const betaInput = qs<HTMLInputElement>(root, '#d-beta')
-  const magGeomSelect = qs<HTMLSelectElement>(root, '#d-maggeom')
-  const madSelect = qs<HTMLSelectElement>(root, '#d-mad')
-  const rinModeSelect = qs<HTMLSelectElement>(root, '#d-rinmode')
-  const rinInput = qs<HTMLInputElement>(root, '#d-rin')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
   const orbitSelect = qs<HTMLSelectElement>(root, '#d-orbit')
   const tiltInput = qs<HTMLInputElement>(root, '#d-tilt')
-  const tiltNodeInput = qs<HTMLInputElement>(root, '#d-tilt-node')
-  const perturbInput = qs<HTMLInputElement>(root, '#d-perturb')
   const jetInput = qs<HTMLInputElement>(root, '#d-jet')
 
   const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
@@ -96,20 +81,10 @@ export function mountControls(
   const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
   const mdotVal = qs<HTMLElement>(root, '[data-val="mdot"]')
   const rho0Val = qs<HTMLElement>(root, '[data-val="rho0"]')
-  const hrVal = qs<HTMLElement>(root, '[data-val="hr"]')
-  const gammaVal = qs<HTMLElement>(root, '[data-val="gamma"]')
-  const polykVal = qs<HTMLElement>(root, '[data-val="polyk"]')
-  const ellVal = qs<HTMLElement>(root, '[data-val="ell"]')
   const betaVal = qs<HTMLElement>(root, '[data-val="beta"]')
-  const maggeomVal = qs<HTMLElement>(root, '[data-val="maggeom"]')
-  const madVal = qs<HTMLElement>(root, '[data-val="mad"]')
-  const rinmodeVal = qs<HTMLElement>(root, '[data-val="rinmode"]')
-  const rinVal = qs<HTMLElement>(root, '[data-val="rin"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
   const orbitVal = qs<HTMLElement>(root, '[data-val="orbit"]')
   const tiltVal = qs<HTMLElement>(root, '[data-val="tilt"]')
-  const tiltNodeVal = qs<HTMLElement>(root, '[data-val="tiltNode"]')
-  const perturbVal = qs<HTMLElement>(root, '[data-val="perturb"]')
   const jetVal = qs<HTMLElement>(root, '[data-val="jet"]')
 
   const distInput = qs<HTMLInputElement>(root, '#c-dist')
@@ -132,7 +107,7 @@ export function mountControls(
       btn.classList.toggle('active', on)
       btn.setAttribute('aria-pressed', on ? 'true' : 'false')
     }
-    if (presetHint) presetHint.textContent = hint ?? 'Base-parameter scenes'
+    if (presetHint) presetHint.textContent = hint ?? 'Thin-disk free bases'
   }
   function onUserTweaked(): void {
     if (activePresetId !== null) setActivePresetUi(null)
@@ -153,26 +128,13 @@ export function mountControls(
       rho0Input,
       sliderFromLog(d.rho0, DISK_LIMITS.rho0.min, DISK_LIMITS.rho0.max),
     )
-    setRangeValue(hrInput, d.scaleHeight)
-    if (gammaSelect) gammaSelect.value = d.gamma < 1.5 ? '1.3333' : '1.6667'
-    setRangeValue(
-      polyKInput,
-      sliderFromLog(d.polyK, DISK_LIMITS.polyK.min, DISK_LIMITS.polyK.max),
-    )
-    setRangeValue(ellInput, d.specificL)
     setRangeValue(
       betaInput,
       sliderFromLog(d.plasmaBeta, DISK_LIMITS.plasmaBeta.min, DISK_LIMITS.plasmaBeta.max),
     )
-    if (magGeomSelect) magGeomSelect.value = d.magGeometry
-    if (madSelect) madSelect.value = d.magnetState
-    if (rinModeSelect) rinModeSelect.value = d.rinFree ? 'free' : 'isco'
-    setRangeValue(rinInput, d.rinM)
     setRangeValue(outerInput, d.outerM)
     if (orbitSelect) orbitSelect.value = d.prograde ? 'pro' : 'ret'
     setRangeValue(tiltInput, radToDeg(d.tiltRad))
-    setRangeValue(tiltNodeInput, radToDeg(d.tiltNodeRad))
-    setRangeValue(perturbInput, d.perturbAmp)
     setRangeValue(jetInput, d.jetPower)
 
     if (mdotVal) {
@@ -180,20 +142,10 @@ export function mountControls(
       mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
     }
     setText(rho0Val, fmt(d.rho0, 2))
-    setText(hrVal, fmt(d.scaleHeight, 3))
-    setText(gammaVal, d.gamma < 1.5 ? '4/3' : '5/3')
-    setText(polykVal, fmt(d.polyK, 2))
-    setText(ellVal, fmt(d.specificL, 2))
     setText(betaVal, fmt(d.plasmaBeta, 1))
-    setText(maggeomVal, d.magGeometry)
-    setText(madVal, d.magnetState.toUpperCase())
-    setText(rinmodeVal, d.rinFree ? 'free' : 'ISCO')
-    setText(rinVal, `${fmt(d.rinM, 1)} M`)
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
     setText(orbitVal, d.prograde ? 'pro' : 'ret')
     setText(tiltVal, fmt(radToDeg(d.tiltRad), 1))
-    setText(tiltNodeVal, fmt(radToDeg(d.tiltNodeRad), 0))
-    setText(perturbVal, fmt(d.perturbAmp, 2))
     setText(jetVal, fmt(d.jetPower, 2))
   }
 
@@ -232,47 +184,11 @@ export function mountControls(
     onUserTweaked()
     setDisk({ rho0: logFromSlider(v, DISK_LIMITS.rho0.min, DISK_LIMITS.rho0.max) })
   })
-  bindRange(hrInput, (v) => {
-    onUserTweaked()
-    setDisk({ scaleHeight: v })
-  })
-  bindSelect(gammaSelect, (v) => {
-    onUserTweaked()
-    setDisk({ gamma: Number(v) })
-  })
-  bindRange(polyKInput, (v) => {
-    onUserTweaked()
-    setDisk({ polyK: logFromSlider(v, DISK_LIMITS.polyK.min, DISK_LIMITS.polyK.max) })
-  })
-  bindRange(ellInput, (v) => {
-    onUserTweaked()
-    setDisk({ specificL: v })
-  })
   bindRange(betaInput, (v) => {
     onUserTweaked()
     setDisk({
       plasmaBeta: logFromSlider(v, DISK_LIMITS.plasmaBeta.min, DISK_LIMITS.plasmaBeta.max),
     })
-  })
-  bindSelect(magGeomSelect, (v) => {
-    onUserTweaked()
-    setDisk({ magGeometry: v as MagGeometry })
-  })
-  bindSelect(madSelect, (v) => {
-    onUserTweaked()
-    const state = v as MagnetState
-    // Switching MAD/SANE nudges β toward typical seeds if extreme
-    if (state === 'mad') setDisk({ magnetState: state, plasmaBeta: Math.min(getDisk().plasmaBeta, 5) })
-    else setDisk({ magnetState: state, plasmaBeta: Math.max(getDisk().plasmaBeta, 50) })
-  })
-  bindSelect(rinModeSelect, (v) => {
-    onUserTweaked()
-    setDisk({ rinFree: v === 'free' })
-  })
-  bindRange(rinInput, (v) => {
-    onUserTweaked()
-    setDisk({ rinM: v, rinFree: true })
-    if (rinModeSelect) rinModeSelect.value = 'free'
   })
   bindRange(outerInput, (v) => {
     onUserTweaked()
@@ -285,14 +201,6 @@ export function mountControls(
   bindRange(tiltInput, (v) => {
     onUserTweaked()
     setDisk({ tiltRad: degToRad(v) })
-  })
-  bindRange(tiltNodeInput, (v) => {
-    onUserTweaked()
-    setDisk({ tiltNodeRad: degToRad(v) })
-  })
-  bindRange(perturbInput, (v) => {
-    onUserTweaked()
-    setDisk({ perturbAmp: v })
   })
   bindRange(jetInput, (v) => {
     onUserTweaked()

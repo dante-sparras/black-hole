@@ -1,26 +1,37 @@
-# Controls ↔ physics map
+# Controls ↔ physics map (thin-disk trim)
 
-| Goal wording | Code | UI | Effect |
-|--------------|------|-----|--------|
-| Mass \(M\) | `params.mass` | BH | Scale |
-| Spin \(a_★\) | `params.spinStar` | BH signed ±0.998 | Rays, ISCO, jets |
-| Charge \(Q\) | `params.charge` | BH | RN/KN |
-| \(\dot m\) | `disk.mdot` | Disk | NT power / T |
-| Density \(\rho_0\) | `disk.rho0` | Disk | Dens weight + OD |
-| Aspect \(H/r\) | `disk.scaleHeight` | Disk **free** | Volume thickness |
-| \(\Gamma\) | `disk.gamma` | Disk | EOS; thin H/r ref + poly T |
-| \(K\) polytrope | `disk.polyK` | Disk | \(T\propto K\rho^{\Gamma-1}\) proxy |
-| \(\ell\) ang. mom. | `disk.specificL` | Disk | Dens peak radius (FM-like) |
-| \(\beta_0\) | `disk.plasmaBeta` | Disk | MRI dens variance |
-| B geometry | `disk.magGeometry` | Disk | single/multi/vertical dens mod |
-| Magnetization | `disk.magnetState` | Disk | SANE / MAD |
-| \(r_\mathrm{in}\) | `disk.rinM` + `rinFree` | Disk | Free or ISCO-locked |
-| \(r_\mathrm{out}\) | `disk.outerM` | Disk | Outer luminous edge |
-| Orbit | `disk.prograde` | Disk | Co/counter-rot |
-| Tilt | `disk.tiltRad`, `tiltNodeRad` | Disk | Midplane vs spin |
-| Perturb | `disk.perturbAmp` | Disk | Turbulence seed |
-| Jets | `disk.jetPower` | Disk | Funnel \(\propto a_★^2\dot m\) |
+## Free controls (user)
 
-All disk base properties live in **one** Accretion disk panel (no expert submenu).
+| Control | Code |
+|---------|------|
+| Mass \(M\) | `params.mass` |
+| Spin \(a_★\) signed | `params.spinStar` |
+| Charge \(Q\) | `params.charge` |
+| \(\dot m\) | `disk.mdot` |
+| \(\rho_0\) | `disk.rho0` |
+| \(\beta_0\) | `disk.plasmaBeta` |
+| \(r_\mathrm{out}/M\) | `disk.outerM` |
+| Orbit pro/ret | `disk.prograde` |
+| Tilt | `disk.tiltRad` |
+| Jet **boost** 0…1 | `disk.jetPower` |
+| Observer | camera |
+| Quality / dens source | numerics |
 
-Approximations: [limitations.md](./limitations.md).
+## Derived only (HUD / model — not sliders)
+
+| Quantity | From |
+|----------|------|
+| \(r_\mathrm{in}\) | = ISCO(\(M,a_★,Q\), orbit) |
+| \(H/r\) | `thinDiskScaleHeight(ṁ, r_in/M, Γ=5/3)` |
+| \(\Gamma\) | fixed **5/3** |
+| \(\ell\tilde{}\) | \(\sqrt{r_\mathrm{in}/M}\) |
+| \(r_\mathrm{peak}\) | from \(\ell\) |
+| SANE/MAD class | \(\beta_0 < 10\) → MAD else SANE |
+| Perturb | from \(\beta_0\) |
+| B geometry | fixed single-loop |
+| Tilt node | fixed 0 |
+| \(K\) | unused free (NT path) |
+| jet_eff | \(a_★^2 \dot m^{0.4}\) · boost |
+| \(r_+\), \(r_\mathrm{ph}\), \(\eta\), \(b_c\), … | metric / NT |
+
+See [limitations.md](./limitations.md).

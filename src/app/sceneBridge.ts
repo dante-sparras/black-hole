@@ -4,11 +4,12 @@
  * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
-import { autoExposureFromPhysics } from '../physics/disk'
+import { autoExposureFromPhysics, thinDiskScaleHeight } from '../physics/disk'
 import {
-  magGeometryCode,
+  magnetClassFromBeta,
   plasmaBetaToMriScale,
   polyTemperatureScale,
+  perturbFromBeta,
 } from '../physics/diskParams'
 import { effectiveDiskGeom } from '../physics/diskGeometry'
 import { resolveCameraDistance } from '../physics/observer'
@@ -79,11 +80,13 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const disk = getDisk()
     const geom = effectiveDiskGeom(p, disk)
     const rinM = geom.rinOverM
-    // Free H/r from disk store (base torus param)
-    const scaleHeight = disk.scaleHeight
-    const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta, disk.magnetState)
-    const polyTScale = polyTemperatureScale(disk.polyK, disk.rho0, disk.gamma)
-    const madBoost = disk.magnetState === 'mad' ? 1 : 0
+    // Thin-disk: H/r derived (not free UI)
+    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM, disk.gamma)
+    const magnetState = magnetClassFromBeta(disk.plasmaBeta)
+    const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta, magnetState)
+    const polyTScale = polyTemperatureScale(1, disk.rho0, 5 / 3)
+    const madBoost = magnetState === 'mad' ? 1 : 0
+    const perturbAmp = perturbFromBeta(disk.plasmaBeta)
     tracer.setSpacetime({
       mass: p.mass,
       spinStar: p.spinStar,
@@ -100,15 +103,15 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       shearRate: disk.shearRate,
       animate: disk.animate,
       tiltRad: disk.tiltRad,
-      tiltNodeRad: disk.tiltNodeRad,
+      tiltNodeRad: 0,
       jetPower: disk.jetPower,
       mriTurbScale,
       rho0: disk.rho0,
       polyTScale,
       rPeakOverM: geom.rPeakOverM,
-      magGeom: magGeometryCode(disk.magGeometry),
+      magGeom: 0,
       madBoost,
-      perturbAmp: disk.perturbAmp,
+      perturbAmp,
     })
     setLook({
       exposure: autoExposureFromPhysics(
