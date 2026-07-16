@@ -206,8 +206,8 @@ describe('mdot scales', () => {
     const eMax = autoExposureFromPhysics(0.9, 3, true)
     expect(eCool).toBeGreaterThan(eHot)
     expect(eHot).toBeGreaterThan(eMax)
-    expect(eMax).toBeGreaterThanOrEqual(0.32)
-    expect(eCool).toBeLessThanOrEqual(1.25)
+    expect(eMax).toBeGreaterThanOrEqual(0.28)
+    expect(eCool).toBeLessThanOrEqual(1.2)
   })
 
   test('mdotDisplayBrightness is compressive at high ṁ (no white blast)', () => {

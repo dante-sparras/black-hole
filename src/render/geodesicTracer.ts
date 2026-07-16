@@ -689,25 +689,30 @@ export function createGeodesicTracer(): GeodesicTracer {
       const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.85))
       const densCube = max(cubeRaw, float(0)).mul(boxMask)
       // Cube-led dens with residual analytic filaments for fine structure
-      const dens = densAnalytic
-        .mul(float(1).sub(uGrmhdMix.mul(0.78)))
+      const densBase = densAnalytic
+        .mul(float(1).sub(uGrmhdMix.mul(0.72)))
         .add(densCube.mul(uGrmhdMix))
+      // High-ṁ photosphere: suppress deep midplane column (edge-on white bar)
+      // mdotPhot→1 for ṁ≳1.2; dens *= 1 − k·densZ so surface layers carry light
+      const mdotPhot = min(mdot.div(float(1.15)), float(1))
+      const dens = densBase.mul(
+        float(1).sub(mdotPhot.mul(float(0.62)).mul(densZ)),
+      )
       const sphR = pos.length()
 
       // Only skip deep inside capture — keep photon-ring / far-side bridge
       If(
         dens
-          .greaterThan(0.02)
+          .greaterThan(0.018)
           .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01)))),
         () => {
-          const dsH = min(ds.div(Hloc), float(0.75))
+          const dsH = min(ds.div(Hloc), float(0.55))
           // Opacity: electron scattering (inner/hot) vs Kramers-like (outer/cool)
-          // κ_es ~ const (Thomson); κ_K rises outward / in dusty cooler gas
           const fEs = min(
             float(1),
             plasmaW.mul(0.75).add(gasW.mul(0.4)).add(float(0.12)),
           )
-          const kappaEs = float(0.26).mul(float(0.65).add(densZ.mul(0.55)))
+          const kappaEs = float(0.28).mul(float(0.65).add(densZ.mul(0.55)))
           const kappaKr = float(0.08)
             .add(dustW.mul(0.42))
             .add(pow(xRad.add(0.08), float(1.1)).mul(0.28))
@@ -715,21 +720,34 @@ export function createGeodesicTracer(): GeodesicTracer {
             .mul(fEs)
             .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
             .mul(float(0.8).add(struct.mul(0.25)))
-            // High ṁ → thicker photosphere (saturates; less infinite white stack)
-            .mul(float(1).add(mdot.mul(float(0.45))))
+            // High ṁ → photosphere: τ rises fast (saturate, less fog stack)
+            .mul(float(1).add(mdot.mul(float(0.95))))
           const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(uVolumeStride))
           // Multi-image: when outside dense slab after a hit, decay τ so secondary survives
           const outSlab = absY.greaterThan(Hloc.mul(1.8))
           If(outSlab.and(hits.greaterThan(0.5)), () => {
-            diskTau.mulAssign(0.92)
+            diskTau.mulAssign(0.9)
           })
+          // Harder Beer at high ṁ (eye sees surface, not deep volume)
+          const beerA = float(RT.beerSoft).add(mdotPhot.mul(0.22))
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
-          const beer = exp(diskTau.mul(float(-RT.beerSoft)))
-          // Secondary multi-path + ṁ weight compress (eye adapts to bright surface)
+          const beer = exp(diskTau.mul(beerA.mul(-1)))
+          // Edge-on path penalty: long midplane chords contribute less (photosphere)
+          const nYabs = abs(vel.y)
+          const pathKill = nYabs
+            .div(nYabs.add(float(0.18).add(mdotPhot.mul(0.22))))
+            .mul(float(0.35).add(mdotPhot.mul(0.55)))
+            .add(float(1).sub(mdotPhot).mul(0.65).add(0.35))
           const sec = hits.greaterThan(1.2).select(float(1.1), float(1))
-          const mdotW = float(1).div(float(1).add(mdot.mul(float(0.38))))
-          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.9)).mul(sec).mul(mdotW)
-          If(w.greaterThan(0.012), () => {
+          const mdotW = float(1).div(float(1).add(mdot.mul(float(0.55))))
+          const w = dens
+            .mul(dsH)
+            .mul(beer)
+            .mul(strideF.mul(0.88))
+            .mul(sec)
+            .mul(mdotW)
+            .mul(min(pathKill, float(1.15)))
+          If(w.greaterThan(0.01), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,
@@ -876,15 +894,17 @@ export function createGeodesicTracer(): GeodesicTracer {
       col.assign(vec3(0, 0, 0))
     })
 
-    // Human-eye adaptation: Reinhard on luminance, keep chromaticity.
-    // Pure-black capture stays black (luma~0 → scale finite via max).
+    // Human-eye adaptation: Reinhard on luminance, keep chromaticity + mild sat.
     const luma = dot(col, vec3(0.2126, 0.7152, 0.0722))
-    const knee = float(0.55)
+    const knee = float(0.4)
     const toned = luma.div(float(1).add(luma.mul(knee)))
     const eyeScale = toned.div(max(luma, float(1e-5)))
-    // Only compress when there is disk/sky light — leave pure void black
     const hasLight = luma.greaterThan(1e-6)
-    col.assign(hasLight.select(col.mul(eyeScale), col))
+    const colT = col.mul(eyeScale)
+    // Mild saturation restore (Doppler / outer red after compress)
+    const sat = float(1.12)
+    const colSat = colT.mul(sat).sub(vec3(toned).mul(sat.sub(1)))
+    col.assign(hasLight.select(max(colSat, vec3(0)), col))
 
     applyDebugFalseColor({
       mode: uDebugMode,

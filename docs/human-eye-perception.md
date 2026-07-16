@@ -28,7 +28,16 @@ the bright surface: the hole stays black, the ring stays structured, and color
 - \(\dot m\sim 1{-}3\): much brighter, hotter (bluer), still **not** featureless white  
 - Midplane slash reduced vs uncapped stack  
 
-## Honesty
+## High-ṁ photosphere (max slider)
 
-Still a real-time proxy (not full GRRT + retinal model). True super-Eddington
-disks are thicker / windy; thin-disk + volume dens is approximate.
+For \(\dot m \gtrsim 1\):
+
+1. **Midplane dens suppress** — dens × (1 − k densZ) kills edge-on glowing bar  
+2. **Faster τ / harder Beer** — only the surface contributes  
+3. **Edge-on path kill** — long midplane chords weighted down  
+4. **Structure boost** — filaments survive tonemap  
+5. **Outer dust cool** — redder outer limb under hot accretion  
+6. **Softer final tonemap + mild saturation** — Doppler / color return  
+
+Still approximate: real super-Eddington disks have winds/thickness beyond thin-disk + sech².
+

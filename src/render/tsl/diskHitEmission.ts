@@ -220,11 +220,11 @@ export function accumulateDiskHit(p) {
     .mul(spinFac)
   const tRestK = tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
   const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
-  // Physical T: NT + g-redshift; outer dust cooler, inner plasma slightly hotter
+  // Physical T: NT + g-redshift; stronger outer dust cool (red limb), mild plasma heat
   const tZone = float(1)
-    .sub(dustZone.mul(0.18).mul(dustContrast.add(0.3)))
-    .add(plasmaZone.mul(0.08).mul(turbContrast.add(0.2)))
-  const tAtm = float(0.72).add(dVert.mul(0.28))
+    .sub(dustZone.mul(float(E.outerDustCool)).mul(dustContrast.add(0.35)))
+    .add(plasmaZone.mul(0.1).mul(turbContrast.add(0.25)))
+  const tAtm = float(0.7).add(dVert.mul(0.3))
   let TK = max(
     float(E.tColorMinK),
     min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tZone).mul(tAtm)),
@@ -389,13 +389,16 @@ export function accumulateDiskHit(p) {
     .mul(float(0.84).add(ripple.mul(0.32)))
     .mul(edgeFac)
     .mul(float(0.82).add(mriLn.mul(0.18)))
+  // High ṁ: punch structure so filaments survive eye tonemap
+  const texAmp = float(1).add(mdot.mul(float(E.structureBoostMdot))).add(uStructure.mul(0.12))
+  texFac = float(1).add(texFac.sub(float(1)).mul(texAmp))
   texFac = max(float(TX.texMin), min(float(TX.texMax), texFac))
 
   // Plasma hotspots / cooler dust: T jitter (still blackbody)
   const tJitter = float(1)
     .add(float(TX.tempJitterAmp).mul(turbContrast.add(0.35)).mul(turb.mul(2).sub(1)))
-    .add(plasmaZone.mul(0.1).mul(turbContrast.add(0.4)))
-    .sub(dustZone.mul(0.07).mul(dustContrast.add(0.3)))
+    .add(plasmaZone.mul(0.12).mul(turbContrast.add(0.4)))
+    .sub(dustZone.mul(0.12).mul(dustContrast.add(0.35)))
   TK = max(float(E.tColorMinK), min(float(E.tColorMaxK), TK.mul(tJitter)))
 
   // Photon-ring: multi-wrap from true path accumulation only (boost=0 by default)

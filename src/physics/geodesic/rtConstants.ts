@@ -26,8 +26,8 @@ export const RT = {
   diskOuterM: 24,
   iscoHorizonMargin: 1.05,
   volumeStride: 2,
-  beerSoft: 0.72,
-  tauSampleMax: 3.2,
+  beerSoft: 0.78,
+  tauSampleMax: 2.6,
   /** Allow more multi-wrap disk samples (secondary images) */
   maxDiskHits: 18,
 } as const

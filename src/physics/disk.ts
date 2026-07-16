@@ -217,25 +217,35 @@ export const DISK_EMISSION = {
    * Pre-tone intensity into HDR (before eye adaptation).
    * Keep moderate — high ṁ must not white-out; exposure + final tonemap carry range.
    */
-  intensityGain: 1.35,
+  intensityGain: 1.28,
   /**
    * Display brightness vs ṁ (eye-like compressive, not pure F∝ṁ).
    * Physical F∝ṁ still lives in fluxRel × mdotFluxScale paths for T/F shape;
    * this is photopic “how bright it looks” so ṁ=3 ≠ pure white blast.
    */
-  mdotBrightBase: 0.22,
-  mdotBrightScale: 0.95,
+  mdotBrightBase: 0.24,
+  mdotBrightScale: 0.85,
   /** Compressive: ~0.4 ≈ log-ish for human dynamic range */
-  mdotBrightPower: 0.42,
+  mdotBrightPower: 0.4,
   mdotBrightFloor: 0.006,
   /** Final eye tonemap knee on accumulated luminance (Reinhard-like) */
-  eyeTonemapKnee: 0.55,
+  eyeTonemapKnee: 0.4,
   /** Per-sample soft-knee (preserves chroma when applied to I only) */
-  sampleKnee: 0.42,
+  sampleKnee: 0.32,
   /** Extra optical-depth growth with ṁ — photosphere saturates, less milk-glass stack */
-  mdotOpacityBoost: 0.45,
+  mdotOpacityBoost: 0.95,
   /** Weight compress at high ṁ (eye adapts; surface not infinitely brighter) */
-  mdotWeightCompress: 0.38,
+  mdotWeightCompress: 0.55,
+  /**
+   * High-ṁ photosphere: suppress deep midplane dens (kill edge-on bar).
+   * dens *= 1 − mdotPhot * densZ * photMidSuppress
+   */
+  mdotPhotScale: 0.85,
+  photMidSuppress: 0.62,
+  /** Boost structure contrast at high ṁ so filaments survive tonemap */
+  structureBoostMdot: 0.45,
+  /** Outer dust cooling (rest-frame T) — keep red outer limb under hot ṁ */
+  outerDustCool: 0.32,
   /** NT peak radius ≈ (49/36) r_in */
   ntPeakOverRin: 49 / 36,
 } as const
@@ -321,8 +331,8 @@ export function autoExposureFromPhysics(
   const power = eta * Math.max(mdot, 1e-4)
   // Reference: ṁ=0.1, η~0.057 → power~0.0057 → e~1.0
   // ṁ=3, η~0.1 → power~0.3 → e~0.4
-  const e = 1.05 / Math.sqrt(1 + 12 * power)
-  return Math.min(1.25, Math.max(0.32, e))
+  const e = 1.0 / Math.sqrt(1 + 18 * power)
+  return Math.min(1.2, Math.max(0.28, e))
 }
 
 /**
