@@ -9,6 +9,7 @@
 import type { DiskParams } from '../physics/diskParams'
 import { DEFAULT_DISK } from '../physics/diskParams'
 import type { BlackHoleParams } from '../physics/types'
+import { withBatch } from './batch'
 import {
   CAMERA_DEFAULTS,
   setCamera,
@@ -155,22 +156,24 @@ export function applyPreset(preset: ScenePreset | string): ScenePreset {
   if (!p) {
     throw new Error(`Unknown preset: ${String(preset)}`)
   }
-  setParams({
-    mass: p.params.mass,
-    spinStar: p.params.spinStar,
-    charge: p.params.charge,
-  })
-  setDisk({
-    mdot: p.disk.mdot,
-    outerM: p.disk.outerM,
-  })
-  setCamera({ ...CAMERA_DEFAULTS })
-  setLook({
-    bloomEnabled: p.look.bloomEnabled ?? LOOK_DEFAULTS.bloomEnabled,
-    bloomStrength: p.look.bloomStrength ?? LOOK_DEFAULTS.bloomStrength,
-    bloomRadius: p.look.bloomRadius ?? LOOK_DEFAULTS.bloomRadius,
-    bloomThreshold: p.look.bloomThreshold ?? LOOK_DEFAULTS.bloomThreshold,
-    exposure: p.look.exposure ?? LOOK_DEFAULTS.exposure,
+  withBatch(() => {
+    setParams({
+      mass: p.params.mass,
+      spinStar: p.params.spinStar,
+      charge: p.params.charge,
+    })
+    setDisk({
+      mdot: p.disk.mdot,
+      outerM: p.disk.outerM,
+    })
+    setCamera({ ...CAMERA_DEFAULTS })
+    setLook({
+      bloomEnabled: p.look.bloomEnabled ?? LOOK_DEFAULTS.bloomEnabled,
+      bloomStrength: p.look.bloomStrength ?? LOOK_DEFAULTS.bloomStrength,
+      bloomRadius: p.look.bloomRadius ?? LOOK_DEFAULTS.bloomRadius,
+      bloomThreshold: p.look.bloomThreshold ?? LOOK_DEFAULTS.bloomThreshold,
+      exposure: p.look.exposure ?? LOOK_DEFAULTS.exposure,
+    })
   })
   return p
 }

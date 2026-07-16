@@ -1,6 +1,7 @@
 import { deriveGeometry } from '../physics/derive'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import { normalizeParams, type ParamsInput } from '../physics/validate'
+import { emitStore } from './batch'
 
 type Listener = (params: BlackHoleParams, derived: DerivedGeometry) => void
 
@@ -19,9 +20,9 @@ export function getDerived(): DerivedGeometry {
 export function setParams(input: ParamsInput): BlackHoleParams {
   params = normalizeParams({ ...params, ...input })
   derived = deriveGeometry(params)
-  for (const listener of listeners) {
-    listener(params, derived)
-  }
+  emitStore('params', () => {
+    for (const listener of listeners) listener(params, derived)
+  })
   return params
 }
 

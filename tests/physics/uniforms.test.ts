@@ -2,14 +2,14 @@ import { describe, expect, test } from 'bun:test'
 import { deriveGeometry } from '../../src/physics/derive'
 import { DEFAULT_DISK } from '../../src/physics/diskParams'
 import { normalizeParams } from '../../src/physics/validate'
-import { toUniforms } from '../../src/render/uniforms'
+import { toSpacetimeSnapshot } from '../../src/render/spacetimeSnapshot'
 
-describe('toUniforms', () => {
+describe('toSpacetimeSnapshot (CPU/HUD snapshot, not GPU upload)', () => {
   test('maps no-hair + disk + derived fields', () => {
     const p = normalizeParams({ mass: 2, spinStar: 0.5, charge: 0.1 })
     const d = deriveGeometry(p)
     const disk = { ...DEFAULT_DISK, mdot: 0.25, outerM: 30 }
-    const u = toUniforms(p, d, disk)
+    const u = toSpacetimeSnapshot(p, d, disk)
     expect(u.mass).toBe(2)
     expect(u.spinStar).toBeCloseTo(0.5, 5)
     expect(u.charge).toBeCloseTo(0.1, 5)

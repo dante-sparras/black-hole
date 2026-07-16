@@ -1,14 +1,12 @@
-import { MAX_SPIN_STAR, MDOT_MAX, MDOT_MIN } from '../physics/constants'
+import { MDOT_MAX, MDOT_MIN } from '../physics/constants'
 import {
   mdotFromSlider as mdotFromSliderRange,
   mdotTemperatureScale,
   sliderFromMdot as sliderFromMdotRange,
 } from '../physics/disk'
-import { DISK_LIMITS } from '../physics/diskParams'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import type { DiskParams } from '../physics/diskParams'
 import {
-  CAMERA_LIMITS,
   degToRad,
   getCamera,
   radToDeg,
@@ -17,15 +15,9 @@ import {
   type CameraState,
 } from '../state/camera'
 import { getDisk, setDisk, subscribeDisk } from '../state/disk'
-import {
-  getLook,
-  LOOK_LIMITS,
-  setLook,
-  subscribeLook,
-  type LookState,
-} from '../state/look'
+import { getLook, setLook, subscribeLook, type LookState } from '../state/look'
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
-import { ALL_PRESETS, applyPreset } from '../state/presets'
+import { applyPreset } from '../state/presets'
 import {
   getGeodesicIntegrator,
   setGeodesicIntegrator,
@@ -35,10 +27,18 @@ import {
   getSky,
   resetSky,
   setSky,
-  SKY_LIMITS,
   subscribeSky,
   type SkyState,
 } from '../state/sky'
+import {
+  bindCheckbox,
+  bindRange,
+  bindSelect,
+  qs,
+  setRangeValue,
+  setText,
+} from './controlBind'
+import { buildControlsHtml } from './controlsMarkup'
 import { fmt, fmtMdot } from './format'
 import { renderDerivedHud } from './hud'
 
@@ -55,184 +55,53 @@ export function mountControls(
   root: HTMLElement,
   derivedRoot: HTMLElement | null,
 ): void {
-  const distLim = CAMERA_LIMITS.distanceM
-  const incDegMin = radToDeg(CAMERA_LIMITS.inclination.min)
-  const incDegMax = radToDeg(CAMERA_LIMITS.inclination.max)
-  const fovLim = CAMERA_LIMITS.fov
+  root.innerHTML = buildControlsHtml()
 
-  root.innerHTML = `
-    <div class="ctrl-section">Presets</div>
-    <div class="preset-grid" id="preset-grid">
-      ${ALL_PRESETS.map(
-        (p) =>
-          `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
-      ).join('')}
-    </div>
-    <p class="ctrl-hint" id="preset-hint">One-click scene: physics + camera + look</p>
+  const massInput = qs<HTMLInputElement>(root, '#p-mass')
+  const spinInput = qs<HTMLInputElement>(root, '#p-spin')
+  const chargeInput = qs<HTMLInputElement>(root, '#p-charge')
+  const mdotInput = qs<HTMLInputElement>(root, '#d-mdot')
+  const outerInput = qs<HTMLInputElement>(root, '#d-outer')
+  const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
+  const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
+  const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
+  const mdotVal = qs<HTMLElement>(root, '[data-val="mdot"]')
+  const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
 
-    <div class="ctrl-section">Black hole (no-hair)</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Mass M</span>
-      <input type="range" id="p-mass" min="0.1" max="10" step="0.01" />
-      <span class="ctrl-val" data-val="mass"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Spin a★</span>
-      <input type="range" id="p-spin" min="0" max="${MAX_SPIN_STAR}" step="0.001" />
-      <span class="ctrl-val" data-val="spin"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Charge Q</span>
-      <input type="range" id="p-charge" min="0" max="0.95" step="0.01" />
-      <span class="ctrl-val" data-val="charge"></span>
-    </label>
-    <p class="ctrl-hint">Only M, a★, Q characterize the stationary BH (no-hair)</p>
+  const distInput = qs<HTMLInputElement>(root, '#c-dist')
+  const incInput = qs<HTMLInputElement>(root, '#c-inc')
+  const azInput = qs<HTMLInputElement>(root, '#c-az')
+  const fovInput = qs<HTMLInputElement>(root, '#c-fov')
+  const distVal = qs<HTMLElement>(root, '[data-val="dist"]')
+  const incVal = qs<HTMLElement>(root, '[data-val="inc"]')
+  const azVal = qs<HTMLElement>(root, '[data-val="az"]')
+  const fovVal = qs<HTMLElement>(root, '[data-val="fov"]')
 
-    <div class="ctrl-section">Accretion disk (not hair)</div>
-    <label class="ctrl">
-      <span class="ctrl-name">ṁ / ṁ_Edd</span>
-      <input type="range" id="d-mdot" min="0" max="1000" step="1" />
-      <span class="ctrl-val" data-val="mdot"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">r_out / M</span>
-      <input type="range" id="d-outer" min="${DISK_LIMITS.outerM.min}" max="${DISK_LIMITS.outerM.max}" step="1" />
-      <span class="ctrl-val" data-val="outer"></span>
-    </label>
-    <p class="ctrl-hint">ṁ → NT flux &amp; T∝ṁ¼ · r_out = luminous outer edge · ISCO = derived inner edge</p>
+  const bloomOnInput = qs<HTMLInputElement>(root, '#l-bloom-on')
+  const bloomStrInput = qs<HTMLInputElement>(root, '#l-bloom-str')
+  const bloomRadInput = qs<HTMLInputElement>(root, '#l-bloom-rad')
+  const bloomThrInput = qs<HTMLInputElement>(root, '#l-bloom-thr')
+  const exposureInput = qs<HTMLInputElement>(root, '#l-exposure')
+  const bloomOnVal = qs<HTMLElement>(root, '[data-val="bloomOn"]')
+  const bloomStrVal = qs<HTMLElement>(root, '[data-val="bloomStr"]')
+  const bloomRadVal = qs<HTMLElement>(root, '[data-val="bloomRad"]')
+  const bloomThrVal = qs<HTMLElement>(root, '[data-val="bloomThr"]')
+  const exposureVal = qs<HTMLElement>(root, '[data-val="exposure"]')
 
-    <div class="ctrl-section">Camera</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Distance</span>
-      <input type="range" id="c-dist" min="${distLim.min}" max="${distLim.max}" step="0.5" />
-      <span class="ctrl-val" data-val="dist"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Incl °</span>
-      <input type="range" id="c-inc" min="${incDegMin.toFixed(0)}" max="${incDegMax.toFixed(0)}" step="0.5" />
-      <span class="ctrl-val" data-val="inc"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Azim °</span>
-      <input type="range" id="c-az" min="0" max="360" step="0.5" />
-      <span class="ctrl-val" data-val="az"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">FOV</span>
-      <input type="range" id="c-fov" min="${fovLim.min}" max="${fovLim.max}" step="0.01" />
-      <span class="ctrl-val" data-val="fov"></span>
-    </label>
-    <p class="ctrl-hint">Drag canvas to orbit · scroll/pinch to zoom</p>
+  const starDensInput = qs<HTMLInputElement>(root, '#s-density')
+  const starBrightInput = qs<HTMLInputElement>(root, '#s-bright')
+  const nebulaInput = qs<HTMLInputElement>(root, '#s-nebula')
+  const milkyInput = qs<HTMLInputElement>(root, '#s-milky')
+  const skyResetBtn = qs<HTMLButtonElement>(root, '#s-reset')
+  const starDensVal = qs<HTMLElement>(root, '[data-val="starDens"]')
+  const starBrightVal = qs<HTMLElement>(root, '[data-val="starBright"]')
+  const nebulaVal = qs<HTMLElement>(root, '[data-val="nebula"]')
+  const milkyVal = qs<HTMLElement>(root, '[data-val="milky"]')
 
-    <div class="ctrl-section">Geodesics (global)</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Integrator</span>
-      <select id="g-integr" style="flex:1;min-width:0">
-        <option value="rt">RT (Cartesian, default)</option>
-        <option value="bl">BL (Boyer–Lindquist)</option>
-      </select>
-      <span class="ctrl-val" data-val="geodesic"></span>
-    </label>
-    <p class="ctrl-hint">RT = live force approx · BL = Mino Kerr nulls · not hair · not presets</p>
+  const geodesicSelect = qs<HTMLSelectElement>(root, '#g-integr')
+  const geodesicVal = qs<HTMLElement>(root, '[data-val="geodesic"]')
 
-    <div class="ctrl-section">Look</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Bloom</span>
-      <input type="checkbox" id="l-bloom-on" />
-      <span class="ctrl-val" data-val="bloomOn"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Strength</span>
-      <input type="range" id="l-bloom-str" min="${LOOK_LIMITS.bloomStrength.min}" max="${LOOK_LIMITS.bloomStrength.max}" step="0.01" />
-      <span class="ctrl-val" data-val="bloomStr"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Radius</span>
-      <input type="range" id="l-bloom-rad" min="${LOOK_LIMITS.bloomRadius.min}" max="${LOOK_LIMITS.bloomRadius.max}" step="0.01" />
-      <span class="ctrl-val" data-val="bloomRad"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Threshold</span>
-      <input type="range" id="l-bloom-thr" min="${LOOK_LIMITS.bloomThreshold.min}" max="${LOOK_LIMITS.bloomThreshold.max}" step="0.01" />
-      <span class="ctrl-val" data-val="bloomThr"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Exposure</span>
-      <input type="range" id="l-exposure" min="${LOOK_LIMITS.exposure.min}" max="${LOOK_LIMITS.exposure.max}" step="0.01" />
-      <span class="ctrl-val" data-val="exposure"></span>
-    </label>
-    <p class="ctrl-hint">Unreal bloom on HDR · ACES tone map · not hair</p>
-
-    <div class="ctrl-section">Deep space (global)</div>
-    <label class="ctrl">
-      <span class="ctrl-name">Stars</span>
-      <input type="range" id="s-density" min="${SKY_LIMITS.starDensity.min}" max="${SKY_LIMITS.starDensity.max}" step="0.05" />
-      <span class="ctrl-val" data-val="starDens"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Star bright</span>
-      <input type="range" id="s-bright" min="${SKY_LIMITS.starBrightness.min}" max="${SKY_LIMITS.starBrightness.max}" step="0.05" />
-      <span class="ctrl-val" data-val="starBright"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Nebula</span>
-      <input type="range" id="s-nebula" min="${SKY_LIMITS.nebula.min}" max="${SKY_LIMITS.nebula.max}" step="0.05" />
-      <span class="ctrl-val" data-val="nebula"></span>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Milky lane</span>
-      <input type="range" id="s-milky" min="${SKY_LIMITS.milky.min}" max="${SKY_LIMITS.milky.max}" step="0.05" />
-      <span class="ctrl-val" data-val="milky"></span>
-    </label>
-    <button type="button" class="preset-btn" id="s-reset" style="margin-top:6px;width:100%">Reset sky defaults</button>
-    <p class="ctrl-hint">Same sky for every preset · not hair</p>
-  `
-
-  const massInput = root.querySelector<HTMLInputElement>('#p-mass')
-  const spinInput = root.querySelector<HTMLInputElement>('#p-spin')
-  const chargeInput = root.querySelector<HTMLInputElement>('#p-charge')
-  const mdotInput = root.querySelector<HTMLInputElement>('#d-mdot')
-  const outerInput = root.querySelector<HTMLInputElement>('#d-outer')
-  const massVal = root.querySelector<HTMLElement>('[data-val="mass"]')
-  const spinVal = root.querySelector<HTMLElement>('[data-val="spin"]')
-  const chargeVal = root.querySelector<HTMLElement>('[data-val="charge"]')
-  const mdotVal = root.querySelector<HTMLElement>('[data-val="mdot"]')
-  const outerVal = root.querySelector<HTMLElement>('[data-val="outer"]')
-
-  const distInput = root.querySelector<HTMLInputElement>('#c-dist')
-  const incInput = root.querySelector<HTMLInputElement>('#c-inc')
-  const azInput = root.querySelector<HTMLInputElement>('#c-az')
-  const fovInput = root.querySelector<HTMLInputElement>('#c-fov')
-  const distVal = root.querySelector<HTMLElement>('[data-val="dist"]')
-  const incVal = root.querySelector<HTMLElement>('[data-val="inc"]')
-  const azVal = root.querySelector<HTMLElement>('[data-val="az"]')
-  const fovVal = root.querySelector<HTMLElement>('[data-val="fov"]')
-
-  const bloomOnInput = root.querySelector<HTMLInputElement>('#l-bloom-on')
-  const bloomStrInput = root.querySelector<HTMLInputElement>('#l-bloom-str')
-  const bloomRadInput = root.querySelector<HTMLInputElement>('#l-bloom-rad')
-  const bloomThrInput = root.querySelector<HTMLInputElement>('#l-bloom-thr')
-  const exposureInput = root.querySelector<HTMLInputElement>('#l-exposure')
-  const bloomOnVal = root.querySelector<HTMLElement>('[data-val="bloomOn"]')
-  const bloomStrVal = root.querySelector<HTMLElement>('[data-val="bloomStr"]')
-  const bloomRadVal = root.querySelector<HTMLElement>('[data-val="bloomRad"]')
-  const bloomThrVal = root.querySelector<HTMLElement>('[data-val="bloomThr"]')
-  const exposureVal = root.querySelector<HTMLElement>('[data-val="exposure"]')
-
-  const starDensInput = root.querySelector<HTMLInputElement>('#s-density')
-  const starBrightInput = root.querySelector<HTMLInputElement>('#s-bright')
-  const nebulaInput = root.querySelector<HTMLInputElement>('#s-nebula')
-  const milkyInput = root.querySelector<HTMLInputElement>('#s-milky')
-  const skyResetBtn = root.querySelector<HTMLButtonElement>('#s-reset')
-  const starDensVal = root.querySelector<HTMLElement>('[data-val="starDens"]')
-  const starBrightVal = root.querySelector<HTMLElement>('[data-val="starBright"]')
-  const nebulaVal = root.querySelector<HTMLElement>('[data-val="nebula"]')
-  const milkyVal = root.querySelector<HTMLElement>('[data-val="milky"]')
-
-  const geodesicSelect = root.querySelector<HTMLSelectElement>('#g-integr')
-  const geodesicVal = root.querySelector<HTMLElement>('[data-val="geodesic"]')
-
-  const presetHint = root.querySelector<HTMLElement>('#preset-hint')
+  const presetHint = qs<HTMLElement>(root, '#preset-hint')
   const presetBtns = root.querySelectorAll<HTMLButtonElement>('.preset-btn:not(#s-reset)')
 
   let activePresetId: string | null = null
@@ -251,68 +120,67 @@ export function mountControls(
   }
 
   function onUserTweaked(): void {
-    // Manual slider changes leave presets; clear highlight
     if (activePresetId !== null) setActivePresetUi(null)
   }
 
   function syncPhysicsInputs(p: BlackHoleParams): void {
-    if (massInput) massInput.value = String(p.mass)
-    if (spinInput) spinInput.value = String(p.spinStar)
-    if (chargeInput) chargeInput.value = String(p.charge)
-    if (massVal) massVal.textContent = fmt(p.mass, 2)
-    if (spinVal) spinVal.textContent = fmt(p.spinStar, 3)
-    if (chargeVal) chargeVal.textContent = fmt(p.charge, 3)
+    setRangeValue(massInput, p.mass)
+    setRangeValue(spinInput, p.spinStar)
+    setRangeValue(chargeInput, p.charge)
+    setText(massVal, fmt(p.mass, 2))
+    setText(spinVal, fmt(p.spinStar, 3))
+    setText(chargeVal, fmt(p.charge, 3))
   }
 
   function syncDiskInputs(d: DiskParams): void {
-    if (mdotInput) mdotInput.value = String(sliderFromMdot(d.mdot))
-    if (outerInput) outerInput.value = String(d.outerM)
+    setRangeValue(mdotInput, sliderFromMdot(d.mdot))
+    setRangeValue(outerInput, d.outerM)
     if (mdotVal) {
       const tScale = mdotTemperatureScale(d.mdot)
       mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
     }
-    if (outerVal) outerVal.textContent = `${fmt(d.outerM, 0)} M`
+    setText(outerVal, `${fmt(d.outerM, 0)} M`)
   }
 
   function syncCameraInputs(c: CameraState): void {
-    if (distInput) distInput.value = String(c.distanceM)
-    if (incInput) incInput.value = String(radToDeg(c.inclination))
-    if (azInput) azInput.value = String(radToDeg(c.azimuth))
-    if (fovInput) fovInput.value = String(c.fov)
-    if (distVal) distVal.textContent = `${fmt(c.distanceM, 1)}M`
-    if (incVal) incVal.textContent = fmt(radToDeg(c.inclination), 1)
-    if (azVal) azVal.textContent = fmt(radToDeg(c.azimuth), 1)
-    if (fovVal) fovVal.textContent = fmt(c.fov, 2)
+    setRangeValue(distInput, c.distanceM)
+    setRangeValue(incInput, radToDeg(c.inclination))
+    setRangeValue(azInput, radToDeg(c.azimuth))
+    setRangeValue(fovInput, c.fov)
+    setText(distVal, `${fmt(c.distanceM, 1)}M`)
+    setText(incVal, fmt(radToDeg(c.inclination), 1))
+    setText(azVal, fmt(radToDeg(c.azimuth), 1))
+    setText(fovVal, fmt(c.fov, 2))
   }
 
   function syncLookInputs(l: LookState): void {
     if (bloomOnInput) bloomOnInput.checked = l.bloomEnabled
-    if (bloomStrInput) bloomStrInput.value = String(l.bloomStrength)
-    if (bloomRadInput) bloomRadInput.value = String(l.bloomRadius)
-    if (bloomThrInput) bloomThrInput.value = String(l.bloomThreshold)
-    if (exposureInput) exposureInput.value = String(l.exposure)
-    if (bloomOnVal) bloomOnVal.textContent = l.bloomEnabled ? 'on' : 'off'
-    if (bloomStrVal) bloomStrVal.textContent = fmt(l.bloomStrength, 2)
-    if (bloomRadVal) bloomRadVal.textContent = fmt(l.bloomRadius, 2)
-    if (bloomThrVal) bloomThrVal.textContent = fmt(l.bloomThreshold, 2)
-    if (exposureVal) exposureVal.textContent = fmt(l.exposure, 2)
+    setRangeValue(bloomStrInput, l.bloomStrength)
+    setRangeValue(bloomRadInput, l.bloomRadius)
+    setRangeValue(bloomThrInput, l.bloomThreshold)
+    setRangeValue(exposureInput, l.exposure)
+    setText(bloomOnVal, l.bloomEnabled ? 'on' : 'off')
+    setText(bloomStrVal, fmt(l.bloomStrength, 2))
+    setText(bloomRadVal, fmt(l.bloomRadius, 2))
+    setText(bloomThrVal, fmt(l.bloomThreshold, 2))
+    setText(exposureVal, fmt(l.exposure, 2))
   }
 
   function syncSkyInputs(s: SkyState): void {
-    if (starDensInput) starDensInput.value = String(s.starDensity)
-    if (starBrightInput) starBrightInput.value = String(s.starBrightness)
-    if (nebulaInput) nebulaInput.value = String(s.nebula)
-    if (milkyInput) milkyInput.value = String(s.milky)
-    if (starDensVal) starDensVal.textContent = fmt(s.starDensity, 2)
-    if (starBrightVal) starBrightVal.textContent = fmt(s.starBrightness, 2)
-    if (nebulaVal) nebulaVal.textContent = fmt(s.nebula, 2)
-    if (milkyVal) milkyVal.textContent = fmt(s.milky, 2)
+    setRangeValue(starDensInput, s.starDensity)
+    setRangeValue(starBrightInput, s.starBrightness)
+    setRangeValue(nebulaInput, s.nebula)
+    setRangeValue(milkyInput, s.milky)
+    setText(starDensVal, fmt(s.starDensity, 2))
+    setText(starBrightVal, fmt(s.starBrightness, 2))
+    setText(nebulaVal, fmt(s.nebula, 2))
+    setText(milkyVal, fmt(s.milky, 2))
   }
 
   function syncGeodesicUi(): void {
     const mode = getGeodesicIntegrator()
     if (geodesicSelect) geodesicSelect.value = mode
-    if (geodesicVal) geodesicVal.textContent = mode === 'bl' ? 'BL' : 'RT'
+    setText(geodesicVal, mode === 'bl' ? 'BL' : 'RT')
   }
 
   function syncDerived(d: DerivedGeometry, p: BlackHoleParams): void {
@@ -320,84 +188,75 @@ export function mountControls(
     renderDerivedHud(derivedRoot, p, d, getDisk())
   }
 
-  massInput?.addEventListener('input', () => {
+  bindRange(massInput, (v) => {
     onUserTweaked()
-    setParams({ mass: Number(massInput.value) })
+    setParams({ mass: v })
   })
-  spinInput?.addEventListener('input', () => {
+  bindRange(spinInput, (v) => {
     onUserTweaked()
-    setParams({ spinStar: Number(spinInput.value) })
+    setParams({ spinStar: v })
   })
-  chargeInput?.addEventListener('input', () => {
+  bindRange(chargeInput, (v) => {
     onUserTweaked()
-    setParams({ charge: Number(chargeInput.value) })
+    setParams({ charge: v })
   })
-  mdotInput?.addEventListener('input', () => {
+  bindRange(mdotInput, (v) => {
     onUserTweaked()
-    setDisk({ mdot: mdotFromSlider(Number(mdotInput.value)) })
+    setDisk({ mdot: mdotFromSlider(v) })
   })
-  outerInput?.addEventListener('input', () => {
+  bindRange(outerInput, (v) => {
     onUserTweaked()
-    setDisk({ outerM: Number(outerInput.value) })
+    setDisk({ outerM: v })
   })
 
-  distInput?.addEventListener('input', () => {
+  bindRange(distInput, (v) => {
     onUserTweaked()
-    setCamera({ distanceM: Number(distInput.value) })
+    setCamera({ distanceM: v })
   })
-  incInput?.addEventListener('input', () => {
+  bindRange(incInput, (v) => {
     onUserTweaked()
-    setCamera({ inclination: degToRad(Number(incInput.value)) })
+    setCamera({ inclination: degToRad(v) })
   })
-  azInput?.addEventListener('input', () => {
+  bindRange(azInput, (v) => {
     onUserTweaked()
-    setCamera({ azimuth: degToRad(Number(azInput.value)) })
+    setCamera({ azimuth: degToRad(v) })
   })
-  fovInput?.addEventListener('input', () => {
+  bindRange(fovInput, (v) => {
     onUserTweaked()
-    setCamera({ fov: Number(fovInput.value) })
+    setCamera({ fov: v })
   })
 
-  bloomOnInput?.addEventListener('change', () => {
+  bindCheckbox(bloomOnInput, (checked) => {
     onUserTweaked()
-    setLook({ bloomEnabled: Boolean(bloomOnInput.checked) })
+    setLook({ bloomEnabled: checked })
   })
-  bloomStrInput?.addEventListener('input', () => {
+  bindRange(bloomStrInput, (v) => {
     onUserTweaked()
-    setLook({ bloomStrength: Number(bloomStrInput.value) })
+    setLook({ bloomStrength: v })
   })
-  bloomRadInput?.addEventListener('input', () => {
+  bindRange(bloomRadInput, (v) => {
     onUserTweaked()
-    setLook({ bloomRadius: Number(bloomRadInput.value) })
+    setLook({ bloomRadius: v })
   })
-  bloomThrInput?.addEventListener('input', () => {
+  bindRange(bloomThrInput, (v) => {
     onUserTweaked()
-    setLook({ bloomThreshold: Number(bloomThrInput.value) })
+    setLook({ bloomThreshold: v })
   })
-  exposureInput?.addEventListener('input', () => {
+  bindRange(exposureInput, (v) => {
     onUserTweaked()
-    setLook({ exposure: Number(exposureInput.value) })
+    setLook({ exposure: v })
   })
 
-  starDensInput?.addEventListener('input', () => {
-    setSky({ starDensity: Number(starDensInput.value) })
-  })
-  starBrightInput?.addEventListener('input', () => {
-    setSky({ starBrightness: Number(starBrightInput.value) })
-  })
-  nebulaInput?.addEventListener('input', () => {
-    setSky({ nebula: Number(nebulaInput.value) })
-  })
-  milkyInput?.addEventListener('input', () => {
-    setSky({ milky: Number(milkyInput.value) })
-  })
+  bindRange(starDensInput, (v) => setSky({ starDensity: v }))
+  bindRange(starBrightInput, (v) => setSky({ starBrightness: v }))
+  bindRange(nebulaInput, (v) => setSky({ nebula: v }))
+  bindRange(milkyInput, (v) => setSky({ milky: v }))
   skyResetBtn?.addEventListener('click', () => {
     resetSky()
   })
 
-  geodesicSelect?.addEventListener('change', () => {
-    const v = geodesicSelect.value === 'bl' ? 'bl' : 'rt'
-    setGeodesicIntegrator(v)
+  bindSelect(geodesicSelect, (v) => {
+    setGeodesicIntegrator(v === 'bl' ? 'bl' : 'rt')
   })
 
   for (const btn of presetBtns) {
@@ -443,7 +302,6 @@ export function mountControls(
     chargeInput.max = String(Math.max(0, m * 0.99))
   })
 
-  // Initial paint (each subscribe also fires once; these cover any missed sync order).
   syncPhysicsInputs(getParams())
   syncDiskInputs(getDisk())
   syncCameraInputs(getCamera())

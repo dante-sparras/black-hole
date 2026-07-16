@@ -4,6 +4,7 @@ import {
   OBSERVER_LIMITS,
   type ObserverCamera,
 } from '../physics/observer'
+import { emitStore } from './batch'
 
 export type CameraState = ObserverCamera
 
@@ -36,7 +37,9 @@ export function setCamera(partial: Partial<CameraState>): CameraState {
   next.fov = clamp(next.fov, CAMERA_LIMITS.fov.min, CAMERA_LIMITS.fov.max)
 
   camera = next
-  for (const listener of listeners) listener(camera)
+  emitStore('camera', () => {
+    for (const listener of listeners) listener(camera)
+  })
   return camera
 }
 

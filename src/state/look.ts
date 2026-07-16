@@ -3,6 +3,7 @@
  * Bloom is Unreal-style luminance threshold + multi-mip blur.
  * Defaults stay subtle so the shadow stays readable.
  */
+import { emitStore } from './batch'
 
 export type LookState = {
   /** Master bloom toggle */
@@ -70,7 +71,9 @@ export function setLook(partial: Partial<LookState>): LookState {
   )
   next.bloomEnabled = Boolean(next.bloomEnabled)
   look = next
-  for (const fn of listeners) fn(look)
+  emitStore('look', () => {
+    for (const fn of listeners) fn(look)
+  })
   return look
 }
 

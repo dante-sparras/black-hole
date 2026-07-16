@@ -1,6 +1,7 @@
 /**
  * Application bridge: pure stores → render tracer / bloom / debug mode.
- * Targeted subscriptions so a sky tweak does not re-upload spacetime, etc.
+ * Targeted subscriptions + microtask coalesce so multi-store patches
+ * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
@@ -29,8 +30,26 @@ export type SceneBridge = {
   setBloomPipeline: (pipeline: BloomPipeline | null) => void
 }
 
+type Dirty = {
+  physics: boolean
+  camera: boolean
+  look: boolean
+  sky: boolean
+  debug: boolean
+  geodesic: boolean
+}
+
 export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
   let bloom: BloomPipeline | null = null
+  const dirty: Dirty = {
+    physics: false,
+    camera: false,
+    look: false,
+    sky: false,
+    debug: false,
+    geodesic: false,
+  }
+  let scheduled = false
 
   function applyPhysics(): void {
     const p = getParams()
@@ -67,16 +86,50 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     tracer.setIntegratorMode(mode === 'bl' ? 1 : 0)
   }
 
+  function flush(): void {
+    scheduled = false
+    if (dirty.physics) {
+      dirty.physics = false
+      applyPhysics()
+    }
+    if (dirty.camera) {
+      dirty.camera = false
+      applyCamera()
+    }
+    if (dirty.look) {
+      dirty.look = false
+      applyLook()
+    }
+    if (dirty.sky) {
+      dirty.sky = false
+      applySky()
+    }
+    if (dirty.debug) {
+      dirty.debug = false
+      applyDebug()
+    }
+    if (dirty.geodesic) {
+      dirty.geodesic = false
+      applyGeodesic()
+    }
+  }
+
+  function mark(key: keyof Dirty): void {
+    dirty[key] = true
+    if (scheduled) return
+    scheduled = true
+    queueMicrotask(flush)
+  }
+
   function connect(): () => void {
-    // Each store subscribe fires once on attach — full initial upload.
     const unsubs = [
-      subscribeParams(() => applyPhysics()),
-      subscribeDisk(() => applyPhysics()),
-      subscribeCamera(() => applyCamera()),
-      subscribeLook(() => applyLook()),
-      subscribeSky(() => applySky()),
-      subscribeGeodesic(() => applyGeodesic()),
-      subscribeDebug(() => applyDebug()),
+      subscribeParams(() => mark('physics')),
+      subscribeDisk(() => mark('physics')),
+      subscribeCamera(() => mark('camera')),
+      subscribeLook(() => mark('look')),
+      subscribeSky(() => mark('sky')),
+      subscribeGeodesic(() => mark('geodesic')),
+      subscribeDebug(() => mark('debug')),
     ]
     return () => {
       for (const u of unsubs) u()

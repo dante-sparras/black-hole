@@ -1,8 +1,14 @@
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import type { DiskParams } from '../physics/diskParams'
 
-/** CPU-side spacetime + disk snapshot uploaded when params change. */
-export type SpacetimeUniforms = {
+/**
+ * CPU-side spacetime + disk snapshot for tests / diagnostics / HUD tooling.
+ *
+ * Not the GPU upload path — the tracer uses SpacetimeTraceParams
+ * (mass, spinStar, charge, mdot, rIscoOverM, outerM) via setSpacetime.
+ * This shape keeps derived geometry (r±, r_ISCO absolute, spin length).
+ */
+export type SpacetimeSnapshot = {
   mass: number
   spinStar: number
   spinLength: number
@@ -14,11 +20,11 @@ export type SpacetimeUniforms = {
   rIsco: number
 }
 
-export function toUniforms(
+export function toSpacetimeSnapshot(
   p: BlackHoleParams,
   d: DerivedGeometry,
   disk: DiskParams,
-): SpacetimeUniforms {
+): SpacetimeSnapshot {
   return {
     mass: p.mass,
     spinStar: p.spinStar,

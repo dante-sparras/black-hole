@@ -2,6 +2,8 @@
  * Deep-space backdrop controls (not black-hole hair, not per-preset).
  * Shared globally so every preset sees the same sky unless the user changes it.
  */
+import { emitStore } from './batch'
+
 export type SkyState = {
   /** Multiplier for star spawn density (0 = none, ~1.2 default, 2 = dense) */
   starDensity: number
@@ -55,14 +57,18 @@ export function setSky(partial: Partial<SkyState>): SkyState {
   next.nebula = clamp(next.nebula, SKY_LIMITS.nebula.min, SKY_LIMITS.nebula.max)
   next.milky = clamp(next.milky, SKY_LIMITS.milky.min, SKY_LIMITS.milky.max)
   sky = next
-  for (const fn of listeners) fn(sky)
+  emitStore('sky', () => {
+    for (const fn of listeners) fn(sky)
+  })
   return sky
 }
 
 /** Reset to global defaults (same for all presets). */
 export function resetSky(): SkyState {
   sky = { ...SKY_DEFAULTS }
-  for (const fn of listeners) fn(sky)
+  emitStore('sky', () => {
+    for (const fn of listeners) fn(sky)
+  })
   return sky
 }
 

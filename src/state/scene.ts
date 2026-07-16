@@ -5,6 +5,7 @@
 import type { DiskInput, DiskParams } from '../physics/diskParams'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import type { ParamsInput } from '../physics/validate'
+import { withBatch } from './batch'
 import {
   getCamera,
   setCamera,
@@ -63,12 +64,14 @@ export function getScene(): SceneSnapshot {
 }
 
 export function setScene(patch: ScenePatch): SceneSnapshot {
-  if (patch.params) setParams(patch.params)
-  if (patch.disk) setDisk(patch.disk)
-  if (patch.camera) setCamera(patch.camera)
-  if (patch.look) setLook(patch.look)
-  if (patch.sky) setSky(patch.sky)
-  if (patch.geodesic) setGeodesicIntegrator(patch.geodesic)
+  withBatch(() => {
+    if (patch.params) setParams(patch.params)
+    if (patch.disk) setDisk(patch.disk)
+    if (patch.camera) setCamera(patch.camera)
+    if (patch.look) setLook(patch.look)
+    if (patch.sky) setSky(patch.sky)
+    if (patch.geodesic) setGeodesicIntegrator(patch.geodesic)
+  })
   return getScene()
 }
 

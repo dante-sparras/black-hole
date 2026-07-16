@@ -7,6 +7,7 @@ import {
   type DiskInput,
   type DiskParams,
 } from '../physics/diskParams'
+import { emitStore } from './batch'
 
 type Listener = (disk: DiskParams) => void
 
@@ -19,7 +20,9 @@ export function getDisk(): DiskParams {
 
 export function setDisk(input: DiskInput): DiskParams {
   disk = normalizeDisk({ ...disk, ...input })
-  for (const fn of listeners) fn(disk)
+  emitStore('disk', () => {
+    for (const fn of listeners) fn(disk)
+  })
   return disk
 }
 

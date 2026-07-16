@@ -3,6 +3,8 @@
  * 'rt' = real-time Cartesian (default, GPU twin of knNullAccel)
  * 'bl' = Boyer–Lindquist Mino-time (CPU Phase 1–3 math on GPU)
  */
+import { emitStore } from './batch'
+
 export type GeodesicIntegrator = 'rt' | 'bl'
 
 export const GEODESIC_DEFAULTS = {
@@ -20,7 +22,9 @@ export function getGeodesicIntegrator(): GeodesicIntegrator {
 
 export function setGeodesicIntegrator(mode: GeodesicIntegrator): GeodesicIntegrator {
   integrator = mode === 'bl' ? 'bl' : 'rt'
-  for (const fn of listeners) fn(integrator)
+  emitStore('geodesic', () => {
+    for (const fn of listeners) fn(integrator)
+  })
   return integrator
 }
 
