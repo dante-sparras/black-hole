@@ -72,7 +72,7 @@ export const DISK_LIMITS = {
   clumps: { min: 0, max: 1 },
   dust: { min: 0, max: 1 },
   scaleHeight: { min: 0.02, max: 0.18 },
-  shearRate: { min: 0, max: 1.2 },
+  shearRate: { min: 0, max: 4 },
 } as const
 
 export type DiskInput = Partial<DiskParams>

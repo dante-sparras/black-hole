@@ -139,34 +139,64 @@ export function accumulateDiskHit(p) {
     min(float(E.tColorMaxK), tRestK.mul(gColor).mul(tCoolOuter)),
   )
 
-  // --- Structured surface: spirals + plasma + dust ---
+  // --- Structured surface: advected spirals + flow filaments + plasma + dust ---
+  // Visible Keplerian: shearGain × rate × Ω_K × t (Ω alone is too slow for UI seconds)
   const lnR = log(max(hitR.div(M), float(1e-4)))
   const OmegaK = sqrt(max(M, float(1e-8))).div(pow(max(hitR, float(1e-5)), float(1.5)))
   const sense = uPrograde.greaterThan(0.5).select(float(1), float(-1))
-  const shear = sense.mul(shearRateLive).mul(OmegaK).mul(uTime)
+  const shear = sense
+    .mul(shearRateLive)
+    .mul(float(TX.shearGain))
+    .mul(OmegaK)
+    .mul(uTime)
 
-  // m=2 log spiral from (c,s) — seamless at ±π
-  const c2a = cphi.mul(cphi).sub(sphi.mul(sphi))
-  const s2a = cphi.mul(sphi).mul(2)
+  // Rotate (cφ,sφ) into material frame — pattern advects with gas
+  const csh = cos(shear)
+  const ssh = sin(shear)
+  const cx = cphi.mul(csh).sub(sphi.mul(ssh))
+  const sx = cphi.mul(ssh).add(sphi.mul(csh))
+
+  // m=2 log spiral in advected frame
+  const c2a = cx.mul(cx).sub(sx.mul(sx))
+  const s2a = cx.mul(sx).mul(2)
   const armsN = float(TX.arms)
-  const alpha = armsN
-    .mul(float(-TX.pitch))
-    .mul(lnR)
-    .add(float(TX.phase0))
-    .add(armsN.mul(shear))
+  const alpha = armsN.mul(float(-TX.pitch)).mul(lnR).add(float(TX.phase0))
   const armWave = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(alpha)).add(s2a.mul(sin(alpha)))),
   )
-  // Filamentary arms (gas)
-  const armsBright = pow(max(armWave, float(1e-4)), float(1.6))
+  const armsBright = pow(max(armWave, float(1e-4)), float(1.55))
   const armFac = float(1)
     .sub(armContrast)
-    .add(armContrast.mul(float(0.18).add(armsBright.mul(1.12))))
+    .add(armContrast.mul(float(0.16).add(armsBright.mul(1.1))))
 
-  // Turbulence octave 1 (large gas eddies)
-  const turbDomainZ = lnR.add(shear.mul(0.18))
-  const nUVx = cphi.mul(1.55).add(turbDomainZ.mul(0.1))
-  const nUVy = sphi.mul(1.55).add(turbDomainZ.mul(0.09))
+  // Fine flow-aligned filaments (m=4 + m=8) — reference streamlines
+  const c4a = c2a.mul(c2a).sub(s2a.mul(s2a))
+  const s4a = c2a.mul(s2a).mul(2)
+  const c8a = c4a.mul(c4a).sub(s4a.mul(s4a))
+  const s8a = c4a.mul(s4a).mul(2)
+  const a2s = float(-0.44).mul(lnR).add(float(TX.phase0).mul(0.7))
+  const a8s = float(-0.96).mul(lnR).add(float(TX.phase0).mul(1.3))
+  const stream2 = float(0.5).add(
+    float(0.5).mul(c2a.mul(cos(a2s)).add(s2a.mul(sin(a2s)))),
+  )
+  const stream8 = float(0.5).add(
+    float(0.5).mul(c8a.mul(cos(a8s)).add(s8a.mul(sin(a8s)))),
+  )
+  const streams = stream2
+    .mul(float(1).sub(float(TX.streamHarmonic)))
+    .add(pow(max(stream8, float(1e-4)), float(1.8)).mul(float(TX.streamHarmonic)))
+  const streamFac = float(1)
+    .sub(float(TX.streamContrast).mul(uStructure))
+    .add(
+      float(TX.streamContrast)
+        .mul(uStructure)
+        .mul(float(0.25).add(streams.mul(0.95))),
+    )
+
+  // Turbulence in advected frame (moves with gas) — 3 octaves unrolled
+  const turbDomainZ = lnR.add(shear.mul(0.04))
+  const nUVx = cx.mul(1.65).add(turbDomainZ.mul(0.12))
+  const nUVy = sx.mul(1.65).add(turbDomainZ.mul(0.11))
   const ix1 = floor(nUVx)
   const iy1 = floor(nUVy)
   const fx1 = nUVx.sub(ix1)
@@ -183,9 +213,8 @@ export function accumulateDiskHit(p) {
     .mul(float(1).sub(uy1))
     .add(n01.mul(float(1).sub(ux1)).add(n11.mul(ux1)).mul(uy1))
 
-  // Octave 2 (plasma clumps)
-  const nUVx2 = nUVx.mul(2.15)
-  const nUVy2 = nUVy.mul(2.15)
+  const nUVx2 = nUVx.mul(2.2)
+  const nUVy2 = nUVy.mul(2.2)
   const ix2 = floor(nUVx2)
   const iy2 = floor(nUVy2)
   const fx2 = nUVx2.sub(ix2)
@@ -204,9 +233,8 @@ export function accumulateDiskHit(p) {
     .mul(float(1).sub(uy2))
     .add(m01.mul(float(1).sub(ux2)).add(m11.mul(ux2)).mul(uy2))
 
-  // Octave 3 (fine dust graininess)
-  const nUVx3 = nUVx.mul(4.4)
-  const nUVy3 = nUVy.mul(4.4)
+  const nUVx3 = nUVx.mul(4.8)
+  const nUVy3 = nUVy.mul(4.8)
   const ix3 = floor(nUVx3)
   const iy3 = floor(nUVy3)
   const fx3 = nUVx3.sub(ix3)
@@ -225,12 +253,13 @@ export function accumulateDiskHit(p) {
     .mul(float(1).sub(uy3))
     .add(p01.mul(float(1).sub(ux3)).add(p11.mul(ux3)).mul(uy3))
 
-  const turb = turb1.mul(0.5).add(turb2.mul(0.32)).add(turb3.mul(0.18))
-  // Hot plasma clumping stronger inward
-  const plasmaClump = pow(max(turb2, float(1e-4)), float(1.8)).mul(plasmaZone)
+  const turb = turb1.mul(0.48).add(turb2.mul(0.32)).add(turb3.mul(0.2))
+  const plasmaClump = pow(max(turb2, float(1e-4)), float(1.75)).mul(plasmaZone)
 
-  // Outer dust lanes (radial-only → seamless)
-  const dustWave = float(0.5).add(float(0.5).mul(sin(lnR.mul(5.4).add(0.55))))
+  // Outer dust lanes
+  const dustWave = float(0.5).add(
+    float(0.5).mul(sin(lnR.mul(5.4).add(0.55).add(shear.mul(0.12)))),
+  )
   const dustOuter = min(float(1), max(float(0), lnR.sub(0.55).div(1.9)))
   const dust = float(1).sub(
     dustContrast
@@ -238,18 +267,18 @@ export function accumulateDiskHit(p) {
       .mul(float(0.48).add(dustWave.mul(0.52)))
       .mul(float(0.6).add(dustZone.mul(0.6))),
   )
-  // Settling rings
-  const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.6).add(shear.mul(0.4)))))
+  const ripple = float(0.5).add(float(0.5).mul(sin(lnR.mul(4.8).add(shear.mul(0.25)))))
 
   const turbFac = float(1)
     .sub(turbContrast)
     .add(
-      turbContrast.mul(float(0.26).add(turb.mul(0.88)).add(plasmaClump.mul(0.6))),
+      turbContrast.mul(float(0.2).add(turb.mul(0.85)).add(plasmaClump.mul(0.65))),
     )
   let texFac = armFac
+    .mul(streamFac)
     .mul(turbFac)
     .mul(dust)
-    .mul(float(0.86).add(ripple.mul(0.28)))
+    .mul(float(0.84).add(ripple.mul(0.32)))
     .mul(edgeFac)
   texFac = max(float(TX.texMin), min(float(TX.texMax), texFac))
 

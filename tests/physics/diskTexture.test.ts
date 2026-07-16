@@ -31,8 +31,8 @@ describe('disk texture primitives', () => {
 describe('diskTextureFactor', () => {
   test('positive and bounded', () => {
     const f = diskTextureFactor(10, 2, 1)
-    expect(f).toBeGreaterThan(0.2)
-    expect(f).toBeLessThan(2)
+    expect(f).toBeGreaterThan(0.15)
+    expect(f).toBeLessThan(2.5)
   })
 
   test('zero arm contrast → near unity base (still mild ripple/turb)', () => {
@@ -40,9 +40,10 @@ describe('diskTextureFactor', () => {
       armContrast: 0,
       turbContrast: 0,
       dustContrast: 0,
+      streamContrast: 0,
     })
-    expect(f).toBeGreaterThan(0.75)
-    expect(f).toBeLessThan(1.25)
+    expect(f).toBeGreaterThan(0.7)
+    expect(f).toBeLessThan(1.3)
   })
 
   test('varies with azimuth (spiral structure)', () => {
@@ -82,20 +83,21 @@ describe('diskTextureFactor', () => {
 
   test('Keplerian shear changes pattern over time at fixed point', () => {
     const f0 = diskTextureFactor(10, 2, 1, { time: 0 })
-    const f1 = diskTextureFactor(10, 2, 1, { time: 40 })
-    expect(Math.abs(f1 - f0)).toBeGreaterThan(0.05)
+    const f1 = diskTextureFactor(10, 2, 1, { time: 2 })
+    // With shearGain, motion is visible within a couple of seconds
+    expect(Math.abs(f1 - f0)).toBeGreaterThan(0.03)
   })
 
   test('inner radius shears faster than outer (differential rotation)', () => {
     // Phase advance ∝ Ω ∝ r^{-3/2}: same Δt moves pattern more at small r
-    const dt = 2
-    const dIn = Math.abs(
-      diskTextureFactor(7, 0, 1, { time: dt }) - diskTextureFactor(7, 0, 1, { time: 0 }),
+    const dt = 1.5
+    const dInner = Math.abs(
+      diskTextureFactor(6, 0, 1, { time: dt }) - diskTextureFactor(6, 0, 1, { time: 0 }),
     )
-    const dOut = Math.abs(
-      diskTextureFactor(22, 0, 1, { time: dt }) - diskTextureFactor(22, 0, 1, { time: 0 }),
+    const dOuter = Math.abs(
+      diskTextureFactor(20, 0, 1, { time: dt }) - diskTextureFactor(20, 0, 1, { time: 0 }),
     )
-    expect(dIn).toBeGreaterThan(dOut * 0.8)
+    expect(dInner).toBeGreaterThan(dOuter * 0.9)
   })
 })
 
