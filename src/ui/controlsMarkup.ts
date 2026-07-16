@@ -102,6 +102,14 @@ export function buildControlsHtml(): string {
       </select>
       <span class="ctrl-val" data-val="quality"></span>
     </label>
-    <p class="ctrl-hint">Steps / DPR / sample stride only · laws unchanged</p>
+    <label class="ctrl">
+      <span class="ctrl-name">Density source</span>
+      <select id="grmhd-src" style="flex:1;min-width:0">
+        <option value="analytic">Analytic</option>
+        <option value="cube">GRMHD cube</option>
+      </select>
+      <span class="ctrl-val" data-val="grmhd"></span>
+    </label>
+    <p class="ctrl-hint">Steps / DPR / dens field · cube = 3D dens texture (.bhcm)</p>
   `
 }

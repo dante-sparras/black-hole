@@ -52,4 +52,17 @@ export type GeodesicTracer = {
   setTime: (seconds: number) => void
   /** Numerical quality only (steps / stride / base step) */
   setQuality: (q: { maxSteps: number; volumeStride: number; baseStepM: number }) => void
+  /**
+   * GRMHD dens cube on GPU. mix 0 = analytic only, 1 = pure cube.
+   * Pass null gpu to disable (mix forced 0).
+   */
+  setGrmhdCube: (
+    gpu: {
+      texture: import('three').Data3DTexture
+      origin: { x: number; y: number; z: number }
+      extent: { x: number; y: number; z: number }
+      densScale: number
+    } | null,
+    mix: number,
+  ) => void
 }

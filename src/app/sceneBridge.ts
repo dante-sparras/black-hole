@@ -17,8 +17,10 @@ import { getParams, subscribe as subscribeParams } from '../state/params'
 import { getScaleFree, subscribeScaleFree } from '../state/scaleFree'
 import { getIdealBeam, subscribeIdealBeam } from '../state/idealBeam'
 import { getQuality, subscribeQuality } from '../state/quality'
+import { getGrmhd, subscribeGrmhd } from '../state/grmhd'
 import { getScene } from '../state/scene'
 import { getSky, subscribeSky } from '../state/sky'
+import { syncGrmhdToTracer } from './grmhdLoader'
 
 export type BloomPipeline = ReturnType<typeof createBloomPipeline>
 
@@ -47,6 +49,7 @@ type Dirty = {
   scaleFree: boolean
   idealBeam: boolean
   quality: boolean
+  grmhd: boolean
 }
 
 export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
@@ -61,6 +64,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     scaleFree: false,
     idealBeam: false,
     quality: false,
+    grmhd: false,
   }
   let scheduled = false
 
@@ -131,6 +135,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     })
   }
 
+  function applyGrmhd(): void {
+    syncGrmhdToTracer(tracer)
+  }
+
   function flush(): void {
     scheduled = false
     if (dirty.physics) {
@@ -169,6 +177,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       dirty.quality = false
       applyQuality()
     }
+    if (dirty.grmhd) {
+      dirty.grmhd = false
+      applyGrmhd()
+    }
   }
 
   function mark(key: keyof Dirty): void {
@@ -189,6 +201,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       subscribeScaleFree(() => mark('scaleFree')),
       subscribeIdealBeam(() => mark('idealBeam')),
       subscribeQuality(() => mark('quality')),
+      subscribeGrmhd(() => mark('grmhd')),
       subscribeDebug(() => mark('debug')),
     ]
     return () => {
@@ -211,13 +224,16 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const orbitTag = disk.prograde ? 'pro' : 'ret'
     const beamTag = idealBeam ? 'g³' : 'g²'
     const qTag = getQuality().level
+    const grmhd = getGrmhd()
+    const densTag = grmhd.enabled && grmhd.cube ? `dens=${grmhd.label}` : 'dens=analytic'
     const mode = realtimeModeTag(p, geodesic)
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
-    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · q=${qTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
-    return healthLine ? `${base}\n${healthLine}` : base
+    const base = `${fps} fps · ${mode} · ${densTag} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · q=${qTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
+    return healthLine ? `${base}
+${healthLine}` : base
   }
 
   return {

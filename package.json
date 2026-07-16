@@ -10,7 +10,9 @@
     "test": "bun test tests",
     "test:ref": "bun run scripts/cpu-ref-render.ts",
     "test:ref:write": "bun run scripts/cpu-ref-render.ts -- --write",
-    "test:all": "bun test tests && bun run scripts/cpu-ref-render.ts"
+    "test:all": "bun test tests && bun run scripts/cpu-ref-render.ts",
+    "cube:gen": "bun run scripts/gen-grmhd-cube.ts",
+    "cube:check": "bun run scripts/convert-harm-stub.ts"
   },
   "devDependencies": {
     "@types/three": "^0.185.1",

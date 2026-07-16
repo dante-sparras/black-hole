@@ -25,6 +25,7 @@ import {
   subscribeQuality,
   type QualityLevel,
 } from '../state/quality'
+import { getGrmhd, setGrmhd, subscribeGrmhd } from '../state/grmhd'
 import {
   bindRange,
   bindSelect,
@@ -189,6 +190,24 @@ export function mountControls(
   subscribeQuality((q) => {
     if (qualitySelect) qualitySelect.value = q.level
     setText(qualityVal, q.level)
+  })
+
+  const grmhdSelect = qs<HTMLSelectElement>(root, '#grmhd-src')
+  const grmhdVal = qs<HTMLElement>(root, '[data-val="grmhd"]')
+  bindSelect(grmhdSelect, (v) => {
+    const wantCube = v === 'cube'
+    const s = getGrmhd()
+    if (wantCube && !s.cube) {
+      setText(grmhdVal, 'no cube')
+      if (grmhdSelect) grmhdSelect.value = 'analytic'
+      return
+    }
+    setGrmhd({ enabled: wantCube, mix: wantCube ? 1 : 0 })
+  })
+  subscribeGrmhd((s) => {
+    const mode = s.enabled && s.cube ? 'cube' : 'analytic'
+    if (grmhdSelect) grmhdSelect.value = mode
+    setText(grmhdVal, s.enabled && s.cube ? s.label : 'analytic')
   })
 
   for (const btn of presetBtns) {

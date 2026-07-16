@@ -3,6 +3,7 @@ import './style.css'
 import * as THREE from 'three/webgpu'
 
 import { createSceneBridge } from './app/sceneBridge'
+import { loadGrmhdFromUrl } from './app/grmhdLoader'
 import { getDebug } from './debug/state'
 import { createBloomPipeline } from './render/bloomPipeline'
 import { createGeodesicTracer } from './render/geodesicTracer'
@@ -97,6 +98,17 @@ async function boot(): Promise<void> {
   bridge.setBloomPipeline(bloomPipeline)
   // Bloom is created post-WebGPU init; look subscribe already ran before bloom existed.
   bridge.applyLook()
+
+  // Optional GRMHD dens cube (public/cubes/demo.bhcm)
+  try {
+    await loadGrmhdFromUrl('/cubes/demo.bhcm', tracer, {
+      enable: true,
+      mix: 1,
+      label: 'demo',
+    })
+  } catch {
+    // Analytic dens remains default if cube missing
+  }
 
   renderer.setAnimationLoop(() => {
     const now = performance.now()
