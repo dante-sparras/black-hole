@@ -99,11 +99,12 @@ async function boot(): Promise<void> {
   // Bloom is created post-WebGPU init; look subscribe already ran before bloom existed.
   bridge.applyLook()
 
-  // Optional GRMHD dens cube (public/cubes/demo.bhcm)
+  // Optional GRMHD dens cube — load but keep analytic dens by default
+  // (texture3D + mix=1 at boot was black-screening some GPUs).
   try {
     await loadGrmhdFromUrl('/cubes/demo.bhcm', tracer, {
-      enable: true,
-      mix: 1,
+      enable: false,
+      mix: 0,
       label: 'demo',
     })
   } catch {
