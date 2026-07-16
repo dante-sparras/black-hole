@@ -69,11 +69,13 @@ export function mountControls(
   const chargeInput = qs<HTMLInputElement>(root, '#p-charge')
   const mdotInput = qs<HTMLInputElement>(root, '#d-mdot')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
+  const orbitSelect = qs<HTMLSelectElement>(root, '#d-orbit')
   const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
   const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
   const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
   const mdotVal = qs<HTMLElement>(root, '[data-val="mdot"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
+  const orbitVal = qs<HTMLElement>(root, '[data-val="orbit"]')
 
   const distInput = qs<HTMLInputElement>(root, '#c-dist')
   const distName = qs<HTMLElement>(root, '#c-dist-name')
@@ -146,11 +148,13 @@ export function mountControls(
   function syncDiskInputs(d: DiskParams): void {
     setRangeValue(mdotInput, sliderFromMdot(d.mdot))
     setRangeValue(outerInput, d.outerM)
+    if (orbitSelect) orbitSelect.value = d.prograde ? 'pro' : 'ret'
     if (mdotVal) {
       const tScale = mdotTemperatureScale(d.mdot)
       mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
     }
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
+    setText(orbitVal, d.prograde ? 'pro' : 'ret')
   }
 
   function syncCameraInputs(c: CameraState): void {
@@ -235,6 +239,10 @@ export function mountControls(
   bindRange(outerInput, (v) => {
     onUserTweaked()
     setDisk({ outerM: v })
+  })
+  bindSelect(orbitSelect, (v) => {
+    onUserTweaked()
+    setDisk({ prograde: v !== 'ret' })
   })
 
   bindRange(distInput, (v) => {

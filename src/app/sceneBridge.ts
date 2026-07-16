@@ -4,6 +4,7 @@
  * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
+import { diskIsco } from '../physics/disk'
 import { resolveCameraDistance } from '../physics/observer'
 import { realtimeModeTag, rIscoOverM } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
@@ -12,7 +13,7 @@ import { getCamera, subscribeCamera } from '../state/camera'
 import { getDisk, subscribeDisk } from '../state/disk'
 import { getGeodesicIntegrator, subscribeGeodesic } from '../state/geodesic'
 import { getLook, subscribeLook } from '../state/look'
-import { getDerived, getParams, subscribe as subscribeParams } from '../state/params'
+import { getParams, subscribe as subscribeParams } from '../state/params'
 import { getScaleFree, subscribeScaleFree } from '../state/scaleFree'
 import { getScene } from '../state/scene'
 import { getSky, subscribeSky } from '../state/sky'
@@ -58,15 +59,16 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
 
   function applyPhysics(): void {
     const p = getParams()
-    const d = getDerived()
     const disk = getDisk()
+    const rIsco = diskIsco(p, disk.prograde)
     tracer.setSpacetime({
       mass: p.mass,
       spinStar: p.spinStar,
       charge: p.charge,
       mdot: disk.mdot,
-      rIscoOverM: rIscoOverM(d.rIsco, p.mass),
+      rIscoOverM: rIscoOverM(rIsco, p.mass),
       outerM: disk.outerM,
+      prograde: disk.prograde,
     })
   }
 
@@ -162,12 +164,13 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const distTag = scaleFree
       ? `d=${c.distanceM.toFixed(1)}M (D/M)`
       : `D=${D.toFixed(1)} (fixed)`
+    const orbitTag = disk.prograde ? 'pro' : 'ret'
     const mode = realtimeModeTag(p, geodesic)
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
-    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
+    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
     return healthLine ? `${base}\n${healthLine}` : base
   }
 

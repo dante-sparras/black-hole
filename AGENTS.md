@@ -44,6 +44,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 | ----- | ---- | ----- | ----- |
 | Eddington ratio \(\dot{m}\) | `mdot` | \(10^{-3}\)–\(3\) | \(F\propto\dot{m}\), \(T\propto\dot{m}^{1/4}\) |
 | Outer radius | `outerM` | \(8\)–\(80\,M\) | Luminous cutoff; **inner edge = family ISCO** (derived) |
+| Orbit sense | `prograde` | pro / ret | Co-rotating (default) vs counter-rotating ISCO + Doppler |
 
 **Not free (realism):** inner edge (locked to ISCO), film palette as primary color.
 

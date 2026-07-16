@@ -198,6 +198,7 @@ export function mountDebugHud(root: HTMLElement): DebugHudApi {
       ndcY,
       logStride: 6,
       scaleFree: getScaleFree(),
+      prograde: getDisk().prograde,
     })
     renderProbe(p)
     debugLog.info('probe', p.summary, {

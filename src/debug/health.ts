@@ -1,7 +1,7 @@
 /**
  * Live health checks via sparse CPU probes (P1).
  */
-import { diskPeakTemperatureK } from '../physics/disk'
+import { diskIsco, diskPeakTemperatureK } from '../physics/disk'
 import type { DiskParams } from '../physics/diskParams'
 import { RT } from '../physics/geodesic/rtConstants'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
@@ -62,6 +62,7 @@ export function runHealthCheck(input: HealthInput): HealthReport {
     width: 48,
     height: 27,
     scaleFree,
+    prograde: disk.prograde,
   })
   const total =
     ref.counts.capture + ref.counts.disk + ref.counts.escape + ref.counts.max
@@ -128,7 +129,7 @@ export function runHealthCheck(input: HealthInput): HealthReport {
   // ṁ / T peak
   const tPeakK = diskPeakTemperatureK(
     disk.mdot,
-    derived.rIsco / Math.max(params.mass, 1e-12),
+    diskIsco(params, disk.prograde) / Math.max(params.mass, 1e-12),
     params.spinStar,
   )
   checks.push({
@@ -147,6 +148,7 @@ export function runHealthCheck(input: HealthInput): HealthReport {
     ndcY: 0,
     logStride: 64,
     scaleFree,
+    prograde: disk.prograde,
   })
   if (centerProbe.fate === 'escape' && params.spinStar < 0.5) {
     checks.push({

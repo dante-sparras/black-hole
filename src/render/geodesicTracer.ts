@@ -66,6 +66,8 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uAzimuth = uniform(OBSERVER_DEFAULTS.azimuth)
   const uFov = uniform(OBSERVER_DEFAULTS.fov)
   const uRoutM = uniform(RT.diskOuterM)
+  /** 1 = prograde disk Ω; 0 = retrograde */
+  const uPrograde = uniform(1)
   const uStarDensity = uniform(SKY_DEFAULTS.starDensity)
   const uStarBright = uniform(SKY_DEFAULTS.starBrightness)
   const uNebula = uniform(SKY_DEFAULTS.nebula)
@@ -284,7 +286,13 @@ export function createGeodesicTracer(): GeodesicTracer {
                 const rhoSafe = max(hitR, float(1e-5))
                 const sqrtM = sqrt(max(M, float(1e-8)))
                 const r32 = pow(rhoSafe, float(1.5))
-                const Omega = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+                // Ω = ±√M / (r^{3/2} ± a√M)
+                const OmegaPro = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+                const denomR = r32.sub(a.mul(sqrtM))
+                const OmegaRet = float(-1)
+                  .mul(sqrtM)
+                  .div(abs(denomR).lessThan(1e-12).select(float(1e-12), denomR))
+                const Omega = uPrograde.greaterThan(0.5).select(OmegaPro, OmegaRet)
                 const g_tt = float(-1).add(rs.div(rhoSafe)).sub(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
                 const g_tphi = a.mul(M).mul(-2).div(rhoSafe)
                 const g_phiphi = rhoSafe
@@ -383,7 +391,13 @@ export function createGeodesicTracer(): GeodesicTracer {
             const rhoSafe = max(rho, float(1e-5))
             const sqrtM = sqrt(max(M, float(1e-8)))
             const r32 = pow(rhoSafe, float(1.5))
-            const Omega = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+            // Ω = ±√M / (r^{3/2} ± a√M)
+            const OmegaPro = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+            const denomR = r32.sub(a.mul(sqrtM))
+            const OmegaRet = float(-1)
+              .mul(sqrtM)
+              .div(abs(denomR).lessThan(1e-12).select(float(1e-12), denomR))
+            const Omega = uPrograde.greaterThan(0.5).select(OmegaPro, OmegaRet)
             const g_tt = float(-1).add(rs.div(rhoSafe)).sub(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
             const g_tphi = a.mul(M).mul(-2).div(rhoSafe)
             const g_phiphi = rhoSafe
@@ -396,7 +410,10 @@ export function createGeodesicTracer(): GeodesicTracer {
               .sub(Omega.mul(2).mul(g_tphi))
               .sub(Omega.mul(Omega).mul(g_phiphi))
             const u_t = float(1).div(sqrt(max(Xorb, float(1e-8))))
-            const tdir = vec3(hz.mul(-1), float(0), hx).normalize()
+            // ê_φ prograde about +Y: (−z,0,x); retrograde flips
+            const tdirPro = vec3(hz.mul(-1), float(0), hx).normalize()
+            const tdirRet = vec3(hz, float(0), hx.mul(-1)).normalize()
+            const tdir = uPrograde.greaterThan(0.5).select(tdirPro, tdirRet)
             const nObs = vel.normalize().mul(-1)
             const mu = dot(tdir, nObs)
             const lambda = rhoSafe.mul(mu)
@@ -520,6 +537,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       uMdot.value = p.mdot
       uRIscoM.value = p.rIscoOverM
       uRoutM.value = p.outerM
+      uPrograde.value = p.prograde ? 1 : 0
     },
     setCamera: (c) => {
       uCamDistM.value = c.distanceM

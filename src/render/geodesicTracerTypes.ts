@@ -7,10 +7,12 @@ export type SpacetimeTraceParams = {
   spinStar: number
   charge: number
   mdot: number
-  /** r_ISCO / M from CPU diskIsco */
+  /** r_ISCO / M from CPU diskIsco (matches orbital sense) */
   rIscoOverM: number
   /** Disk outer radius in units of M */
   outerM: number
+  /** true = prograde/co-rotating Ω; false = retrograde */
+  prograde: boolean
 }
 
 export type CameraTraceParams = {

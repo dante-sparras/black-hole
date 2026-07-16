@@ -40,6 +40,47 @@ describe('circular orbit redshift', () => {
     expect(Math.abs(o9)).toBeLessThan(Math.abs(o0))
   })
 
+  test('retrograde Omega opposite sign to prograde', () => {
+    const pro = circularOmega(1, 12, 0.5, true)
+    const ret = circularOmega(1, 12, 0.5, false)
+    expect(pro).toBeGreaterThan(0)
+    expect(ret).toBeLessThan(0)
+  })
+
+  test('retrograde flips which side is blue/red', () => {
+    const bluePro = orbitingRedshiftFactor({
+      mass: 1,
+      r: 12,
+      mu: 0.5,
+      spinLength: 0.5,
+      prograde: true,
+    })
+    const redPro = orbitingRedshiftFactor({
+      mass: 1,
+      r: 12,
+      mu: -0.5,
+      spinLength: 0.5,
+      prograde: true,
+    })
+    expect(bluePro.g).toBeGreaterThan(redPro.g)
+    const blueRet = orbitingRedshiftFactor({
+      mass: 1,
+      r: 12,
+      mu: 0.5,
+      spinLength: 0.5,
+      prograde: false,
+    })
+    const redRet = orbitingRedshiftFactor({
+      mass: 1,
+      r: 12,
+      mu: -0.5,
+      spinLength: 0.5,
+      prograde: false,
+    })
+    // With flipped Ω, same μ ordering inverts
+    expect(blueRet.g).toBeLessThan(redRet.g)
+  })
+
   test('diskFrequencyFactor uses orbiting g', () => {
     const f = diskFrequencyFactor({
       mass: 1,

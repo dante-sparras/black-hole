@@ -22,7 +22,7 @@ export type ShadowDiagnostics = {
   rPlus: number
   /** Photon-sphere / prograde circular-photon radius */
   rPhoton: number
-  /** Prograde thin-disk ISCO */
+  /** Prograde thin-disk ISCO (or counter if diagnostics called with diskCoRotating=false) */
   rIsco: number
   /** Critical impact b_c (prograde / co-rotating side) */
   bCritPro: number
@@ -46,17 +46,20 @@ export type ShadowDiagnostics = {
 
 /**
  * Build diagnostics from live params (and optional precomputed geometry).
+ * @param diskCoRotating — disk fluid L ‖ hole J (default true). Sets r_ISCO for disk HUD.
  */
 export function shadowDiagnostics(
   params: BlackHoleParams,
   derived?: DerivedGeometry,
+  diskCoRotating = true,
 ): ShadowDiagnostics {
   const M = params.mass
   const a = spinLength(params)
   const Q = params.charge
 
   const rPlus = derived?.rPlus ?? knHorizon(M, a, Q)
-  const rIsco = derived?.rIsco ?? diskIsco(params)
+  // Prefer live disk ISCO (pro/retro sense); fall back to derived co-rotating
+  const rIsco = diskIsco(params, diskCoRotating)
   const rPhoton = derived?.rPhotonSphere ?? familyPhotonSphere(params)
   const { prograde: bCritPro, retrograde: bCritRet } =
     familyCriticalImpacts(params)

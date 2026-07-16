@@ -87,6 +87,8 @@ export type ProbeOptions = {
   /** Log every Nth step + events (default 8) */
   logStride?: number
   scaleFree?: boolean
+  /** Disk orbital sense (default prograde). */
+  prograde?: boolean
 }
 
 /**
@@ -104,7 +106,7 @@ export function probeRay(options: ProbeOptions = {}): ProbeResult {
   const M = params.mass
   const a = spinLength(params)
   const Q = params.charge
-  const rIsco = diskIsco(params)
+  const rIsco = diskIsco(params, options.prograde ?? true)
   const rPlus = knHorizon(M, a, Q)
   const rin = Math.max(
     rIsco,

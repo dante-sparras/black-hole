@@ -4,7 +4,8 @@
  * No-hair = (M, a★, Q) only. The disk is matter outside the horizon:
  *   - ṁ sets accretion power (NT flux ∝ ṁ, T ∝ ṁ^{1/4})
  *   - outerM is the emission cutoff in units of M (model truncation)
- *   - inner edge is derived: family ISCO (not a free slider — realism)
+ *   - prograde: orbital sense L ‖ J (co-rotating) vs counter-rotating
+ *   - inner edge is derived: family ISCO for that sense (not a free slider)
  *
  * Geometric units G = c = 1.
  */
@@ -22,11 +23,18 @@ export type DiskParams = {
    * Physical disks extend far; this is the modeled luminous outer edge.
    */
   readonly outerM: number
+  /**
+   * Orbital sense relative to hole spin (+Y / a★ > 0):
+   * true  = prograde / co-rotating (default) — smaller ISCO, Ω > 0 form
+   * false = retrograde / counter-rotating — larger ISCO, flipped Doppler
+   */
+  readonly prograde: boolean
 }
 
 export const DEFAULT_DISK: DiskParams = {
   mdot: DEFAULT_MDOT,
   outerM: RT.diskOuterM,
+  prograde: true,
 }
 
 export const DISK_LIMITS = {
@@ -52,7 +60,9 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
     DISK_LIMITS.outerM.min,
     DISK_LIMITS.outerM.max,
   )
-  return { mdot, outerM }
+  const prograde =
+    typeof input.prograde === 'boolean' ? input.prograde : DEFAULT_DISK.prograde
+  return { mdot, outerM, prograde }
 }
 
 function clamp(v: number, lo: number, hi: number): number {

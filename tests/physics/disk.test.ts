@@ -29,6 +29,13 @@ describe('diskIsco', () => {
     expect(r9).toBeGreaterThan(1.5)
   })
 
+  test('Kerr counter-rotating ISCO grows with spin', () => {
+    const rPro = diskIsco({ mass: 1, spinStar: 0.9, charge: 0 }, true)
+    const rRet = diskIsco({ mass: 1, spinStar: 0.9, charge: 0 }, false)
+    expect(rRet).toBeGreaterThan(rPro)
+    expect(rRet).toBeGreaterThan(6)
+  })
+
   test('RN ISCO between 4M and 6M', () => {
     const r = diskIsco({ mass: 1, spinStar: 0, charge: 0.7 })
     expect(r).toBeLessThan(6)

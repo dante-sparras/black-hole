@@ -74,6 +74,8 @@ export type CpuRefOptions = {
    * false → distanceM is absolute geometric D.
    */
   scaleFree?: boolean
+  /** Disk orbital sense (default true = prograde / co-rotating ISCO). */
+  prograde?: boolean
 }
 
 export type CpuRefResult = {
@@ -277,7 +279,7 @@ export function renderCpuRef(options: CpuRefOptions = {}): CpuRefResult {
   const M = params.mass
   const a = spinLength(params)
   const Q = params.charge
-  const rIsco = options.rIsco ?? diskIsco(params)
+  const rIsco = options.rIsco ?? diskIsco(params, options.prograde ?? true)
   const rPlus = knHorizon(M, a, Q)
   const rin = Math.max(
     rIsco,

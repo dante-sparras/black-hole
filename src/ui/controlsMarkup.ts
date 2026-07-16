@@ -51,7 +51,15 @@ export function buildControlsHtml(): string {
       <input type="range" id="d-outer" min="${DISK_LIMITS.outerM.min}" max="${DISK_LIMITS.outerM.max}" step="1" />
       <span class="ctrl-val" data-val="outer"></span>
     </label>
-    <p class="ctrl-hint">ṁ → NT flux &amp; T∝ṁ¼ · r_out = luminous outer edge · ISCO = derived inner edge</p>
+    <label class="ctrl">
+      <span class="ctrl-name">Orbit</span>
+      <select id="d-orbit" style="flex:1;min-width:0">
+        <option value="pro">Prograde (co-rot)</option>
+        <option value="ret">Retrograde (counter)</option>
+      </select>
+      <span class="ctrl-val" data-val="orbit"></span>
+    </label>
+    <p class="ctrl-hint">ṁ → NT flux &amp; T∝ṁ¼ · ISCO from orbit sense · Doppler L/R flips with retrograde</p>
 
     <div class="ctrl-section">Camera</div>
     <label class="ctrl">
