@@ -160,8 +160,8 @@ export function mountDebugHud(root: HTMLElement): DebugHudApi {
     const s = getDebug()
     if (!s.healthEnabled) return
     healthAccum++
-    // ~ every 45 frames at 60fps ≈ 0.75s; also first call
-    if (healthAccum > 1 && healthAccum % 45 !== 0) return
+    // ~ every 90 frames — multi-pixel CPU probe; keep off the hot path
+    if (healthAccum > 1 && healthAccum % 90 !== 0) return
     try {
       const report = runHealthCheck({
         params: getParams(),

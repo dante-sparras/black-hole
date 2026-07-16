@@ -482,20 +482,22 @@ export function createGeodesicTracer(): GeodesicTracer {
           .and(sphR.greaterThan(rCapture.mul(1.15)))
           .and(diskTau.lessThan(1.7))
           .and(transm.greaterThan(0.05))
-          .and(hits.lessThan(12)),
+          .and(hits.lessThan(10))
+          // Volume every N steps — full emission is expensive; scale weight by stride
+          .and(stepCount.mod(int(RT.volumeStride)).equal(int(0))),
         () => {
           const dsH = min(ds.div(Hloc), float(0.8))
-          // Plasma denser opacity; dust more translucent but extended
           const kappa = float(0.18)
             .add(plasmaW.mul(0.35))
             .add(densZ.mul(0.22))
             .add(dustW.mul(0.08))
-          const dTau = dens.mul(dsH).mul(kappa)
+          const stride = float(RT.volumeStride)
+          const dTau = dens.mul(dsH).mul(kappa).mul(stride)
           const beer = exp(diskTau.mul(-1))
-          // Brightness: plasma hotter path weight; dust dimmer
           const zoneBright = float(0.45).add(plasmaW.mul(0.55)).sub(dustW.mul(0.12))
-          const w = dens.mul(dsH).mul(beer).mul(zoneBright)
-          If(w.greaterThan(0.01), () => {
+          // × stride so average brightness matches denser sampling
+          const w = dens.mul(dsH).mul(beer).mul(zoneBright).mul(stride.mul(0.92))
+          If(w.greaterThan(0.02), () => {
             processDiskVolumeSample({
               hx: hxV,
               hz: hzV,

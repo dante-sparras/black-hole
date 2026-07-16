@@ -4,16 +4,17 @@
  *   - CPU knNull / cpuRef topology checks
  *
  * CRITICAL: step adapt floor must stay ≳ 0.2M or rays stall at the photon sphere.
+ * Performance: maxSteps / baseStepM dominate cost per pixel — keep lean for 60fps.
  */
 export const RT = {
-  /** Max integrator steps per ray (GPU) */
-  maxSteps: 900,
+  /** Max integrator steps per ray (GPU). 900 was ~20fps with volume disk. */
+  maxSteps: 520,
   /** Base step size multiplier: ds = baseStepM * M * adapt */
-  baseStepM: 0.1,
+  baseStepM: 0.13,
   /** Adaptive ds clamp: min(adaptMax, max(adaptFloor, r/(adaptScale * M))) */
-  adaptFloor: 0.2,
-  adaptMax: 1.5,
-  adaptScale: 12,
+  adaptFloor: 0.26,
+  adaptMax: 1.75,
+  adaptScale: 11,
   /** Capture just outside r₊ */
   captureMargin: 1.02,
   /** Escape when r > escapeCamFactor * camD and outbound */
@@ -24,6 +25,11 @@ export const RT = {
   diskOuterM: 22,
   /** Floor ISCO above horizon */
   iscoHorizonMargin: 1.05,
+  /**
+   * Volume disk sample stride (GPU). Every Nth step when inside the slab.
+   * Higher = faster; weight scaled by stride so brightness holds.
+   */
+  volumeStride: 3,
 } as const
 
 /** Adaptive step size in geometric units. */

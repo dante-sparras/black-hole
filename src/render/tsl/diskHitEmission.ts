@@ -184,23 +184,21 @@ export function accumulateDiskHit(p) {
     .sub(armContrast)
     .add(armContrast.mul(float(0.16).add(armsBright.mul(1.1))))
 
-  // Fine flow-aligned filaments (m=4 + m=8) — phase shifts with height (not extruded)
+  // m=2 + m=4 filaments (skip m=8 for perf — similar look at lower cost)
   const c4a = c2a.mul(c2a).sub(s2a.mul(s2a))
   const s4a = c2a.mul(s2a).mul(2)
-  const c8a = c4a.mul(c4a).sub(s4a.mul(s4a))
-  const s8a = c4a.mul(s4a).mul(2)
-  const zPhase = float(1).sub(dVert).mul(1.8) // atmosphere offset vs midplane
+  const zPhase = float(1).sub(dVert).mul(1.8)
   const a2s = float(-0.44).mul(lnR).add(float(TX.phase0).mul(0.7)).add(zPhase.mul(0.4))
-  const a8s = float(-0.96).mul(lnR).add(float(TX.phase0).mul(1.3)).add(zPhase.mul(1.1))
+  const a4s = float(-0.72).mul(lnR).add(float(TX.phase0).mul(1.1)).add(zPhase.mul(0.85))
   const stream2 = float(0.5).add(
     float(0.5).mul(c2a.mul(cos(a2s)).add(s2a.mul(sin(a2s)))),
   )
-  const stream8 = float(0.5).add(
-    float(0.5).mul(c8a.mul(cos(a8s)).add(s8a.mul(sin(a8s)))),
+  const stream4 = float(0.5).add(
+    float(0.5).mul(c4a.mul(cos(a4s)).add(s4a.mul(sin(a4s)))),
   )
   const streams = stream2
     .mul(float(1).sub(float(TX.streamHarmonic)))
-    .add(pow(max(stream8, float(1e-4)), float(1.8)).mul(float(TX.streamHarmonic)))
+    .add(pow(max(stream4, float(1e-4)), float(1.6)).mul(float(TX.streamHarmonic)))
   // Stronger filaments in denser midplane gas
   const streamStr = float(TX.streamContrast)
     .mul(uStructure)
@@ -249,27 +247,8 @@ export function accumulateDiskHit(p) {
     .mul(float(1).sub(uy2))
     .add(m01.mul(float(1).sub(ux2)).add(m11.mul(ux2)).mul(uy2))
 
-  const nUVx3 = nUVx.mul(4.8)
-  const nUVy3 = nUVy.mul(4.8)
-  const ix3 = floor(nUVx3)
-  const iy3 = floor(nUVy3)
-  const fx3 = nUVx3.sub(ix3)
-  const fy3 = nUVy3.sub(iy3)
-  const ux3 = fx3.mul(fx3).mul(float(3).sub(fx3.mul(2)))
-  const uy3 = fy3.mul(fy3).mul(float(3).sub(fy3.mul(2)))
-  const p00 = fract(sin(ix3.mul(91.7).add(iy3.mul(173.3)).add(41.2)).mul(43758.5453))
-  const p10 = fract(sin(ix3.add(1).mul(91.7).add(iy3.mul(173.3)).add(41.2)).mul(43758.5453))
-  const p01 = fract(sin(ix3.mul(91.7).add(iy3.add(1).mul(173.3)).add(41.2)).mul(43758.5453))
-  const p11 = fract(
-    sin(ix3.add(1).mul(91.7).add(iy3.add(1).mul(173.3)).add(41.2)).mul(43758.5453),
-  )
-  const turb3 = p00
-    .mul(float(1).sub(ux3))
-    .add(p10.mul(ux3))
-    .mul(float(1).sub(uy3))
-    .add(p01.mul(float(1).sub(ux3)).add(p11.mul(ux3)).mul(uy3))
-
-  const turb = turb1.mul(0.48).add(turb2.mul(0.32)).add(turb3.mul(0.2))
+  // 2 octaves only (3rd was ~+40% texture ALU for little look)
+  const turb = turb1.mul(0.62).add(turb2.mul(0.38))
   const plasmaClump = pow(max(turb2, float(1e-4)), float(1.75)).mul(plasmaZone)
 
   const turbFac = float(1)
