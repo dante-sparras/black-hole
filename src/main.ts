@@ -99,12 +99,12 @@ async function boot(): Promise<void> {
   // Bloom is created post-WebGPU init; look subscribe already ran before bloom existed.
   bridge.applyLook()
 
-  // GRMHD dens cube is the default dens field (R8 3D tex).
-  // Fall back to analytic if missing or load fails.
+  // Default dens = analytic (demo cube still has high-m lace → face-on rings)
+  // User can enable GRMHD cube via Numerics.
   try {
     await loadGrmhdFromUrl('/cubes/demo.bhcm', tracer, {
-      enable: true,
-      mix: 1,
+      enable: false,
+      mix: 0,
       label: 'demo',
     })
   } catch {

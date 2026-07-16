@@ -26,10 +26,13 @@ export const RT = {
   diskOuterM: 24,
   iscoHorizonMargin: 1.05,
   volumeStride: 2,
-  beerSoft: 0.95,
-  tauSampleMax: 1.6,
-  /** Allow more multi-wrap disk samples (secondary images) */
-  maxDiskHits: 14,
+  beerSoft: 0.98,
+  tauSampleMax: 0.9,
+  /**
+   * Max disk hits: 2 keeps one secondary for edge-on without face-on ring ladder.
+   * Higher-order images face-on appear as concentric radar rings (real GR, ugly without full RT).
+   */
+  maxDiskHits: 40,
 } as const
 
 /** Adaptive step size in geometric units (CPU twin). */

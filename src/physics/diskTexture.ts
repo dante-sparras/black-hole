@@ -112,7 +112,7 @@ export function turbulence2(x: number, y: number): number {
 export const DISK_TEXTURE = {
   arms: 2,
   /** Log-spiral pitch (tighter = more wound, GRMHD-like) */
-  pitch: 0.55,
+  pitch: 0.35,
   /** Arm vs inter-arm contrast — softer face-on (no radar lace) */
   armContrast: 0.72,
   /** Multi-scale plasma — large-scale dominant */
@@ -127,9 +127,9 @@ export const DISK_TEXTURE = {
   shearRate: 1.25,
   /**
    * Visual gain: wall-clock seconds → pattern phase.
-   * Uses Ω̃=(M/r)^{3/2} (not geometric Ω∝1/M) so scale-free mass does not freeze the disk.
+   * Too high → face-on arms wind into concentric radar rings.
    */
-  shearGain: 32,
+  shearGain: 6,
   texMin: 0.2,
   texMax: 2.2,
   /** Mild T jitter from clumping */
@@ -140,7 +140,7 @@ export const DISK_TEXTURE = {
   streamContrast: 0.55,
   /** Secondary streamline harmonic weight — keep low (m=8 causes face-on lace) */
   streamHarmonic: 0.25,
-  frameDragGain: 1.4,
+  frameDragGain: 0.55,
   mriSigma: 0.55,
   photonRingBoost: 0,
   warpAmp: 0.05,

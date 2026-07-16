@@ -44,6 +44,7 @@ import { applyDebugFalseColor } from './tsl/debugFalseColor'
 import { sampleDeepSpaceSky } from './tsl/deepSpaceSky'
 import { accumulateDiskHit } from './tsl/diskHitEmission'
 import { processDiskVolumeSample } from './tsl/diskLayerHit'
+import { singularityDiskComposite } from './tsl/singularityDisk'
 import { knNullAccelTsl } from './tsl/knNullAccelTsl'
 
 export type {
@@ -552,17 +553,16 @@ export function createGeodesicTracer(): GeodesicTracer {
       const hzV = pos.z
       const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
       const absY = abs(pos.y)
-      const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(2.6), M.mul(0.12))
+      const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(5), M.mul(0.4))
       // Sample denser near midplane (stride 1–2) so thin far-side isn't skipped
-      const midStride = absY.lessThan(roughH.mul(0.55)).select(int(1), int(uVolumeStride))
+      const midStride = absY.lessThan(roughH.mul(1.1)).select(int(1), int(uVolumeStride))
       If(
         rhoV
-          .greaterThan(rin.mul(1.001))
-          .and(rhoV.lessThan(rout.mul(1.18)))
+          .greaterThan(rin.mul(0.9))
+          .and(rhoV.lessThan(rout.mul(1.3)))
           .and(absY.lessThan(roughH))
-          .and(transm.greaterThan(0.04))
-          .and(diskTau.lessThan(float(RT.tauSampleMax)))
-          .and(hits.lessThan(float(RT.maxDiskHits)))
+          .and(transm.greaterThan(0.02))
+          .and(hits.lessThan(float(40)))
           .and(stepCount.mod(midStride).equal(int(0))),
         () => {
       // 3D volume dens: Keplerian-advected spirals + plasma/gas/dust zones
@@ -589,7 +589,7 @@ export function createGeodesicTracer(): GeodesicTracer {
       const shear = sense
         .mul(uShearRate)
         .mul(uAnim)
-        .mul(float(32))
+        .mul(float(6))
         .mul(OmegaDim)
         .mul(uTime)
       // Kerr frame-drag + Lense–Thirring dens wind
@@ -707,43 +707,45 @@ export function createGeodesicTracer(): GeodesicTracer {
       const densCube = max(cubeRaw, float(0))
         .mul(boxMask)
         .mul(float(0.78).add(min(densEdge, float(1.0)).mul(0.4)))
-      // Thin photosphere densZ² (less extreme than densZ³ for sampling stability)
+      // Thin photosphere densZ²
       const densZPhot = densZ.mul(densZ).mul(float(1.7))
-      // Deep noise: AZIMUTHAL swirl UV — NO rho×k rotation (that caused radar rings)
-      // UV lives in material (cx,sx) + mild log pitch wind, low frequency
-      const rotP = shearTot.mul(0.25).add(lnR.mul(0.55)).sub(uTime.mul(0.07))
+      // Milder spiral wind than singularity 4.27 (tight wind → ring look on sparse samples)
+      const xyLen = min(float(1.2), rhoV.div(max(rout, M.mul(4))))
+      const rotP = xyLen.mul(1.65).sub(uTime.mul(0.08))
       const cR = cos(rotP)
       const sR = sin(rotP)
-      const uxN = cx.mul(cR).sub(sx.mul(sR)).mul(0.38)
-      const uzN = cx.mul(sR).add(sx.mul(cR)).mul(0.38)
-      const nUv = vec2(uxN, uzN).mul(0.42).add(0.5)
+      const pxN = hxV.div(max(rout, M.mul(4)))
+      const pzN = hzV.div(max(rout, M.mul(4)))
+      const rx = pxN.mul(cR).add(pzN.mul(sR))
+      const rz = pxN.mul(sR.mul(-1)).add(pzN.mul(cR))
+      // Larger UV scale → coarser noise blobs (less lace)
+      const nUv = vec2(rx.mul(1.2), rz.mul(1.2)).add(0.5)
       const nDeep = texture(noiseDeepMap, nUv)
-      const nDeep2 = texture(noiseDeepMap, nUv.add(vec2(0.006, 0.004)))
-      const nEdge = abs(nDeep.r.sub(nDeep2.r)).mul(float(DISK_TEXTURE.noiseEdgeBoost))
-      // Large-scale swirl structure from noise (low edge weight)
-      const nStruct = min(
-        float(1.45),
-        nDeep.r.mul(0.5).add(nDeep.g.mul(0.28)).add(nDeep.b.mul(0.12)).add(nEdge.mul(0.28)),
-      )
-      const noiseMix = float(DISK_TEXTURE.noiseDensMix).mul(float(0.65).add(struct.mul(0.35)))
-      const densBase = densAnalytic
-        .mul(float(1).sub(uGrmhdMix.mul(0.4)))
-        .add(densCube.mul(uGrmhdMix.mul(0.5)))
-        .mul(float(1).add(struct.mul(0.2)))
-        .mul(float(1).sub(noiseMix).add(nStruct.mul(noiseMix)))
-        .mul(densZPhot.div(max(densZ, float(1e-4))))
+      const nDeep2 = texture(noiseDeepMap, nUv.mul(1.004))
+      const nEdge = abs(nDeep.r.sub(nDeep2.r)).mul(float(8))
+      const noiseAmp = nDeep.r.mul(0.55).add(nDeep.g.mul(0.3)).add(nDeep.b.mul(0.15))
+      const noiseN = nDeep2.r.mul(0.55).add(nDeep2.g.mul(0.3)).add(nDeep2.b.mul(0.15))
+      const nStruct = min(float(1.55), noiseAmp.mul(0.9).add(nEdge.mul(0.45)))
+      // dens = envelope × noise (no analytic lace)
+      const densEnv = densZ.mul(radialGate).mul(densZPhot.div(max(densZ, float(1e-4))))
+      const densNoise = densEnv
+        .mul(float(0.35).add(nStruct.mul(0.95)))
+        .mul(float(1).add(noiseAmp.sub(noiseN).mul(3.5)))
+      const densBase = densNoise
+        .mul(float(1).sub(uGrmhdMix.mul(0.35)))
+        .add(densCube.mul(uGrmhdMix.mul(0.4)).mul(float(0.5).add(nStruct.mul(0.5))))
+        .mul(float(0.95).add(struct.mul(0.2)))
       const mdotPhot = min(mdot.div(float(1.0)), float(1))
-      const dens = densBase.mul(float(1).sub(mdotPhot.mul(float(0.7)).mul(densZ)))
+      const dens = densBase.mul(float(1).sub(mdotPhot.mul(float(0.5)).mul(densZ)))
       const sphR = pos.length()
 
-      // Only skip deep inside capture — keep photon-ring / far-side bridge
+      // Physics dens path
       If(
         dens
-          .greaterThan(0.018)
+          .greaterThan(0.012)
           .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01)))),
         () => {
           const dsH = min(ds.div(Hloc), float(0.4))
-          // Opacity: electron scattering (inner/hot) vs Kramers-like (outer/cool)
           const fEs = min(
             float(1),
             plasmaW.mul(0.75).add(gasW.mul(0.4)).add(float(0.12)),
@@ -756,19 +758,15 @@ export function createGeodesicTracer(): GeodesicTracer {
             .mul(fEs)
             .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
             .mul(float(0.85).add(struct.mul(0.3)))
-            // High ṁ → photosphere: τ rises fast (saturate, less fog stack)
             .mul(float(1).add(mdot.mul(float(1.05))))
           const strideF = absY.lessThan(Hloc.mul(0.9)).select(float(1.05), float(uVolumeStride))
-          // Multi-image: when outside dense slab after a hit, decay τ so secondary survives
           const outSlab = absY.greaterThan(Hloc.mul(1.5))
           If(outSlab.and(hits.greaterThan(0.5)), () => {
             diskTau.mulAssign(0.88)
           })
-          // Harder Beer at high ṁ (eye sees surface, not deep volume)
           const beerA = float(RT.beerSoft).add(mdotPhot.mul(0.28))
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
           const beer = exp(diskTau.mul(beerA.mul(-1)))
-          // Edge-on path penalty: long midplane chords contribute less (photosphere)
           const nYabs = abs(vel.y)
           const pathKill = nYabs
             .div(nYabs.add(float(0.22).add(mdotPhot.mul(0.28))))

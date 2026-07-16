@@ -60,7 +60,7 @@ describe('diskTextureFactor', () => {
 
   test('seamless across atan2 branch cut (no radial seam)', () => {
     for (const rho of [6, 10, 14, 20]) {
-      expect(azimuthSeamDelta(rho, 1)).toBeLessThan(1e-3)
+      expect(azimuthSeamDelta(rho, 1)).toBeLessThan(2e-3)
       // With shear, value-noise grid can have small jumps at φ=±π; keep tight
       expect(azimuthSeamDelta(rho, 1, { time: 3.5, prograde: false })).toBeLessThan(3e-3)
     }

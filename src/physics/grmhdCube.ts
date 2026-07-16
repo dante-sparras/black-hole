@@ -236,22 +236,21 @@ export function synthesizeGrmhdLikeCube(opts: {
         const lt = aStar * (2.6 / Math.max(rho * rho * rho, 1.5))
 
         const arm2 =
-          0.5 + 0.5 * Math.cos(2 * phi - 0.82 * lnR + drag * 2.2 + lt)
+          0.5 + 0.5 * Math.cos(2 * phi - 0.55 * lnR + drag * 1.6 + lt)
         const arm4 =
-          0.5 + 0.5 * Math.cos(4 * phi - 0.55 * lnR + drag * 1.4 + 0.7)
-        const fil8 =
-          0.5 + 0.5 * Math.cos(8 * phi - 0.35 * lnR + drag * 0.9 + 1.3)
+          0.5 + 0.5 * Math.cos(4 * phi - 0.35 * lnR + drag * 1.0 + 0.7)
+        // No m=8 (face-on lace/rings)
         const spiral =
-          0.22 +
-          0.95 * Math.pow(Math.max(arm2, 1e-4), 1.75) +
-          0.4 * Math.pow(Math.max(arm4, 1e-4), 1.9) +
-          0.28 * Math.pow(Math.max(fil8, 1e-4), 2.2)
+          0.35 +
+          0.85 * Math.pow(Math.max(arm2, 1e-4), 1.4) +
+          0.35 * Math.pow(Math.max(arm4, 1e-4), 1.5)
 
         const h1 = hash01(ix * 12.9898 + iy * 78.233 + iz * 37.719 + seed)
         const h2 = hash01(ix * 5.13 + iy * 11.37 + iz * 17.71 + seed * 1.7)
         const h3 = hash01(ix * 19.2 + iy * 3.7 + iz * 9.1 + seed * 2.3)
-        const turb = 0.5 * h1 + 0.3 * h2 + 0.2 * h3
-        const sigma = 0.72
+        // Large-scale turb only
+        const turb = 0.55 * h1 + 0.3 * h2 + 0.15 * h3
+        const sigma = 0.45
         const mri = Math.exp(sigma * (2 * turb - 1) - 0.5 * sigma * sigma)
 
         const hOverR =
@@ -277,11 +276,8 @@ export function synthesizeGrmhdLikeCube(opts: {
         const radial = gap * outer
 
         const densPlasma = 1 + plasmaW * (0.55 + 0.9 * h1)
-        const densDust =
-          1 -
-          dustW *
-            (0.25 + 0.55 * (0.5 + 0.5 * Math.sin(lnR * 3.5 + phi * 2)))
-        const densGas = 0.45 + gasW * spiral * 0.85
+        const densDust = 1 - dustW * (0.25 + 0.4 * h2)
+        const densGas = 0.5 + gasW * spiral * 0.75
 
         let dens =
           densZ *
