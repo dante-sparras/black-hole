@@ -75,7 +75,7 @@ export function processDiskVolumeSample(p) {
   const nObs = nRay.mul(-1)
   const mu = dot(tdir, nObs)
   const lambda = rhoSafe.mul(mu)
-  const freq = float(1).div(max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)))
+  const freq = float(1).div(max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.08)))
   const invRho = float(1).div(max(rhoSafe, float(1e-5)))
   const nY = abs(nRay.y)
   const dVert = densVert === undefined ? float(1) : densVert

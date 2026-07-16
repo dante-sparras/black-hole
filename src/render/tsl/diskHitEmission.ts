@@ -191,17 +191,18 @@ export function accumulateDiskHit(p) {
   const fluxRel = Ftilde.div(max(FtildeMax, float(1e-12)))
   const fluxVis = pow(max(fluxRel, float(1e-6)), float(E.fluxVisPower))
 
-  // Soft radial edges — physical ISCO taper; power-law outer
+  // Soft radial edges — sharp physical ISCO zero-torque taper
   const softIn = min(
     float(1),
-    max(float(0), hitR.sub(rin).div(max(rin.mul(0.22), M.mul(0.3)))),
+    max(float(0), hitR.sub(rin).div(max(rin.mul(0.12), M.mul(0.2)))),
   )
   const outerLin = min(
     float(1),
     max(float(0), rout.sub(hitR).div(max(rout.sub(rin).mul(0.2), M.mul(1.5)))),
   )
   const softOut = pow(outerLin, float(1.65))
-  const edgeFac = float(0.42).add(float(0.58).mul(pow(softIn, float(0.9)).mul(softOut)))
+  // Harder ISCO edge (emissivity locked to rin)
+  const edgeFac = pow(softIn, float(1.35)).mul(softOut)
 
   // Zones relative to ISCO–outer
   const spanR = max(rout.sub(rin), M.mul(4))

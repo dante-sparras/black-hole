@@ -94,6 +94,10 @@ export function createGeodesicTracer(): GeodesicTracer {
   const uIdealBeam = uniform(1)
   /** Animation clock (s) — Keplerian disk shear */
   const uTime = uniform(0)
+  /** Quality: effective step budget (≤ STEPS hard ceiling) */
+  const uMaxSteps = uniform(RT.defaultMaxSteps)
+  const uVolumeStride = uniform(RT.volumeStride)
+  const uBaseStepM = uniform(RT.baseStepM)
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -198,7 +202,7 @@ export function createGeodesicTracer(): GeodesicTracer {
     const halfPi = float(1.57079632679)
 
     Loop({ start: int(0), end: int(STEPS), type: 'int', condition: '<' }, () => {
-      If(done.greaterThan(0.5), () => {
+      If(done.greaterThan(0.5).or(stepCount.greaterThanEqual(int(uMaxSteps))), () => {
         Break()
       })
       stepCount.addAssign(1)
@@ -292,7 +296,7 @@ export function createGeodesicTracer(): GeodesicTracer {
               .mul(blTh.sub(halfPi))
               .lessThan(0)
               .and(transm.greaterThan(0.02))
-              .and(hits.lessThan(8)),
+              .and(hits.lessThan(float(RT.maxDiskHits))),
             () => {
               const denom = prevTh.sub(blTh)
               const t = abs(denom)
@@ -300,12 +304,13 @@ export function createGeodesicTracer(): GeodesicTracer {
                 .select(float(0), prevTh.sub(halfPi).div(denom))
               const tt = min(max(t, float(0)), float(1))
               const hitR = prevBlR.add(blR.sub(prevBlR).mul(tt))
-              If(hitR.greaterThanEqual(rin).and(hitR.lessThanEqual(rout)), () => {
+              // ISCO-locked: no emission inside rin
+              If(hitR.greaterThanEqual(rin.mul(1.001)).and(hitR.lessThanEqual(rout)), () => {
                 hits.addAssign(1)
                 const rhoSafe = max(hitR, float(1e-5))
                 const sqrtM = sqrt(max(M, float(1e-8)))
                 const r32 = pow(rhoSafe, float(1.5))
-                // Ω = ±√M / (r^{3/2} ± a√M)
+                // Exact Kerr Ω = ±√M / (r^{3/2} ± a√M)
                 const OmegaPro = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
                 const denomR = r32.sub(a.mul(sqrtM))
                 const OmegaRet = float(-1)
@@ -325,10 +330,16 @@ export function createGeodesicTracer(): GeodesicTracer {
                   .sub(Omega.mul(Omega).mul(g_phiphi))
                 const u_t = float(1).div(sqrt(max(Xorb, float(1e-8))))
                 const lambda = blLz.div(max(blE, float(1e-8)))
+                // Honest g floor (was 0.25 — clipped dim side)
                 const freq = float(1).div(
-                  max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.25)),
+                  max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.08)),
                 )
                 const hitPh = prevBlPh.add(blPh.sub(prevBlPh).mul(tt))
+                // Soft vertical weight near equator (thin slab for BL)
+                const dTh = abs(blTh.sub(halfPi))
+                const Hth = max(uScaleH.mul(0.9), float(0.02))
+                const densVertBl = exp(dTh.div(Hth).mul(dTh.div(Hth)).mul(-1))
+                const wBl = densVertBl.mul(float(0.85).add(hits.greaterThan(1.5).select(float(0.15), float(0))))
                 accumulateDiskHit({
                   hitR,
                   freq,
@@ -357,10 +368,85 @@ export function createGeodesicTracer(): GeodesicTracer {
                   uScaleH,
                   uShearRate,
                   uAnim,
-                  // BL equator: moderate path (no easy |v_y|)
-                  pathAbsY: float(0.35),
-                  weight: float(1),
+                  pathAbsY: max(float(0.08), densVertBl.mul(0.5)),
+                  weight: wBl,
+                  densVert: densVertBl,
                 })
+              })
+            },
+          )
+          // BL volume samples near equator (not only midplane crossings)
+          If(
+            transm
+              .greaterThan(0.04)
+              .and(hits.lessThan(float(RT.maxDiskHits)))
+              .and(blR.greaterThan(rin.mul(0.95)))
+              .and(blR.lessThan(rout.mul(1.1)))
+              .and(stepCount.mod(int(uVolumeStride)).equal(int(0))),
+            () => {
+              const dThV = abs(blTh.sub(halfPi))
+              const HthV = max(uScaleH.mul(1.1), float(0.025))
+              const densV = exp(dThV.div(HthV).mul(dThV.div(HthV)).mul(-1))
+              If(densV.greaterThan(0.05), () => {
+                const rhoSafe = max(blR, float(1e-5))
+                const sqrtM = sqrt(max(M, float(1e-8)))
+                const r32 = pow(rhoSafe, float(1.5))
+                const OmegaPro = sqrtM.div(r32.add(a.mul(sqrtM)).add(1e-8))
+                const denomR = r32.sub(a.mul(sqrtM))
+                const OmegaRet = float(-1)
+                  .mul(sqrtM)
+                  .div(abs(denomR).lessThan(1e-12).select(float(1e-12), denomR))
+                const Omega = uPrograde.greaterThan(0.5).select(OmegaPro, OmegaRet)
+                const g_tt = float(-1).add(rs.div(rhoSafe)).sub(Q.mul(Q).div(rhoSafe.mul(rhoSafe)))
+                const g_tphi = a.mul(M).mul(-2).div(rhoSafe)
+                const g_phiphi = rhoSafe
+                  .mul(rhoSafe)
+                  .add(a.mul(a))
+                  .add(M.mul(2).mul(a).mul(a).div(rhoSafe))
+                  .sub(a.mul(a).mul(Q).mul(Q).div(rhoSafe.mul(rhoSafe)))
+                const Xorb = g_tt
+                  .mul(-1)
+                  .sub(Omega.mul(2).mul(g_tphi))
+                  .sub(Omega.mul(Omega).mul(g_phiphi))
+                const u_t = float(1).div(sqrt(max(Xorb, float(1e-8))))
+                const lambda = blLz.div(max(blE, float(1e-8)))
+                const freq = float(1).div(
+                  max(u_t.mul(float(1).sub(Omega.mul(lambda))), float(0.08)),
+                )
+                const w = densV.mul(float(0.35)).mul(float(RT.volumeStride).mul(0.5))
+                accumulateDiskHit({
+                  hitR: blR,
+                  freq,
+                  cphi: cos(blPh),
+                  sphi: sin(blPh),
+                  M,
+                  aStar,
+                  mdot,
+                  rin,
+                  rout,
+                  uRIscoM,
+                  hits,
+                  col,
+                  transm,
+                  dbgG,
+                  dbgT,
+                  dbgFlux,
+                  uDebugMode,
+                  uIdealBeam,
+                  uTime,
+                  uPrograde,
+                  uStructure,
+                  uArms,
+                  uClumps,
+                  uDust,
+                  uScaleH,
+                  uShearRate,
+                  uAnim,
+                  pathAbsY: densV.mul(0.4).add(0.05),
+                  weight: w,
+                  densVert: densV,
+                })
+                hits.addAssign(0.08)
               })
             },
           )
@@ -384,8 +470,17 @@ export function createGeodesicTracer(): GeodesicTracer {
         Break()
       })
 
-      const adapt = min(float(RT.adaptMax), max(float(RT.adaptFloor), r.div(M.mul(RT.adaptScale))))
-      const ds = float(RT.baseStepM).mul(M).mul(adapt)
+      // Photon-sphere refinement: smaller steps near r~3M → nested rings from geometry
+      const rOverM = r.div(max(M, float(1e-8)))
+      const nearPh = exp(
+        abs(rOverM.sub(float(RT.phCenterM))).div(float(RT.phWidthM)).mul(-1),
+      )
+      const adaptFloorL = float(RT.adaptFloor).mul(float(1).sub(nearPh.mul(float(RT.phRefine))))
+      const adapt = min(
+        float(RT.adaptMax),
+        max(adaptFloorL, r.div(M.mul(RT.adaptScale))),
+      )
+      const ds = uBaseStepM.mul(M).mul(adapt)
 
       prevY.assign(pos.y)
       const p0x = pos.x.toVar()
@@ -416,15 +511,15 @@ export function createGeodesicTracer(): GeodesicTracer {
       const absY = abs(pos.y)
       const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(2.6), M.mul(0.12))
       // Sample denser near midplane (stride 1–2) so thin far-side isn't skipped
-      const midStride = absY.lessThan(roughH.mul(0.55)).select(int(1), int(RT.volumeStride))
+      const midStride = absY.lessThan(roughH.mul(0.55)).select(int(1), int(uVolumeStride))
       If(
         rhoV
-          .greaterThan(rin.mul(0.75))
+          .greaterThan(rin.mul(1.001))
           .and(rhoV.lessThan(rout.mul(1.18)))
           .and(absY.lessThan(roughH))
           .and(transm.greaterThan(0.04))
           .and(diskTau.lessThan(float(RT.tauSampleMax)))
-          .and(hits.lessThan(14))
+          .and(hits.lessThan(float(RT.maxDiskHits)))
           .and(stepCount.mod(midStride).equal(int(0))),
         () => {
       // 3D volume dens: Keplerian-advected spirals + plasma/gas/dust zones
@@ -560,11 +655,12 @@ export function createGeodesicTracer(): GeodesicTracer {
             .mul(fEs)
             .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
             .mul(float(0.8).add(struct.mul(0.25)))
-          const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(RT.volumeStride))
+          const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(uVolumeStride))
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
           const beer = exp(diskTau.mul(float(-RT.beerSoft)))
-          // Emission weight follows dens · path · e^{−τ} (not fake zone film)
-          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.88))
+          // Secondary images: less attenuation after first wrap (true multi-path)
+          const sec = hits.greaterThan(1.2).select(float(1.06), float(1))
+          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.88)).mul(sec)
           If(w.greaterThan(0.016), () => {
             processDiskVolumeSample({
               hx: hxV,
@@ -736,6 +832,11 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setTime: (seconds) => {
       uTime.value = seconds
+    },
+    setQuality: (q) => {
+      uMaxSteps.value = q.maxSteps
+      uVolumeStride.value = q.volumeStride
+      uBaseStepM.value = q.baseStepM
     },
   }
 }

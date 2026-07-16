@@ -201,23 +201,18 @@ export const DISK_EMISSION = {
    * Observed color temperature ∝ g^{gColorExponent}.
    * Physical Wien shift uses ~1; slightly soft so high-spin faces stay readable.
    */
-  gColorExponent: 0.9,
-  gColorFloor: 0.22,
+  gColorExponent: 1.0,
+  gColorFloor: 0.12,
   /** Optical color temperature clamp [K] for max-norm chroma */
   tColorMinK: 1600,
   tColorMaxK: 48_000,
-  /**
-   * Doppler beam I ∝ g^{beamExponent}.
-   * Default soft display (2). Ideal GRRT uses 3.
-   */
   beamExponent: 2.0,
-  /** Ideal invariant I_ν/ν³ → I ∝ g³ */
   beamExponentIdeal: 3.0,
-  beamFloor: 0.28,
-  beamFloorIdeal: 0.18,
-  /** fluxVis = fluxRel^{fluxVisPower} — closer to 1 = true NT radial profile */
-  fluxVisPower: 0.9,
-  fluxVisFloor: 0.04,
+  beamFloor: 0.15,
+  beamFloorIdeal: 0.1,
+  /** fluxVis = fluxRel^{fluxVisPower} — 1 = true NT radial profile */
+  fluxVisPower: 1.0,
+  fluxVisFloor: 0.02,
   /** Overall HDR gain into ACES (not a fake fill of the shadow) */
   intensityGain: 1.75,
   /**
@@ -354,20 +349,46 @@ export function mdotFluxScale(mdot: number): number {
 }
 
 /**
- * Thin-disk scale-height H/R from ṁ and r_ISCO/M (not a free look knob).
+ * Thin-disk scale-height H/R from ṁ and r_ISCO/M (α-disk inspired).
  *
- * Rough α-disk gas-pressure scaling:
- *   H/R ∼ ṁ^{1/8} · (r_in / 6M)^{-1/5}
- * Clamped to the thin-disk regime [0.03, 0.14].
+ * Gas-pressure branch (low ṁ): H/R ∼ ṁ^{1/8} · (r_in/6M)^{-1/5}
+ * Radiation-pressure tendency (high ṁ): slightly thicker.
+ * Clamped to thin-disk regime [0.03, 0.14].
  */
 export function thinDiskScaleHeight(mdot: number, rIscoOverM: number): number {
   const m = Math.max(mdot, 1e-4)
   const rinM = Math.max(rIscoOverM, 1.2)
-  const h =
-    0.055 *
+  // Gas-pressure base
+  let h =
+    0.052 *
     Math.pow(m / T_PEAK_MDOT_REF, 0.125) *
     Math.pow(R_ISCO_SCHW_OVER_M / rinM, 0.2)
+  // Mild radiation-pressure thickening above ~0.3 ṁ_Edd
+  if (m > 0.3) {
+    h *= 1 + 0.25 * Math.log10(m / 0.3)
+  }
   return Math.min(0.14, Math.max(0.03, h))
+}
+
+/**
+ * Exact Kerr equatorial circular angular velocity Ω (geometric units).
+ * Prograde: +√M/(r^{3/2}+a√M); retrograde: −√M/(r^{3/2}−a√M).
+ */
+export function kerrCircularOmega(
+  r: number,
+  mass: number,
+  aStar: number,
+  prograde = true,
+): number {
+  const M = Math.max(mass, 1e-12)
+  const a = aStar * M
+  const sqrtM = Math.sqrt(M)
+  const r32 = Math.pow(Math.max(r, 1e-6), 1.5)
+  if (prograde) {
+    return sqrtM / (r32 + a * sqrtM + 1e-12)
+  }
+  const den = r32 - a * sqrtM
+  return -sqrtM / (Math.abs(den) < 1e-12 ? 1e-12 : den)
 }
 
 /** Log-space slider (0…1000) ↔ ṁ ∈ [mdotMin, mdotMax]. */

@@ -4,6 +4,7 @@ import {
   diskIsco,
   DISK_EMISSION,
   kerrCircularEnergy,
+  kerrCircularOmega,
   mdotDisplayBrightness,
   mdotFluxScale,
   mdotFromSlider,
@@ -165,20 +166,25 @@ describe('mdot scales', () => {
     expect(DISK_EMISSION.beamExponent).toBeGreaterThanOrEqual(1.5)
     expect(DISK_EMISSION.beamExponent).toBeLessThanOrEqual(3)
     expect(DISK_EMISSION.beamExponentIdeal).toBe(3)
-    expect(DISK_EMISSION.fluxVisPower).toBeGreaterThanOrEqual(0.8)
-    expect(DISK_EMISSION.gColorExponent).toBeGreaterThanOrEqual(0.8)
+    expect(DISK_EMISSION.fluxVisPower).toBeGreaterThanOrEqual(0.95)
+    expect(DISK_EMISSION.gColorExponent).toBeGreaterThanOrEqual(0.95)
     expect(DISK_EMISSION.mdotBrightPower).toBeGreaterThanOrEqual(0.7)
     expect(DISK_EMISSION.tColorMinK).toBeGreaterThanOrEqual(1000)
     expect(DISK_EMISSION.intensityGain).toBeGreaterThan(0)
   })
 
-  test('colorRedshiftFactor tracks g (near-physical)', () => {
+  test('colorRedshiftFactor tracks g (physical g^1)', () => {
     const full = 0.5
     const soft = colorRedshiftFactor(full)
-    // g^0.9 still < 1 for g<1, closer to full g than old g^0.45
-    expect(soft).toBeGreaterThan(full)
-    expect(soft).toBeLessThan(1)
-    expect(soft).toBeLessThan(Math.pow(full, 0.45) + 0.01)
+    expect(soft).toBeCloseTo(full, 5)
+  })
+
+  test('kerrCircularOmega prograde positive, ret negative', () => {
+    const op = kerrCircularOmega(10, 1, 0.5, true)
+    const or = kerrCircularOmega(10, 1, 0.5, false)
+    expect(op).toBeGreaterThan(0)
+    expect(or).toBeLessThan(0)
+    expect(Math.abs(op)).not.toBeCloseTo(Math.abs(or), 5)
   })
 })
 

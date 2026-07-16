@@ -21,6 +21,11 @@ import { applyPreset } from '../state/presets'
 import { setIdealBeam } from '../state/idealBeam'
 import { setScaleFree } from '../state/scaleFree'
 import {
+  setQuality,
+  subscribeQuality,
+  type QualityLevel,
+} from '../state/quality'
+import {
   bindRange,
   bindSelect,
   qs,
@@ -174,6 +179,16 @@ export function mountControls(
   bindRange(fovInput, (v) => {
     onUserTweaked()
     setCamera({ fov: v })
+  })
+
+  const qualitySelect = qs<HTMLSelectElement>(root, '#q-level')
+  const qualityVal = qs<HTMLElement>(root, '[data-val="quality"]')
+  bindSelect(qualitySelect, (v) => {
+    setQuality(v as QualityLevel)
+  })
+  subscribeQuality((q) => {
+    if (qualitySelect) qualitySelect.value = q.level
+    setText(qualityVal, q.level)
   })
 
   for (const btn of presetBtns) {

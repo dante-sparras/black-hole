@@ -7,6 +7,7 @@ import { getDebug } from './debug/state'
 import { createBloomPipeline } from './render/bloomPipeline'
 import { createGeodesicTracer } from './render/geodesicTracer'
 import { getLook } from './state/look'
+import { getQuality, subscribeQuality } from './state/quality'
 import { mountControls } from './ui/controls'
 import { mountDebugHud } from './ui/debugHud'
 import { mountOrbitControls } from './ui/orbit'
@@ -26,8 +27,10 @@ function showError(message: string): void {
 }
 
 const renderer = new THREE.WebGPURenderer({ antialias: false })
-// Cap DPR at 1 — full-screen geodesic is O(pixels × steps). Retina is too costly.
-renderer.setPixelRatio(1)
+function applyDpr(): void {
+  renderer.setPixelRatio(getQuality().dpr)
+}
+applyDpr()
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.setClearColor(0x000000, 1)
 document.body.appendChild(renderer.domElement)
@@ -48,10 +51,15 @@ let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
 let debugHud: ReturnType<typeof mountDebugHud> | null = null
 
 function onResize(): void {
+  applyDpr()
   renderer.setSize(window.innerWidth, window.innerHeight)
   bloomPipeline?.setSize(window.innerWidth, window.innerHeight)
 }
 window.addEventListener('resize', onResize)
+subscribeQuality(() => {
+  applyDpr()
+  onResize()
+})
 
 if (controlsEl) {
   mountControls(controlsEl, derivedEl)

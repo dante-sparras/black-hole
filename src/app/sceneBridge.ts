@@ -16,6 +16,7 @@ import { getLook, subscribeLook } from '../state/look'
 import { getParams, subscribe as subscribeParams } from '../state/params'
 import { getScaleFree, subscribeScaleFree } from '../state/scaleFree'
 import { getIdealBeam, subscribeIdealBeam } from '../state/idealBeam'
+import { getQuality, subscribeQuality } from '../state/quality'
 import { getScene } from '../state/scene'
 import { getSky, subscribeSky } from '../state/sky'
 
@@ -45,6 +46,7 @@ type Dirty = {
   geodesic: boolean
   scaleFree: boolean
   idealBeam: boolean
+  quality: boolean
 }
 
 export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
@@ -58,6 +60,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     geodesic: false,
     scaleFree: false,
     idealBeam: false,
+    quality: false,
   }
   let scheduled = false
 
@@ -115,6 +118,15 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     tracer.setIdealBeam(getIdealBeam())
   }
 
+  function applyQuality(): void {
+    const q = getQuality()
+    tracer.setQuality({
+      maxSteps: q.maxSteps,
+      volumeStride: q.volumeStride,
+      baseStepM: q.baseStepM,
+    })
+  }
+
   function flush(): void {
     scheduled = false
     if (dirty.physics) {
@@ -149,6 +161,10 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       dirty.idealBeam = false
       applyIdealBeam()
     }
+    if (dirty.quality) {
+      dirty.quality = false
+      applyQuality()
+    }
   }
 
   function mark(key: keyof Dirty): void {
@@ -168,6 +184,7 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       subscribeGeodesic(() => mark('geodesic')),
       subscribeScaleFree(() => mark('scaleFree')),
       subscribeIdealBeam(() => mark('idealBeam')),
+      subscribeQuality(() => mark('quality')),
       subscribeDebug(() => mark('debug')),
     ]
     return () => {
@@ -189,12 +206,13 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
       : `D=${D.toFixed(1)} (fixed)`
     const orbitTag = disk.prograde ? 'pro' : 'ret'
     const beamTag = idealBeam ? 'g³' : 'g²'
+    const qTag = getQuality().level
     const mode = realtimeModeTag(p, geodesic)
     const bloomTag = look.bloomEnabled
       ? `bloom=${look.bloomStrength.toFixed(2)}`
       : 'bloom=off'
     const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
-    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
+    const base = `${fps} fps · ${mode} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · q=${qTag} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
     return healthLine ? `${base}\n${healthLine}` : base
   }
 

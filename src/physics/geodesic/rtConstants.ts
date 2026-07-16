@@ -1,51 +1,50 @@
 /**
- * Real-time null integration constants shared by:
- *   - GPU TSL geodesicTracer
- *   - CPU knNull / cpuRef topology checks
+ * Real-time null integration constants shared by GPU TSL + CPU knNull.
  *
- * CRITICAL: step adapt floor must stay ≳ 0.2M or rays stall at the photon sphere.
- * Balance: enough steps for far-side/lensed disk; lean enough for ~60–100fps.
+ * CRITICAL: adapt floor ≳ 0.2M or rays stall at the photon sphere.
+ * Photon-ring multi-wrap needs finer steps near r ~ 1.5–6 M.
  */
 export const RT = {
-  /** Max integrator steps per ray (GPU). Need multi-wrap for far-side above shadow. */
-  maxSteps: 460,
-  /** Base step size multiplier: ds = baseStepM * M * adapt */
-  baseStepM: 0.14,
-  /** Adaptive ds clamp: min(adaptMax, max(adaptFloor, r/(adaptScale * M))) */
-  adaptFloor: 0.24,
-  adaptMax: 1.85,
+  /** Hard loop ceiling (GPU). Effective steps clamped by uMaxSteps quality. */
+  maxSteps: 720,
+  /** Default effective max steps (med quality) */
+  defaultMaxSteps: 500,
+  baseStepM: 0.13,
+  adaptFloor: 0.22,
+  adaptMax: 1.9,
   adaptScale: 11,
-  /** Capture just outside r₊ */
+  /**
+   * Extra refinement near photon sphere: adaptFloor *= (1 − phRefine * nearPh).
+   * nearPh peaks at r≈3M — enables nested rings from geometry, not fake glow.
+   */
+  phRefine: 0.5,
+  phCenterM: 3.0,
+  phWidthM: 2.2,
   captureMargin: 1.02,
-  /** Escape when r > escapeCamFactor * camD and outbound */
   escapeCamFactor: 3,
-  /** Unfinished rays with minR < stalledCapture * M → treat as capture */
   stalledCaptureM: 3.2,
-  /** Default disk outer radius in units of M */
   diskOuterM: 22,
-  /** Floor ISCO above horizon */
   iscoHorizonMargin: 1.05,
-  /**
-   * Volume disk sample stride (GPU). 3 balances FPS vs ring banding.
-   * Weight scaled by stride so brightness holds.
-   */
   volumeStride: 3,
-  /**
-   * Soft optical depth scale for Beer's law (weight ∝ e^{−α τ}).
-   * α < 1 keeps far-side / lensed disk visible after near-side hits.
-   * α = 1 was fully blacking the top bridge over the shadow.
-   */
-  beerSoft: 0.72,
-  /** τ gate for continued sampling */
-  tauSampleMax: 2.8,
+  beerSoft: 0.75,
+  tauSampleMax: 3.0,
+  /** Allow more multi-wrap disk samples (secondary images) */
+  maxDiskHits: 16,
 } as const
 
-/** Adaptive step size in geometric units. */
+/** Adaptive step size in geometric units (CPU twin). */
 export function rtStepSize(r: number, mass: number): number {
   const M = Math.max(mass, 1e-12)
-  const adapt = Math.min(
-    RT.adaptMax,
-    Math.max(RT.adaptFloor, r / (RT.adaptScale * M)),
+  const rM = r / M
+  const nearPh = Math.exp(
+    -Math.abs(rM - RT.phCenterM) / Math.max(RT.phWidthM, 0.5),
   )
+  const floor = RT.adaptFloor * (1 - RT.phRefine * nearPh)
+  const adapt = Math.min(RT.adaptMax, Math.max(floor, r / (RT.adaptScale * M)))
   return RT.baseStepM * M * adapt
+}
+
+/** Photon-sphere proximity ∈ [0,1] for CPU diagnostics. */
+export function photonSphereProximity(rOverM: number): number {
+  return Math.exp(-Math.abs(rOverM - RT.phCenterM) / Math.max(RT.phWidthM, 0.5))
 }

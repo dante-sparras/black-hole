@@ -50,4 +50,6 @@ export type GeodesicTracer = {
   setIdealBeam: (on: boolean) => void
   /** Animation time (seconds) for Keplerian disk shear */
   setTime: (seconds: number) => void
+  /** Numerical quality only (steps / stride / base step) */
+  setQuality: (q: { maxSteps: number; volumeStride: number; baseStepM: number }) => void
 }

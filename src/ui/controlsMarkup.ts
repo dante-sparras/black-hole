@@ -91,5 +91,17 @@ export function buildControlsHtml(): string {
       <span class="ctrl-val" data-val="fov"></span>
     </label>
     <p class="ctrl-hint">Scale-free D = d·M (fixed on) · drag on canvas to orbit</p>
+
+    <div class="ctrl-section">Numerics (not physics)</div>
+    <label class="ctrl">
+      <span class="ctrl-name">Quality</span>
+      <select id="q-level" style="flex:1;min-width:0">
+        <option value="low">Low (fast)</option>
+        <option value="med" selected>Med</option>
+        <option value="high">High (photon ring)</option>
+      </select>
+      <span class="ctrl-val" data-val="quality"></span>
+    </label>
+    <p class="ctrl-hint">Steps / DPR / sample stride only · laws unchanged</p>
   `
 }
