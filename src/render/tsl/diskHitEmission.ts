@@ -201,10 +201,12 @@ export function accumulateDiskHit(p) {
     .mul(float(1).sub(float(TX.streamHarmonic)))
     .add(pow(max(stream8, float(1e-4)), float(1.8)).mul(float(TX.streamHarmonic)))
   // Stronger filaments in denser midplane gas
-  const streamStr = float(TX.streamContrast).mul(uStructure).mul(float(0.75).add(dVert.mul(0.45)))
+  const streamStr = float(TX.streamContrast)
+    .mul(uStructure)
+    .mul(float(0.85).add(dVert.mul(0.5)))
   const streamFac = float(1)
     .sub(streamStr)
-    .add(streamStr.mul(float(0.22).add(streams.mul(1.0))))
+    .add(streamStr.mul(float(0.15).add(streams.mul(1.15))))
 
   // Turbulence in advected frame — z-slice so atmosphere ≠ extruded midplane
   const turbDomainZ = lnR.add(shear.mul(0.04)).add(zPhase.mul(0.25))
@@ -316,29 +318,31 @@ export function accumulateDiskHit(p) {
   const bMax = max(br, max(bg, bb))
   const chroma = vec3(br, bg, bb).div(max(bMax, float(1e-20)))
 
-  // Lensed multi-hit: secondary/photon-ring paths slightly brighter (still physical g)
-  const bounce = float(1).add(max(min(hits, float(5)).sub(1), float(0)).mul(0.32))
+  // Lensed multi-hit: modest secondary (too high → milk white rings)
+  const bounce = float(1).add(max(min(hits, float(4)).sub(1), float(0)).mul(0.2))
   const mdotBright = float(E.mdotBrightBase).add(
     pow(max(mdot.div(T_PEAK_MDOT_REF), float(E.mdotBrightFloor)), float(E.mdotBrightPower)).mul(
       E.mdotBrightScale,
     ),
   )
-  // pathFac mild — volume weights already carry dens·Δs·e^{−τ}
-  const nY = max(pathAbsY, float(0.15))
-  const pathFac = min(float(1.25), uScaleH.div(nY).mul(0.4).add(0.85))
+  // pathFac mild
+  const nY = max(pathAbsY, float(0.18))
+  const pathFac = min(float(1.12), uScaleH.div(nY).mul(0.25).add(0.9))
   const iFlux = max(fluxVis, float(E.fluxVisFloor))
     .mul(mdotBright)
     .mul(E.intensityGain)
     .mul(pathFac)
-  const emit = chroma.mul(iFlux).mul(beam).mul(texFac).mul(bounce).mul(w)
+  // Soft intensity so volume paths keep chroma (not pure white)
+  const raw = iFlux.mul(beam).mul(texFac).mul(bounce).mul(w)
+  const softI = raw.div(float(1).add(raw.mul(0.35)))
+  const emit = chroma.mul(softI)
 
   dbgG.assign(freq)
   dbgT.assign(TK.div(float(12000)))
   dbgFlux.assign(fluxVis.mul(texFac).mul(w))
 
-  If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.015)), () => {
+  If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.01)), () => {
     col.addAssign(emit.mul(transm))
-    // Soft OD: volume samples use small w → light drain; Beer's law is in w
-    transm.mulAssign(max(float(0.8), float(1).sub(w.mul(0.22))))
+    transm.mulAssign(max(float(0.88), float(1).sub(w.mul(0.12))))
   })
 }
