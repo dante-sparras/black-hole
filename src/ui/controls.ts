@@ -131,7 +131,7 @@ export function mountControls(
   }
 
   function syncDerived(d: DerivedGeometry): void {
-    if (derivedRoot) renderDerivedHud(derivedRoot, d, getParams(), getDisk())
+    if (derivedRoot) renderDerivedHud(derivedRoot, getParams(), d, getDisk())
   }
 
   // --- Bind free base parameters only ---
