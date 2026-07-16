@@ -715,6 +715,8 @@ export function createGeodesicTracer(): GeodesicTracer {
             .mul(fEs)
             .add(kappaKr.mul(float(1).sub(fEs.mul(0.8))))
             .mul(float(0.8).add(struct.mul(0.25)))
+            // High ṁ → thicker photosphere (saturates; less infinite white stack)
+            .mul(float(1).add(mdot.mul(float(0.45))))
           const strideF = absY.lessThan(Hloc.mul(1.1)).select(float(1.15), float(uVolumeStride))
           // Multi-image: when outside dense slab after a hit, decay τ so secondary survives
           const outSlab = absY.greaterThan(Hloc.mul(1.8))
@@ -723,9 +725,10 @@ export function createGeodesicTracer(): GeodesicTracer {
           })
           const dTau = dens.mul(dsH).mul(kappa).mul(strideF)
           const beer = exp(diskTau.mul(float(-RT.beerSoft)))
-          // Secondary multi-path: slightly higher weight after first wrap
-          const sec = hits.greaterThan(1.2).select(float(1.12), float(1))
-          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.92)).mul(sec)
+          // Secondary multi-path + ṁ weight compress (eye adapts to bright surface)
+          const sec = hits.greaterThan(1.2).select(float(1.1), float(1))
+          const mdotW = float(1).div(float(1).add(mdot.mul(float(0.38))))
+          const w = dens.mul(dsH).mul(beer).mul(strideF.mul(0.9)).mul(sec).mul(mdotW)
           If(w.greaterThan(0.012), () => {
             processDiskVolumeSample({
               hx: hxV,
@@ -872,6 +875,16 @@ export function createGeodesicTracer(): GeodesicTracer {
     If(captured.greaterThan(0.5).and(hits.lessThan(0.5)), () => {
       col.assign(vec3(0, 0, 0))
     })
+
+    // Human-eye adaptation: Reinhard on luminance, keep chromaticity.
+    // Pure-black capture stays black (luma~0 → scale finite via max).
+    const luma = dot(col, vec3(0.2126, 0.7152, 0.0722))
+    const knee = float(0.55)
+    const toned = luma.div(float(1).add(luma.mul(knee)))
+    const eyeScale = toned.div(max(luma, float(1e-5)))
+    // Only compress when there is disk/sky light — leave pure void black
+    const hasLight = luma.greaterThan(1e-6)
+    col.assign(hasLight.select(col.mul(eyeScale), col))
 
     applyDebugFalseColor({
       mode: uDebugMode,

@@ -416,17 +416,17 @@ export function accumulateDiskHit(p) {
   const mu = min(float(1), max(pathAbsY, float(0.04)))
   const tau0 = float(0.85).add(uScaleH.mul(4))
   const limb = float(1).sub(exp(tau0.div(mu).mul(-1)))
-  const pathFac = min(float(1.1), uScaleH.div(max(mu, float(0.12))).mul(0.18).add(0.9))
+  const pathFac = min(float(1.05), uScaleH.div(max(mu, float(0.12))).mul(0.15).add(0.88))
   const iFlux = max(fluxVis, float(E.fluxVisFloor))
     .mul(mdotBright)
     .mul(E.intensityGain)
     .mul(pathFac)
     .mul(max(limb, float(0.12)))
-  const imageW = hits.greaterThan(1.5).select(float(1.18), float(1))
+  const imageW = hits.greaterThan(1.5).select(float(1.14), float(1))
   const raw = iFlux.mul(beam).mul(texFac).mul(silk).mul(w).mul(imageW)
-  // Milder soft-knee — keep hot ISCO / Doppler punch without milk-glass
-  const softI = raw.div(float(1).add(raw.mul(0.11)))
-  // 5-band blackbody chroma (R,Y,G,C,B → RGB)
+  // Per-sample soft-knee on intensity only — chroma applied after (preserves hue)
+  const softI = raw.div(float(1).add(raw.mul(float(E.sampleKnee))))
+  // 5-band blackbody chroma (R,Y,G,C,B → RGB) — max-norm = pure color for the eye
   const planckC2 = float(PLANCK_C2_NM_K)
   const TKc = max(TK, float(E.tColorMinK))
   const b680 = float(1).div(
@@ -459,6 +459,7 @@ export function accumulateDiskHit(p) {
   const bb5 = b490.mul(0.35).add(b440.mul(0.65))
   const bMax5 = max(br5, max(bg5, bb5))
   const chroma5 = vec3(br5, bg5, bb5).div(max(bMax5, float(1e-20)))
+  // Intensity × unit chroma → color survives tone map
   const emit = chroma5.mul(softI)
 
   dbgG.assign(freq)
@@ -467,8 +468,9 @@ export function accumulateDiskHit(p) {
 
   If(uDebugMode.notEqual(float(8)).and(w.greaterThan(0.01)), () => {
     col.addAssign(emit.mul(transm))
-    // Multi-image isolation: leave more room for lensed far side / photon ring
-    const ext = hits.greaterThan(1.5).select(float(0.03), float(0.055))
-    transm.mulAssign(max(float(0.94), float(1).sub(w.mul(ext))))
+    // Multi-image isolation + stronger extinction at high ṁ (less white fog stack)
+    const mdotFog = float(1).add(mdot.mul(0.12))
+    const ext = hits.greaterThan(1.5).select(float(0.035), float(0.06)).mul(mdotFog)
+    transm.mulAssign(max(float(0.9), float(1).sub(w.mul(ext))))
   })
 }

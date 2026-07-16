@@ -213,15 +213,29 @@ export const DISK_EMISSION = {
   /** fluxVis = fluxRel^{fluxVisPower} — 1 = true NT radial profile */
   fluxVisPower: 1.0,
   fluxVisFloor: 0.015,
-  /** Overall HDR gain into ACES (not a fake fill of the shadow) */
-  intensityGain: 2.05,
   /**
-   * Brightness vs ṁ: closer to F∝ṁ (power→1) with mild base so low-ṁ not pure black.
+   * Pre-tone intensity into HDR (before eye adaptation).
+   * Keep moderate — high ṁ must not white-out; exposure + final tonemap carry range.
    */
-  mdotBrightBase: 0.1,
-  mdotBrightScale: 1.28,
-  mdotBrightPower: 0.88,
+  intensityGain: 1.35,
+  /**
+   * Display brightness vs ṁ (eye-like compressive, not pure F∝ṁ).
+   * Physical F∝ṁ still lives in fluxRel × mdotFluxScale paths for T/F shape;
+   * this is photopic “how bright it looks” so ṁ=3 ≠ pure white blast.
+   */
+  mdotBrightBase: 0.22,
+  mdotBrightScale: 0.95,
+  /** Compressive: ~0.4 ≈ log-ish for human dynamic range */
+  mdotBrightPower: 0.42,
   mdotBrightFloor: 0.006,
+  /** Final eye tonemap knee on accumulated luminance (Reinhard-like) */
+  eyeTonemapKnee: 0.55,
+  /** Per-sample soft-knee (preserves chroma when applied to I only) */
+  sampleKnee: 0.42,
+  /** Extra optical-depth growth with ṁ — photosphere saturates, less milk-glass stack */
+  mdotOpacityBoost: 0.45,
+  /** Weight compress at high ṁ (eye adapts; surface not infinitely brighter) */
+  mdotWeightCompress: 0.38,
   /** NT peak radius ≈ (49/36) r_in */
   ntPeakOverRin: 49 / 36,
 } as const
@@ -292,8 +306,11 @@ export function alphaDiskMidplane(
 }
 
 /**
- * Auto tone-mapping exposure from radiative power proxy η · ṁ.
- * Keeps ACES readable without a film exposure slider.
+ * Auto tone-mapping exposure — human eye adapts to scene brightness.
+ *
+ * Proxy scene power ∝ η_NT · ṁ (disk luminosity scale).
+ * High ṁ / high spin → lower exposure so the hole + ring stay readable
+ * and disk keeps color instead of pure white.
  */
 export function autoExposureFromPhysics(
   aStar: number,
@@ -302,9 +319,10 @@ export function autoExposureFromPhysics(
 ): number {
   const eta = novikovThorneEfficiency(aStar, prograde)
   const power = eta * Math.max(mdot, 1e-4)
-  // Map power ~0.005..0.4 → exposure ~1.2..0.75 (slightly brighter default)
-  const e = 1.12 - 0.32 * Math.log10(1 + 40 * power)
-  return Math.min(1.4, Math.max(0.6, e))
+  // Reference: ṁ=0.1, η~0.057 → power~0.0057 → e~1.0
+  // ṁ=3, η~0.1 → power~0.3 → e~0.4
+  const e = 1.05 / Math.sqrt(1 + 12 * power)
+  return Math.min(1.25, Math.max(0.32, e))
 }
 
 /**
@@ -404,9 +422,11 @@ export function mdotTemperatureScale(mdot: number): number {
 }
 
 /**
- * Display brightness weight for ṁ.
- * Ensures min-slider disks stay visible (thick thermal surface) while
- * still brightening toward high ṁ. Not pure F∝ṁ (that + ACES → black).
+ * Display brightness weight for ṁ (photopic / eye-like).
+ *
+ * Physical flux still scales ∝ ṁ in the NT F factor for relative T(r).
+ * This map is compressive so super-Eddington ṁ does not explode HDR into white.
+ * Low ṁ stays visible via base floor.
  */
 export function mdotDisplayBrightness(mdot: number): number {
   const {

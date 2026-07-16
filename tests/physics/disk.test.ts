@@ -170,9 +170,12 @@ describe('mdot scales', () => {
     expect(DISK_EMISSION.beamExponentIdeal).toBe(3)
     expect(DISK_EMISSION.fluxVisPower).toBeGreaterThanOrEqual(0.95)
     expect(DISK_EMISSION.gColorExponent).toBeGreaterThanOrEqual(0.95)
-    expect(DISK_EMISSION.mdotBrightPower).toBeGreaterThanOrEqual(0.7)
+    expect(DISK_EMISSION.mdotBrightPower).toBeGreaterThanOrEqual(0.35)
+    expect(DISK_EMISSION.mdotBrightPower).toBeLessThanOrEqual(0.7)
     expect(DISK_EMISSION.tColorMinK).toBeGreaterThanOrEqual(1000)
     expect(DISK_EMISSION.intensityGain).toBeGreaterThan(0)
+    expect(DISK_EMISSION.sampleKnee).toBeGreaterThan(0.2)
+    expect(DISK_EMISSION.eyeTonemapKnee).toBeGreaterThan(0.3)
   })
 
   test('colorRedshiftFactor tracks g (physical g^1)', () => {
@@ -197,12 +200,24 @@ describe('mdot scales', () => {
     expect(peak9 / rIsco).toBeLessThan(peak0 / 6 + 0.5)
   })
 
-  test('autoExposureFromPhysics responds to ṁ and spin', () => {
+  test('autoExposureFromPhysics responds to ṁ and spin (eye adapts)', () => {
     const eCool = autoExposureFromPhysics(0, 0.01, true)
     const eHot = autoExposureFromPhysics(0.9, 1.5, true)
+    const eMax = autoExposureFromPhysics(0.9, 3, true)
     expect(eCool).toBeGreaterThan(eHot)
-    expect(eHot).toBeGreaterThanOrEqual(0.55)
-    expect(eCool).toBeLessThanOrEqual(1.35)
+    expect(eHot).toBeGreaterThan(eMax)
+    expect(eMax).toBeGreaterThanOrEqual(0.32)
+    expect(eCool).toBeLessThanOrEqual(1.25)
+  })
+
+  test('mdotDisplayBrightness is compressive at high ṁ (no white blast)', () => {
+    const b01 = mdotDisplayBrightness(0.1)
+    const b1 = mdotDisplayBrightness(1)
+    const b3 = mdotDisplayBrightness(3)
+    expect(b1).toBeGreaterThan(b01)
+    expect(b3).toBeGreaterThan(b1)
+    // Compressive: ṁ ×30 from 0.1 → 3 must not scale brightness ×30
+    expect(b3 / b01).toBeLessThan(8)
   })
 })
 
