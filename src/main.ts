@@ -12,6 +12,7 @@ import { getLook } from './state/look'
 import { getQuality, subscribeQuality } from './state/quality'
 import { mountControls } from './ui/controls'
 import { mountDebugHud } from './ui/debugHud'
+import { mountMobileHud } from './ui/mobileHud'
 import { mountOrbitControls } from './ui/orbit'
 
 // Geometric units G = c = 1. No-hair: M, a★, Q · disk free bases (ṁ scenario/HUD).
@@ -53,15 +54,21 @@ let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
 let debugHud: ReturnType<typeof mountDebugHud> | null = null
 
 function onResize(): void {
+  const w = Math.floor(window.visualViewport?.width ?? window.innerWidth)
+  const h = Math.floor(window.visualViewport?.height ?? window.innerHeight)
   applyDpr()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  bloomPipeline?.setSize(window.innerWidth, window.innerHeight)
+  renderer.setSize(w, h)
+  bloomPipeline?.setSize(w, h)
 }
 window.addEventListener('resize', onResize)
+window.visualViewport?.addEventListener('resize', onResize)
+window.visualViewport?.addEventListener('scroll', onResize)
 subscribeQuality(() => {
   applyDpr()
   onResize()
 })
+
+const mobileHud = mountMobileHud()
 
 if (controlsEl) {
   mountControls(controlsEl, derivedEl)
@@ -70,7 +77,9 @@ if (debugEl) {
   debugHud = mountDebugHud(debugEl)
 }
 
-const orbit = mountOrbitControls(renderer.domElement)
+const orbit = mountOrbitControls(renderer.domElement, undefined, {
+  touchDragBoost: mobileHud.isMobile() ? 1.35 : 1,
+})
 
 // Shift+click (or probe enabled + click without drag) for ray probe
 renderer.domElement.addEventListener('click', (ev) => {

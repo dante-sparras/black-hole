@@ -19,6 +19,7 @@ export type OrbitHandles = {
 export function mountOrbitControls(
   canvas: HTMLElement,
   onChange?: (cam: CameraState) => void,
+  options?: { touchDragBoost?: number },
 ): OrbitHandles {
   let dragging = false
   let lastX = 0
@@ -27,6 +28,7 @@ export function mountOrbitControls(
   let dragDist = 0
   let lastDragDist = 0
 
+  const touchBoost = options?.touchDragBoost ?? 1
   const DRAG_SENS = 0.005
   const WHEEL_SENS = 0.0015
   const PINCH_SENS = 0.01
@@ -61,10 +63,14 @@ export function mountOrbitControls(
     lastX = e.clientX
     lastY = e.clientY
 
+    const sens =
+      e.pointerType === 'touch' || e.pointerType === 'pen'
+        ? DRAG_SENS * touchBoost
+        : DRAG_SENS
     const cam = getCamera()
     setCamera({
-      azimuth: cam.azimuth - dx * DRAG_SENS,
-      inclination: cam.inclination + dy * DRAG_SENS,
+      azimuth: cam.azimuth - dx * sens,
+      inclination: cam.inclination + dy * sens,
     })
     emit()
   }

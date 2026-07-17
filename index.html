@@ -3,20 +3,44 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>black-hole</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#000000" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Black Hole Simulation</title>
 </head>
 
 <body>
-  <div id="hud">
-    <header>
-      <strong>black-hole</strong>
+  <div id="hud" class="hud">
+    <header class="hud-header">
+      <div class="hud-title-row">
+        <strong>black-hole</strong>
+        <button
+          type="button"
+          id="hud-toggle"
+          class="hud-toggle"
+          aria-expanded="true"
+          aria-controls="hud-body"
+          title="Show or hide controls"
+        >
+          Panels
+        </button>
+      </div>
       <span id="stats">starting…</span>
     </header>
-    <p class="hint">Drag to orbit · scroll/pinch zoom · click to probe ray (Debug).</p>
-    <div id="controls" class="controls"></div>
-    <div id="debug-panel" class="controls debug-panel"></div>
-    <dl id="derived" class="derived"></dl>
+    <div id="hud-body" class="hud-body">
+      <p class="hint" id="hud-hint">
+        Drag to orbit · scroll/pinch zoom · click to probe ray (Debug).
+      </p>
+      <div id="controls" class="controls"></div>
+      <div id="debug-panel" class="controls debug-panel"></div>
+      <dl id="derived" class="derived"></dl>
+    </div>
   </div>
   <div id="error"></div>
   <script type="module" src="/src/main.ts"></script>
