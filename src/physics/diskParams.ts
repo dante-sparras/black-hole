@@ -2,8 +2,7 @@
  * Accretion disk parameters — NOT black-hole hair.
  *
  * Free (UI): ρ₀, H/r, Γ, β₀, r_in/M, r_out/M, tilt, jet strength
- * Scenario / derived display: ṁ (presets; HUD — not free)
- * Derived (HUD): ℓ̃ ≈ √(r_in/M), ISCO (reference), MAD class, jet_eff, …
+ * Derived: ṁ from free bases (normalizeDisk); ℓ̃ from r_in; MAD class, …
  * Model defaults (not free UI): structure, arms, clumps, dust, shear, animate
  *
  * No-hair = (M, a★, Q) only. G = c = 1.
@@ -15,7 +14,7 @@ import { clamp, finiteNumber } from './math'
 
 /** Thin-disk / torus free bases + internal texture model (not free UI). */
 export type DiskParams = {
-  /** Eddington ratio ṁ = Ṁ/Ṁ_Edd (scenario / expert readout — not free UI). */
+  /** Eddington ratio ṁ = Ṁ/Ṁ_Edd — derived from free bases (not free UI). */
   readonly mdot: number
   /** Density normalization ρ₀ (relative dens / OD weight). */
   readonly rho0: number
@@ -87,6 +86,46 @@ export const DISK_LIMITS = {
 
 export type DiskInput = Partial<DiskParams>
 
+/**
+ * Derive ṁ / ṁ_Edd from free disk bases (order-of-magnitude continuity proxy).
+ *
+ * Reference (defaults): ρ₀=1, H/r=0.06, Γ=5/3, β=100, r_in=6 → ṁ ≈ 0.1
+ *
+ * Scaling (soft for usable sliders):
+ *   ṁ ∝ ρ₀^{0.6} · (H/r)² · (Γ_ref/Γ)^{0.4} · (β_ref/β)^{0.12} · (6/r_in)^{0.25}
+ *
+ * Physical intuition: denser + thicker + stronger MRI (low β) + smaller r_in
+ * → higher effective accretion rate. Not a full SS solution — expert readout.
+ */
+export function deriveMdotFromBases(d: {
+  rho0: number
+  scaleHeight: number
+  gamma: number
+  plasmaBeta: number
+  rinOverM: number
+}): number {
+  const rhoRef = 1
+  const hRef = 0.06
+  const gRef = 5 / 3
+  const betaRef = 100
+  const rinRef = 6
+  const mdotRef = DEFAULT_MDOT
+
+  const rho = Math.max(d.rho0, DISK_LIMITS.rho0.min)
+  const h = Math.max(d.scaleHeight, DISK_LIMITS.scaleHeight.min)
+  const g = clamp(d.gamma, DISK_LIMITS.gamma.min, DISK_LIMITS.gamma.max)
+  const beta = Math.max(d.plasmaBeta, DISK_LIMITS.plasmaBeta.min)
+  const rin = Math.max(d.rinOverM, DISK_LIMITS.rinOverM.min)
+
+  const densFac = Math.pow(rho / rhoRef, 0.6)
+  const hFac = Math.pow(h / hRef, 2)
+  const gFac = Math.pow(gRef / g, 0.4)
+  const betaFac = Math.pow(betaRef / beta, 0.12)
+  const rinFac = Math.pow(rinRef / rin, 0.25)
+
+  return clamp(mdotRef * densFac * hFac * gFac * betaFac * rinFac, MDOT_MIN, MDOT_MAX)
+}
+
 export function normalizeDisk(input: DiskInput = {}): DiskParams {
   const outerM = clamp(
     finiteNumber(input.outerM, DEFAULT_DISK.outerM),
@@ -100,33 +139,42 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
     DISK_LIMITS.rinOverM.min,
     Math.max(DISK_LIMITS.rinOverM.min, rinMax),
   )
+  const rho0 = clamp(
+    finiteNumber(input.rho0, DEFAULT_DISK.rho0),
+    DISK_LIMITS.rho0.min,
+    DISK_LIMITS.rho0.max,
+  )
+  const scaleHeight = clamp(
+    finiteNumber(input.scaleHeight, DEFAULT_DISK.scaleHeight),
+    DISK_LIMITS.scaleHeight.min,
+    DISK_LIMITS.scaleHeight.max,
+  )
+  const gamma = clamp(
+    finiteNumber(input.gamma, DEFAULT_DISK.gamma),
+    DISK_LIMITS.gamma.min,
+    DISK_LIMITS.gamma.max,
+  )
+  const plasmaBeta = clamp(
+    finiteNumber(input.plasmaBeta, DEFAULT_DISK.plasmaBeta),
+    DISK_LIMITS.plasmaBeta.min,
+    DISK_LIMITS.plasmaBeta.max,
+  )
+
+  // Always derived — free bases own ṁ (ignore input.mdot)
+  const mdot = deriveMdotFromBases({
+    rho0,
+    scaleHeight,
+    gamma,
+    plasmaBeta,
+    rinOverM,
+  })
 
   return {
-    mdot: clamp(
-      finiteNumber(input.mdot, DEFAULT_DISK.mdot),
-      DISK_LIMITS.mdot.min,
-      DISK_LIMITS.mdot.max,
-    ),
-    rho0: clamp(
-      finiteNumber(input.rho0, DEFAULT_DISK.rho0),
-      DISK_LIMITS.rho0.min,
-      DISK_LIMITS.rho0.max,
-    ),
-    scaleHeight: clamp(
-      finiteNumber(input.scaleHeight, DEFAULT_DISK.scaleHeight),
-      DISK_LIMITS.scaleHeight.min,
-      DISK_LIMITS.scaleHeight.max,
-    ),
-    gamma: clamp(
-      finiteNumber(input.gamma, DEFAULT_DISK.gamma),
-      DISK_LIMITS.gamma.min,
-      DISK_LIMITS.gamma.max,
-    ),
-    plasmaBeta: clamp(
-      finiteNumber(input.plasmaBeta, DEFAULT_DISK.plasmaBeta),
-      DISK_LIMITS.plasmaBeta.min,
-      DISK_LIMITS.plasmaBeta.max,
-    ),
+    mdot,
+    rho0,
+    scaleHeight,
+    gamma,
+    plasmaBeta,
     rinOverM,
     outerM,
     tiltRad: clamp(

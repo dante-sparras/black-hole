@@ -8,10 +8,17 @@ import { getScene, setScene, subscribeScene } from '../../src/state/scene'
 describe('scene facade', () => {
   test('getScene returns all slices including disk + geodesic + scaleFree + quality + grmhd', () => {
     setParams({ mass: 1, spinStar: 0.2, charge: 0 })
-    setDisk({ mdot: 0.15, outerM: 25 })
+    setDisk({
+      rho0: 1,
+      scaleHeight: 0.06,
+      gamma: 5 / 3,
+      plasmaBeta: 100,
+      rinOverM: 6,
+      outerM: 25,
+    })
     const s = getScene()
     expect(s.params.spinStar).toBeCloseTo(0.2, 5)
-    expect(s.disk.mdot).toBeCloseTo(0.15, 5)
+    expect(s.disk.mdot).toBeCloseTo(0.1, 2) // derived from free bases
     expect(s.disk.outerM).toBe(25)
     expect(s.camera.distanceM).toBe(getCamera().distanceM)
     expect(s.look.exposure).toBe(getLook().exposure)
@@ -27,14 +34,14 @@ describe('scene facade', () => {
   test('setScene patches multiple stores', () => {
     setScene({
       params: { spinStar: 0, charge: 0.4 },
-      disk: { mdot: 0.05, outerM: 40 },
+      disk: { rho0: 0.5, scaleHeight: 0.04, outerM: 40 },
       camera: { distanceM: 55 },
       look: { bloomStrength: 0.25 },
       quality: 'low',
       grmhd: { enabled: false, mix: 0 },
     })
     expect(getParams().charge).toBeCloseTo(0.4, 5)
-    expect(getDisk().mdot).toBeCloseTo(0.05, 5)
+    expect(getDisk().mdot).toBeLessThan(0.1) // cooler dens → lower ṁ
     expect(getDisk().outerM).toBe(40)
     expect(getCamera().distanceM).toBe(55)
     expect(getLook().bloomStrength).toBeCloseTo(0.25, 5)
@@ -51,7 +58,7 @@ describe('scene facade', () => {
     })
     expect(n).toBeGreaterThanOrEqual(1)
     const before = n
-    setDisk({ mdot: 0.33 })
+    setDisk({ rho0: 1.5 })
     expect(n).toBeGreaterThan(before)
     const mid = n
     setCamera({ fov: 0.85 })

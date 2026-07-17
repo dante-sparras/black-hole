@@ -44,15 +44,19 @@ describe('isExtremalOk', () => {
 })
 
 describe('normalizeDisk (not hair)', () => {
-  test('defaults', () => {
+  test('defaults derive ṁ ≈ 0.1 from free bases', () => {
     const d = normalizeDisk({})
-    expect(d.mdot).toBe(DEFAULT_DISK.mdot)
+    expect(d.mdot).toBeCloseTo(DEFAULT_DISK.mdot, 5)
     expect(d.outerM).toBe(DEFAULT_DISK.outerM)
   })
 
-  test('clamps ṁ', () => {
-    expect(normalizeDisk({ mdot: 1e-9 }).mdot).toBe(DISK_LIMITS.mdot.min)
-    expect(normalizeDisk({ mdot: 99 }).mdot).toBe(DISK_LIMITS.mdot.max)
+  test('ṁ follows free dens / H/r (not input.mdot)', () => {
+    const hot = normalizeDisk({ rho0: 4, scaleHeight: 0.14 })
+    const cool = normalizeDisk({ rho0: 0.3, scaleHeight: 0.035 })
+    expect(hot.mdot).toBeGreaterThan(0.8)
+    expect(cool.mdot).toBeLessThan(0.05)
+    // input.mdot ignored
+    expect(normalizeDisk({ mdot: 99, rho0: 1, scaleHeight: 0.06 }).mdot).toBeCloseTo(0.1, 2)
   })
 
   test('clamps outer radius', () => {

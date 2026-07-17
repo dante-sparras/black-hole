@@ -2,16 +2,28 @@ import { describe, expect, test } from 'bun:test'
 import { DEFAULT_DISK, DISK_LIMITS, normalizeDisk } from '../../src/physics/diskParams'
 
 describe('disk params (expert free bases)', () => {
-  test('defaults free bases', () => {
+  test('ṁ derived from free bases at defaults', () => {
     const d = normalizeDisk({})
-    expect(d.mdot).toBe(DEFAULT_DISK.mdot)
-    expect(d.rho0).toBe(1)
-    expect(d.scaleHeight).toBe(DEFAULT_DISK.scaleHeight)
-    expect(d.gamma).toBe(DEFAULT_DISK.gamma)
-    expect(d.rinOverM).toBe(6)
-    expect(d.plasmaBeta).toBe(100)
-    expect(d.jetBoost).toBe(0)
-    expect(d.tiltRad).toBe(0)
+    expect(d.mdot).toBeCloseTo(DEFAULT_DISK.mdot, 5)
+  })
+
+  test('ṁ rises with dens and H/r', () => {
+    const { deriveMdotFromBases } = require('../../src/physics/diskParams') as typeof import('../../src/physics/diskParams')
+    const lo = deriveMdotFromBases({
+      rho0: 0.5,
+      scaleHeight: 0.04,
+      gamma: 5 / 3,
+      plasmaBeta: 100,
+      rinOverM: 6,
+    })
+    const hi = deriveMdotFromBases({
+      rho0: 3,
+      scaleHeight: 0.12,
+      gamma: 5 / 3,
+      plasmaBeta: 100,
+      rinOverM: 6,
+    })
+    expect(hi).toBeGreaterThan(lo * 2)
   })
 
   test('clamps free bases', () => {

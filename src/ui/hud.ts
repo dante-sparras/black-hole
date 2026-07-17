@@ -1,6 +1,6 @@
 /**
  * Derived / science HUD — non-controllable readouts under free bases.
- * ṁ is expert scenario output; ℓ̃ from free r_in; ISCO is reference only.
+ * ṁ from free bases (ρ₀, H/r, Γ, β₀, r_in); ℓ̃ from r_in; ISCO reference.
  */
 import {
   mdotTemperatureScale,
@@ -48,7 +48,7 @@ export function renderDerivedHud(
       <div><dt>r_ph</dt><dd>${fmt(derived.rPhotonSphere)} <span class="dim">(${fmt(diag.rPhotonOverM, 2)} M)</span></dd></div>
 
       <div class="diag-title">Disk (derived · expert)</div>
-      <div><dt>ṁ / ṁ_Edd</dt><dd><strong>${fmtMdot(disk.mdot)}</strong> <span class="dim">scenario · not free</span></dd></div>
+      <div><dt>ṁ / ṁ_Edd</dt><dd><strong>${fmtMdot(disk.mdot)}</strong> <span class="dim">from ρ₀·H/r·Γ·β₀·r_in</span></dd></div>
       <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
       <div><dt>η_NT</dt><dd>${(eta * 100).toFixed(2)}%</dd></div>
       <div><dt>ℓ̃</dt><dd>${fmt(ell, 2)} <span class="dim">≈√(r_in/M) from free r_in</span></dd></div>
@@ -70,6 +70,6 @@ export function renderDerivedHud(
       <div><dt>⌀_shad</dt><dd>${fmt(diag.shadowDiameter)} <span class="dim">(~${fmt(diag.shadowDiameter / m, 2)} M)</span></dd></div>
       <div><dt>r_ergo</dt><dd>${fmt(derived.rErgoEquator)}</dd></div>
       <div><dt>Δ_ext</dt><dd>${fmt(derived.extremalityDelta)}</dd></div>
-      <p class="ctrl-hint" style="margin-top:6px">Free: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet · ṁ scenario · ℓ̃ & ISCO derived/ref</p>
+      <p class="ctrl-hint" style="margin-top:6px">Free: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet · ṁ & ℓ̃ derived · ISCO ref</p>
     `
 }

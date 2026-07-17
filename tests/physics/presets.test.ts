@@ -3,6 +3,7 @@ import {
   diskIsco,
   diskPeakTemperatureK,
 } from '../../src/physics/disk'
+import { normalizeDisk } from '../../src/physics/diskParams'
 import { normalizeParams } from '../../src/physics/validate'
 import { CAMERA_DEFAULTS, getCamera } from '../../src/state/camera'
 import { getDisk } from '../../src/state/disk'
@@ -25,9 +26,10 @@ import {
 
 function peakT(preset: ScenePreset): number {
   const p = normalizeParams(preset.params)
+  const d = normalizeDisk(preset.disk)
   const rIsco = diskIsco(p)
   const rIscoOverM = rIsco / p.mass
-  return diskPeakTemperatureK(preset.disk.mdot, rIscoOverM, p.spinStar)
+  return diskPeakTemperatureK(d.mdot, rIscoOverM, p.spinStar)
 }
 
 describe('presets', () => {
@@ -41,14 +43,16 @@ describe('presets', () => {
     expect(getPresetById('interstellar')?.label).toBe('Interstellar')
   })
 
-  test('every preset declares full no-hair + disk snapshot', () => {
+  test('every preset declares full no-hair + disk free bases', () => {
     for (const p of ALL_PRESETS) {
       expect(p.params.mass).toBeGreaterThan(0)
       expect(p.params.spinStar).toBeGreaterThanOrEqual(-0.998)
-            expect(p.params.spinStar).toBeLessThanOrEqual(0.998)
-      expect(p.disk.mdot).toBeGreaterThan(0)
+      expect(p.params.spinStar).toBeLessThanOrEqual(0.998)
       expect(p.disk.outerM).toBeGreaterThan(6)
       expect(Number.isFinite(p.params.charge)).toBe(true)
+      // ṁ is derived from free bases on apply
+      const d = normalizeDisk(p.disk)
+      expect(d.mdot).toBeGreaterThan(0)
     }
   })
 
@@ -56,20 +60,21 @@ describe('presets', () => {
     applyPreset(PRESET_INTERSTELLAR)
     expect(getParams().spinStar).toBeCloseTo(0.998, 3)
     expect(getParams().charge).toBe(0)
-    expect(getDisk().mdot).toBeCloseTo(0.1, 5)
+    expect(getDisk().mdot).toBeCloseTo(0.1, 2)
     expect(getLook().bloomEnabled).toBe(true)
     expect(getLook().exposure).toBeLessThan(1.1)
     expect(getLook().bloomStrength).toBeLessThan(0.5)
   })
 
-  test('apply hot raises ṁ without nuking the shadow with bloom', () => {
+  test('apply hot raises ṁ via free dens/H without nuking bloom', () => {
     applyPreset(PRESET_HOT)
-    expect(getDisk().mdot).toBeGreaterThan(1)
+    expect(getDisk().mdot).toBeGreaterThan(0.8)
+    expect(getDisk().rho0).toBeGreaterThan(2)
     expect(getLook().bloomStrength).toBeLessThan(0.5)
     expect(getLook().bloomThreshold).toBeGreaterThanOrEqual(0)
   })
 
-  test('apply cool is low ṁ', () => {
+  test('apply cool is low ṁ via thin dens', () => {
     applyPreset(PRESET_COOL)
     expect(getDisk().mdot).toBeLessThan(0.05)
     expect(getLook().bloomStrength).toBeLessThanOrEqual(0.25)

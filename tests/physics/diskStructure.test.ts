@@ -50,12 +50,13 @@ describe('disk structure realism knobs (model defaults)', () => {
     expect(e.animate).toBe(false)
   })
 
-  test('store patches structure without losing mdot', () => {
-    setDisk({ mdot: 0.3, structure: 0.5, arms: 0.4 })
+  test('store patches structure without losing free dens', () => {
+    setDisk({ rho0: 2, structure: 0.5, arms: 0.4 })
     const d = getDisk()
-    expect(d.mdot).toBeCloseTo(0.3, 5)
+    expect(d.rho0).toBeCloseTo(2, 5)
     expect(d.structure).toBeCloseTo(0.5, 5)
     expect(d.arms).toBeCloseTo(0.4, 5)
+    expect(d.mdot).toBeGreaterThan(0.1) // denser → higher derived ṁ
     setDisk(DEFAULT_DISK)
   })
 })

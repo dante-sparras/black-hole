@@ -25,8 +25,8 @@ export type ScenePreset = {
   hint: string
   /** No-hair only */
   params: Pick<BlackHoleParams, 'mass' | 'spinStar' | 'charge'>
-  /** Accretion disk (not hair) */
-  disk: Partial<DiskParams> & Pick<DiskParams, 'mdot' | 'outerM'>
+  /** Accretion disk free bases (ṁ is derived on apply/normalize) */
+  disk: Partial<DiskParams> & Pick<DiskParams, 'outerM'>
   camera: Partial<CameraState>
   look: Partial<LookState>
 }
@@ -39,17 +39,22 @@ const LOOK_SOFT: LookState = {
   exposure: 0.95,
 }
 
-const DISK_DEFAULT: Pick<DiskParams, 'mdot' | 'outerM'> = {
-  mdot: DEFAULT_DISK.mdot,
+const DISK_DEFAULT: Partial<import('../physics/diskParams').DiskParams> &
+  Pick<import('../physics/diskParams').DiskParams, 'outerM'> = {
   outerM: DEFAULT_DISK.outerM,
+  rho0: DEFAULT_DISK.rho0,
+  scaleHeight: DEFAULT_DISK.scaleHeight,
+  gamma: DEFAULT_DISK.gamma,
+  plasmaBeta: DEFAULT_DISK.plasmaBeta,
+  rinOverM: DEFAULT_DISK.rinOverM,
 }
 
 export const PRESET_DEFAULT: ScenePreset = {
   id: 'default',
   label: 'Default',
-  hint: 'a★=+0.9 · ṁ=0.1 · high prograde Kerr',
+  hint: 'a★=+0.9 · free bases → ṁ≈0.1 · high prograde Kerr',
   params: { mass: 1, spinStar: 0.9, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 0.1 },
+  disk: { ...DISK_DEFAULT },
   camera: { ...CAMERA_DEFAULTS },
   look: { ...LOOK_DEFAULTS },
 }
@@ -59,7 +64,7 @@ export const PRESET_INTERSTELLAR: ScenePreset = {
   label: 'Interstellar',
   hint: 'a★≈0.998 · hot ISCO · soft glow',
   params: { mass: 1, spinStar: 0.998, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 0.1 },
+  disk: { ...DISK_DEFAULT },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
@@ -73,9 +78,14 @@ export const PRESET_INTERSTELLAR: ScenePreset = {
 export const PRESET_HOT: ScenePreset = {
   id: 'hot',
   label: 'Hot',
-  hint: 'ṁ=1.5 · hottest multi-color BB · thin photosphere',
+  hint: 'thick dens + H/r → high ṁ · multi-color BB',
   params: { mass: 1, spinStar: 0.92, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 1.5 },
+  disk: {
+    ...DISK_DEFAULT,
+    rho0: 4,
+    scaleHeight: 0.14,
+    plasmaBeta: 40,
+  },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
@@ -89,9 +99,14 @@ export const PRESET_HOT: ScenePreset = {
 export const PRESET_COOL: ScenePreset = {
   id: 'cool',
   label: 'Cool',
-  hint: 'ṁ=0.02 · coolest multi-color BB',
+  hint: 'low ρ₀ + thin H/r → low ṁ · cool BB',
   params: { mass: 1, spinStar: 0.25, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 0.02 },
+  disk: {
+    ...DISK_DEFAULT,
+    rho0: 0.3,
+    scaleHeight: 0.035,
+    plasmaBeta: 200,
+  },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
@@ -107,7 +122,7 @@ export const PRESET_SCHWARZSCHILD: ScenePreset = {
   label: 'Schwarzschild',
   hint: 'a★=0 · Q=0 · classic shadow',
   params: { mass: 1, spinStar: 0, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 0.1 },
+  disk: { ...DISK_DEFAULT },
   camera: { ...CAMERA_DEFAULTS },
   look: { ...LOOK_SOFT },
 }
@@ -115,9 +130,13 @@ export const PRESET_SCHWARZSCHILD: ScenePreset = {
 export const PRESET_EXTREMAL: ScenePreset = {
   id: 'extremal',
   label: 'Extremal Kerr',
-  hint: 'a★≈0.998 · max Doppler · hot',
+  hint: 'a★≈0.998 · max Doppler · slightly denser',
   params: { mass: 1, spinStar: 0.998, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 0.18 },
+  disk: {
+    ...DISK_DEFAULT,
+    rho0: 1.4,
+    scaleHeight: 0.07,
+  },
   camera: { ...CAMERA_DEFAULTS },
   look: {
     ...LOOK_SOFT,
@@ -132,7 +151,7 @@ export const PRESET_RN: ScenePreset = {
   label: 'RN charged',
   hint: 'Q=0.85 · a★=0 · RN family',
   params: { mass: 1, spinStar: 0, charge: 0.85 },
-  disk: { ...DISK_DEFAULT, mdot: 0.1 },
+  disk: { ...DISK_DEFAULT },
   camera: { ...CAMERA_DEFAULTS },
   look: { ...LOOK_SOFT },
 }
@@ -145,7 +164,8 @@ export const PRESET_NT_SMOOTH: ScenePreset = {
   params: { mass: 1, spinStar: 0.9, charge: 0 },
   disk: {
     ...DISK_DEFAULT,
-    mdot: 0.15,
+    rho0: 1.2,
+    scaleHeight: 0.065,
     structure: 0,
     arms: 0,
     clumps: 0,
@@ -161,7 +181,11 @@ export const PRESET_RETROGRADE: ScenePreset = {
   label: 'Retrograde',
   hint: 'a★=−0.9 · co-rot disk · spin direction only (no counter-L)',
   params: { mass: 1, spinStar: -0.9, charge: 0 },
-  disk: { ...DISK_DEFAULT, mdot: 0.12 },
+  disk: {
+    ...DISK_DEFAULT,
+    rho0: 1.1,
+    scaleHeight: 0.062,
+  },
   camera: { ...CAMERA_DEFAULTS },
   look: { ...LOOK_SOFT, bloomStrength: 0.26, exposure: 0.98 },
 }
@@ -194,7 +218,6 @@ export function applyPreset(preset: ScenePreset | string): ScenePreset {
       charge: p.params.charge,
     })
     setDisk({
-      mdot: p.disk.mdot,
       outerM: p.disk.outerM,
       ...(typeof p.disk.structure === 'number' ? { structure: p.disk.structure } : {}),
       ...(typeof p.disk.arms === 'number' ? { arms: p.disk.arms } : {}),

@@ -32,12 +32,13 @@ describe('store batching', () => {
     const d0 = diskN
     setScene({
       params: { mass: 1.1, spinStar: 0.1, charge: 0 },
-      disk: { mdot: 0.2, outerM: 20 },
+      disk: { outerM: 20, rho0: 1, scaleHeight: 0.06 },
     })
     expect(paramsN).toBe(p0 + 1)
     expect(diskN).toBe(d0 + 1)
     expect(getParams().mass).toBeCloseTo(1.1, 5)
-    expect(getDisk().mdot).toBeCloseTo(0.2, 5)
+    expect(getDisk().outerM).toBe(20)
+    expect(getDisk().mdot).toBeCloseTo(0.1, 2)
     u1()
     u2()
   })
