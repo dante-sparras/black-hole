@@ -44,7 +44,9 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 
 **Free (UI):** ρ₀, H/r, Γ, β₀, r_in/M, r_out, tilt, jet strength.
 
-**Derived / locked:** **ṁ** from free bases (ρ₀·H/r·Γ·β₀·r_in), ℓ̃ ≈ √(r_in/M), **ISCO** (HUD reference only), SANE/MAD from β₀; structure defaults; tilt node 0. Disk always co-rotates (L ‖ J); use signed a★ for spin direction.
+**Derived / locked:** **ṁ** from free bases (ρ₀·H/r·Γ·β₀·r_in), ℓ̃ ≈ √(r_in/M), **ISCO** (HUD reference only — not forced), SANE/MAD from β₀; structure defaults; tilt node 0. Disk always co-rotates (L ‖ J); use signed a★ for spin direction.
+
+**Emission edge policy:** free **r_in** is the luminous / zero-torque edge for NT \(F̃\) and \(T(r)\) (heating \(\propto (6/(r_\mathrm{in}/M))^{3/4}\)). Family Kerr **ISCO** is HUD-only (Δr_in, science readout). Do not force r_in = ISCO.
 
 **Not free:** counter-rotating disk toggle; film palette as primary color.
 

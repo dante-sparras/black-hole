@@ -1,6 +1,7 @@
 /**
  * Effective disk geometry from free bases + BH state.
- * Free r_in/M (floored above horizon); ISCO reported as reference only.
+ * Free r_in/M = luminous / zero-torque edge (floored above horizon).
+ * Family ISCO is reference only — not forced for emission or T heating.
  */
 import type { BlackHoleParams } from './types'
 import { diskIsco } from './diskIsco'

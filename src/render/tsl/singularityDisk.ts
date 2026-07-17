@@ -58,8 +58,14 @@ export function singularityDiskComposite(p) {
   } = p
   const weight = p.weight === undefined ? float(1) : p.weight
   const beam = p.beam === undefined ? float(1) : p.beam
+  const freq = p.freq === undefined ? float(1) : p.freq
   const mdot = p.mdot === undefined ? float(0.1) : p.mdot
-  const rIscoM = p.rIscoM === undefined ? float(R_ISCO_SCHW_OVER_M) : p.rIscoM
+  // Free r_in/M (emission edge) — not family ISCO
+  const rinOverM = p.rinOverM === undefined
+    ? p.rIscoM === undefined
+      ? float(R_ISCO_SCHW_OVER_M)
+      : p.rIscoM
+    : p.rinOverM
 
   // —— Structure (singularity look; unchanged) ——
   const scale = max(rout, M.mul(10))
@@ -93,8 +99,8 @@ export function singularityDiskComposite(p) {
   const E = DISK_EMISSION
   const rLen = pos.length()
   const rSafe = max(rLen, M.mul(1.05))
-  const rin = max(rIscoM, float(1.05)).mul(max(M, float(1e-8)))
-  // Zero-torque Schw shape (good enough for dens samples; full PT is on plane path)
+  const rin = max(rinOverM, float(1.05)).mul(max(M, float(1e-8)))
+  // Zero-torque Schw shape (dens samples; full PT on plane path)
   const gap = max(float(0), float(1).sub(sqrt(rin.div(max(rSafe, rin.mul(1.0001))))))
   const Ftilde = gap.div(rSafe.mul(rSafe).mul(rSafe).add(1e-12))
   const rPeak = rin.mul(float(E.ntPeakOverRin))
@@ -103,22 +109,27 @@ export function singularityDiskComposite(p) {
   const fluxRel = min(float(1.5), Ftilde.div(max(Fmax, float(1e-12))))
   const fluxVis = pow(max(fluxRel, float(E.fluxVisFloor)), float(E.fluxVisPower))
 
-  const iscoHot = pow(
-    float(R_ISCO_SCHW_OVER_M).div(max(rIscoM, float(1.05))),
+  // Heating from free r_in (emission edge), not Kerr ISCO
+  const edgeHot = pow(
+    float(R_ISCO_SCHW_OVER_M).div(max(rinOverM, float(1.05))),
     float(E.iscoHotPower),
   )
   const tPeakK = float(T_PEAK_REF_K)
     .mul(pow(max(mdot.div(float(T_PEAK_MDOT_REF)), float(1e-6)), float(0.25)))
-    .mul(iscoHot)
-  // T(r) = T_peak · (F/Fmax)^{1/4}; mild noise jitter (not film ramp)
+    .mul(edgeHot)
+  // T_rest(r) = T_peak · (F/Fmax)^{1/4}; T_obs ∝ g (Wien); mild noise jitter
   const tJitter = float(1)
     .add(noiseAmp.sub(0.4).mul(0.12))
     .add(edgeRes.mul(0.08))
+  const gColor = pow(max(freq, float(E.gColorFloor)), float(E.gColorExponent))
   const TK = max(
     float(E.tColorMinK),
     min(
       float(E.tColorMaxK),
-      tPeakK.mul(pow(max(fluxRel, float(1e-6)), float(0.25))).mul(tJitter),
+      tPeakK
+        .mul(pow(max(fluxRel, float(1e-6)), float(0.25)))
+        .mul(gColor)
+        .mul(tJitter),
     ),
   )
 

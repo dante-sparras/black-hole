@@ -45,6 +45,7 @@ import { sampleDeepSpaceSky } from './tsl/deepSpaceSky'
 import { accumulateDiskHit } from './tsl/diskHitEmission'
 import { processDiskVolumeSample } from './tsl/diskLayerHit'
 import { singularityDiskComposite } from './tsl/singularityDisk'
+import { orbitingDiskG } from './tsl/orbitingG'
 import { knNullAccelTsl } from './tsl/knNullAccelTsl'
 
 export type {
@@ -780,6 +781,25 @@ export function createGeodesicTracer(): GeodesicTracer {
             .mul(sqrt(max(uPolyT, float(0.2))))
             .mul(mdotW)
           If(w.greaterThan(0.004), () => {
+            // Orbiting g for Doppler beam + Wien T_obs (realism; dens path)
+            const nRayD = vel.normalize()
+            const freqD = orbitingDiskG({
+              hx: hxV,
+              hz: hzV,
+              M,
+              a,
+              Q,
+              rs,
+              nRay: nRayD,
+              uPrograde,
+            })
+            const beamExpD = uIdealBeam
+              .greaterThan(0.5)
+              .select(float(DISK_EMISSION.beamExponentIdeal), float(DISK_EMISSION.beamExponent))
+            const beamFlD = uIdealBeam
+              .greaterThan(0.5)
+              .select(float(DISK_EMISSION.beamFloorIdeal), float(DISK_EMISSION.beamFloor))
+            const beamD = pow(max(freqD, beamFlD), beamExpD)
             singularityDiskComposite({
               pos: diskPos,
               M,
@@ -791,9 +811,10 @@ export function createGeodesicTracer(): GeodesicTracer {
               transm,
               hits,
               weight: w,
-              beam: float(1),
+              beam: beamD,
+              freq: freqD,
               mdot,
-              rIscoM: uRIscoM,
+              rinOverM: uRIscoM,
             })
             diskTau.addAssign(w.mul(float(0.35).add(mdotHi.mul(0.45))))
           })

@@ -23,6 +23,7 @@ export {
   pageThornePeakRadius,
   alphaDiskMidplane,
   diskPeakTemperatureK,
+  densRestTemperatureK,
   diskTemperatureK,
   observedTemperatureK,
   thinDiskScaleHeight,

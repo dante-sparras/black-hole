@@ -260,21 +260,24 @@ export function alphaDiskMidplane(
 }
 
 /**
- * Peak T [K] from ṁ and r_ISCO/M (and mild residual spin factor).
- * Dominant effect: iscoHot = (6 / (r_ISCO/M))^{3/4}
+ * Peak T [K] from ṁ and free emission-edge r_in/M (and mild residual spin factor).
+ * Dominant: edgeHot = (6 / (r_in/M))^{3/4}.
+ *
+ * Policy: free r_in is the zero-torque / luminous edge for T and F̃.
+ * Family Kerr ISCO is HUD reference only (not forced heating).
  */
 export function diskPeakTemperatureK(
   mdot: number,
-  rIscoOverM = R_ISCO_SCHW_OVER_M,
+  rinOverM = R_ISCO_SCHW_OVER_M,
   spinStar = 0,
 ): number {
   const m = Math.max(mdot, 1e-8)
-  const rinM = Math.max(rIscoOverM, 1.05)
+  const rinM = Math.max(rinOverM, 1.05)
   const { iscoHotPower, spinEtaNudge } = DISK_EMISSION
-  const iscoHot = Math.pow(R_ISCO_SCHW_OVER_M / rinM, iscoHotPower)
+  const edgeHot = Math.pow(R_ISCO_SCHW_OVER_M / rinM, iscoHotPower)
   const spinFac = 1 + spinEtaNudge * Math.max(0, Math.min(spinStar, 0.998))
   return (
-    T_PEAK_REF_K * Math.pow(m / T_PEAK_MDOT_REF, 0.25) * iscoHot * spinFac
+    T_PEAK_REF_K * Math.pow(m / T_PEAK_MDOT_REF, 0.25) * edgeHot * spinFac
   )
 }
 
@@ -282,6 +285,7 @@ export function diskPeakTemperatureK(
  * Rest-frame effective temperature [K] from Page–Thorne / NT profile:
  *   T(r) = T_peak · (F̃(r) / F̃_peak)^{1/4}
  * Peak radius from true Kerr F_max when spinning.
+ * rIsco here is the emission inner edge (free r_in), not forced family ISCO.
  */
 export function diskTemperatureK(
   r: number,
@@ -297,14 +301,35 @@ export function diskTemperatureK(
   const rPeak = pageThornePeakRadius(rIsco, mass, a)
   const Fmax = pageThorneFluxFactor(rPeak, mass, a, rIsco)
   if (!(Fmax > 0)) return 0
-  const rIscoOverM = rIsco / Math.max(mass, 1e-12)
-  const Tpeak = diskPeakTemperatureK(mdot, rIscoOverM, spinStar)
+  const rinOverM = rIsco / Math.max(mass, 1e-12)
+  const Tpeak = diskPeakTemperatureK(mdot, rinOverM, spinStar)
+  return Tpeak * Math.pow(F / Fmax, 0.25)
+}
+
+/**
+ * Dens-path rest T [K] — CPU mirror of singularityDisk (Schw NT F̃ shape).
+ * Uses free r_in as zero-torque edge (same policy as GPU dens).
+ */
+export function densRestTemperatureK(
+  r: number,
+  rin: number,
+  mdot: number,
+  mass = 1,
+): number {
+  const F = novikovThorneFluxFactor(r, rin)
+  if (F <= 0) return 0
+  const rPeak = novikovThornePeakRadius(rin)
+  const Fmax = novikovThorneFluxFactor(rPeak, rin)
+  if (!(Fmax > 0)) return 0
+  const rinOverM = rin / Math.max(mass, 1e-12)
+  const Tpeak = diskPeakTemperatureK(mdot, rinOverM, 0)
   return Tpeak * Math.pow(F / Fmax, 0.25)
 }
 
 /**
  * Observed color temperature after frequency shift g:
  *   T_obs ≈ g · T_rest  (thermal spectrum scaling)
+ * Matches DISK_EMISSION.gColorExponent via colorRedshiftFactor when soft.
  */
 export function observedTemperatureK(tRestK: number, g: number): number {
   return Math.max(0, tRestK) * Math.max(g, 0)
