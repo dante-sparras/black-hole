@@ -8,15 +8,14 @@ import { coRotatingIscoRadii } from './kerr'
 /**
  * Peak effective temperature [K] at the NT flux maximum (optical viz scale).
  *
- * T_PEAK_REF_K is an optical visualization reference (~12_000 K), chosen so
- * ṁ ≳ 1 and high-spin peaks reach blue-white multi-color BB in optical RGB.
- * Not the keV-scale T_eff of a stellar-mass X-ray binary.
+ * Real XRBs peak in X-rays (keV); this is a multi-color optical display scale
+ * so Cool→Default→Hot ladders red→white→blue-white at 60fps BB sampling.
  *
- * Higher spin → smaller r_ISCO → hotter via T ∝ r_in^{-3/4} only.
+ * Physics shape (not film): T ∝ ṁ^{1/4} · (r_in/M)^{-3/4} · F̃(r)^{1/4}.
  *
  * Reference: ṁ = 0.1, r_ISCO = 6M (Schw), a★ = 0 → T_peak = T_PEAK_REF_K.
  */
-export const T_PEAK_REF_K = 12_000
+export const T_PEAK_REF_K = 7_000
 export const T_PEAK_MDOT_REF = 0.1
 /** Schwarzschild ISCO in units of M (reference for spin heating). */
 export const R_ISCO_SCHW_OVER_M = 6
@@ -71,8 +70,8 @@ export const DISK_EMISSION = {
   structureBoostMdot: 0.5,
   outerDustCool: 0.3,
   /**
-   * Film grade — KEEP 0 for physical BB multi-color (hot = blue-white).
-   * Nonzero re-introduces gold paint and freezes palette vs ṁ/T.
+   * Film grade — MUST stay 0. Realism: pure blackbody chroma from T(r,ṁ).
+   * Nonzero re-paints gold and freezes palette vs free bases / ṁ.
    */
   filmGrade: 0,
   /** Display emission scale */
