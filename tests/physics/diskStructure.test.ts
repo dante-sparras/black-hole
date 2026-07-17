@@ -51,7 +51,15 @@ describe('disk structure realism knobs (model defaults)', () => {
   })
 
   test('store patches structure without losing free dens', () => {
-    setDisk({ rho0: 2, structure: 0.5, arms: 0.4 })
+    setDisk({
+      rho0: 2,
+      scaleHeight: 0.06,
+      gamma: 5 / 3,
+      plasmaBeta: 100,
+      rinOverM: 6,
+      structure: 0.5,
+      arms: 0.4,
+    })
     const d = getDisk()
     expect(d.rho0).toBeCloseTo(2, 5)
     expect(d.structure).toBeCloseTo(0.5, 5)
