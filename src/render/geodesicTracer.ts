@@ -44,6 +44,7 @@ import { applyDebugFalseColor } from './tsl/debugFalseColor'
 import { sampleDeepSpaceSky } from './tsl/deepSpaceSky'
 import { accumulateDiskHit } from './tsl/diskHitEmission'
 import { processDiskVolumeSample } from './tsl/diskLayerHit'
+import { singularityDiskComposite } from './tsl/singularityDisk'
 import { knNullAccelTsl } from './tsl/knNullAccelTsl'
 
 export type {
@@ -757,7 +758,7 @@ export function createGeodesicTracer(): GeodesicTracer {
         .mul(float(0.7).add(uPerturb.mul(0.6)))
       const sphR = pos.length()
 
-      // Physical volume emission: NT + Planck BB chroma (not gold ColorRamp)
+      // Singularity look path (noise dens + dual edge + α) — BB chroma only (not gold)
       If(
         dens
           .greaterThan(0.008)
@@ -779,38 +780,20 @@ export function createGeodesicTracer(): GeodesicTracer {
             .mul(sqrt(max(uPolyT, float(0.2))))
             .mul(mdotW)
           If(w.greaterThan(0.004), () => {
-            processDiskVolumeSample({
-              hx: hxV,
-              hz: hzV,
-              weight: w,
-              densVert: densZ.mul(zKill),
+            singularityDiskComposite({
+              pos: diskPos,
               M,
-              a,
-              aStar,
-              Q,
-              rs,
-              mdot,
-              rin,
+              rCapture,
               rout,
-              uRIscoM,
-              hits,
+              uTime,
+              noiseDeepMap,
               col,
               transm,
-              dbgG,
-              dbgT,
-              dbgFlux,
-              uDebugMode,
-              uIdealBeam,
-              uTime,
-              uPrograde,
-              uStructure,
-              uArms,
-              uClumps,
-              uDust,
-              uScaleH,
-              uShearRate,
-              uAnim,
-              nRay: vel.normalize(),
+              hits,
+              weight: w,
+              beam: float(1),
+              mdot,
+              rIscoM: uRIscoM,
             })
             diskTau.addAssign(w.mul(float(0.35).add(mdotHi.mul(0.45))))
           })

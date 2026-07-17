@@ -1,22 +1,32 @@
 // @ts-nocheck — TSL top-level only
 /**
- * MisterPrada/singularity BlackHole.js disk look (exact formulas).
- * Noise + thin Z-band + dual-sample edge + ColorRamp3 + front-to-back alpha.
+ * MisterPrada/singularity BlackHole.js disk look (exact structure formulas).
+ * Noise + thin Z-band + dual-sample edge + front-to-back alpha.
+ * COLOR only: Planck blackbody from ṁ + radius (not fixed gold ColorRamp).
  * Called on our Kerr geodesic samples (not his fake 1/r² rays).
  */
 import {
   abs,
   cos,
+  exp,
   float,
   max,
   min,
   mix,
+  pow,
   sin,
   sqrt,
   texture,
   vec2,
   vec3,
 } from 'three/tsl'
+import { PLANCK_C2_NM_K } from '../../physics/blackbody'
+import {
+  DISK_EMISSION,
+  R_ISCO_SCHW_OVER_M,
+  T_PEAK_MDOT_REF,
+  T_PEAK_REF_K,
+} from '../../physics/disk'
 
 /**
  * @param p.pos sample position
@@ -30,6 +40,8 @@ import {
  * @param p.hits hit counter (var)
  * @param p.weight optional extra weight (dens/path, default 1)
  * @param p.beam optional Doppler/g beam multiplier (default 1)
+ * @param p.mdot Eddington ratio (drives BB temperature)
+ * @param p.rIscoM optional r_in/M for spin/ISCO heating
  */
 export function singularityDiskComposite(p) {
   const {
@@ -45,6 +57,8 @@ export function singularityDiskComposite(p) {
   } = p
   const weight = p.weight === undefined ? float(1) : p.weight
   const beam = p.beam === undefined ? float(1) : p.beam
+  const mdot = p.mdot === undefined ? float(0.1) : p.mdot
+  const rIscoM = p.rIscoM === undefined ? float(R_ISCO_SCHW_OVER_M) : p.rIscoM
 
   // Unit-disk coords like his object space (scale by outer radius)
   const scale = max(rout, M.mul(10))
@@ -76,28 +90,94 @@ export function singularityDiskComposite(p) {
   const noiseN = n1.r.mul(0.5).add(n1.g.mul(0.3)).add(n1.b.mul(0.2)).mul(zBand)
 
   // rampInput exact: xyLen + (noiseAmp−0.78)*1.5 + (noiseAmp−noiseN)*19.75
+  // Still drives brightness structure; NOT fixed gold palette.
   const rampInput = xyLen
     .add(noiseAmp.sub(0.78).mul(1.5))
     .add(noiseAmp.sub(noiseN).mul(19.75))
   const t = min(float(1.2), max(float(0), rampInput))
 
-  // ColorRamp3 stops (exact)
-  const gold = vec3(0.95, 0.71, 0.44)
-  const brown = vec3(0.14, 0.05, 0.03)
-  const black = vec3(0.0, 0.0, 0.0)
-  const u01 = min(float(1), max(float(0), t.sub(0.05).div(0.375)))
-  const u12 = min(float(1), max(float(0), t.sub(0.425).div(0.575)))
-  const s01 = u01.mul(u01).mul(float(3).sub(u01.mul(2)))
-  const s12 = u12.mul(u12).mul(float(3).sub(u12.mul(2)))
-  const baseCol = mix(mix(gold, brown, s01), black, s12)
-  // emissive = ramp * 2 + bias
-  const emissiveCol = baseCol.mul(2.0).add(vec3(0.14, 0.129, 0.09))
-
+  // —— COLOR FIX only: Planck BB from ṁ + radius (same structure otherwise) ——
+  // Cool ṁ → red/orange; default → multi-color warm; hot ṁ → blue-white.
+  const E = DISK_EMISSION
   const rLen = pos.length()
+  const rOverM = max(rLen.div(max(M, float(1e-8))), float(1.2))
+  const iscoHot = pow(
+    float(R_ISCO_SCHW_OVER_M).div(max(rIscoM, float(1.05))),
+    float(E.iscoHotPower),
+  )
+  const tPeakK = float(T_PEAK_REF_K)
+    .mul(pow(max(mdot.div(float(T_PEAK_MDOT_REF)), float(1e-6)), float(0.25)))
+    .mul(iscoHot)
+  // Outer cooler; ramp t (his fac) cools further like brown→black limbs
+  const radCool = pow(float(6).div(max(rOverM, float(1.5))), float(0.55))
+  const rampCool = float(1.1).sub(min(t, float(1)).mul(0.75))
+  const tJitter = float(1).add(noiseAmp.sub(0.4).mul(0.3))
+  const TK = max(
+    float(E.tColorMinK),
+    min(float(E.tColorMaxK), tPeakK.mul(radCool).mul(rampCool).mul(tJitter)),
+  )
+
+  // Inline Planck B_λ → max-norm RGB (no nested helpers — TSL-safe)
+  const c2 = float(PLANCK_C2_NM_K)
+  const Tsafe = max(TK, float(800))
+  const x680 = c2.div(float(680).mul(Tsafe).add(1e-6))
+  const x610 = c2.div(float(610).mul(Tsafe).add(1e-6))
+  const x550 = c2.div(float(550).mul(Tsafe).add(1e-6))
+  const x490 = c2.div(float(490).mul(Tsafe).add(1e-6))
+  const x440 = c2.div(float(440).mul(Tsafe).add(1e-6))
+  const b680 = float(1).div(
+    float(680)
+      .mul(680)
+      .mul(680)
+      .mul(680)
+      .mul(680)
+      .mul(max(exp(min(x680, float(40))).sub(1), float(1e-20))),
+  )
+  const b610 = float(1).div(
+    float(610)
+      .mul(610)
+      .mul(610)
+      .mul(610)
+      .mul(610)
+      .mul(max(exp(min(x610, float(40))).sub(1), float(1e-20))),
+  )
+  const b550 = float(1).div(
+    float(550)
+      .mul(550)
+      .mul(550)
+      .mul(550)
+      .mul(550)
+      .mul(max(exp(min(x550, float(40))).sub(1), float(1e-20))),
+  )
+  const b490 = float(1).div(
+    float(490)
+      .mul(490)
+      .mul(490)
+      .mul(490)
+      .mul(490)
+      .mul(max(exp(min(x490, float(40))).sub(1), float(1e-20))),
+  )
+  const b440 = float(1).div(
+    float(440)
+      .mul(440)
+      .mul(440)
+      .mul(440)
+      .mul(440)
+      .mul(max(exp(min(x440, float(40))).sub(1), float(1e-20))),
+  )
+  const br = b680.mul(0.55).add(b610.mul(0.45))
+  const bg = b610.mul(0.2).add(b550.mul(0.55)).add(b490.mul(0.25))
+  const bb = b490.mul(0.35).add(b440.mul(0.65))
+  const bMax = max(br, max(bg, max(bb, float(1e-30))))
+  const baseCol = vec3(br.div(bMax), bg.div(bMax), bb.div(bMax))
+
+  // Same emissive gain as before (*2 + bias), but bias follows BB hue (not fixed gold)
+  const emissiveCol = baseCol.mul(2.0).add(baseCol.mul(0.15))
+
   const insideCore = rLen.lessThan(rCapture.mul(1.05))
   const shadedCol = insideCore.select(vec3(0, 0, 0), emissiveCol)
 
-  // Alpha shaping (his aNoise / aBand / aRadial)
+  // Alpha shaping (his aNoise / aBand / aRadial) — UNCHANGED
   const aNoise = noiseAmp.sub(0.75).mul(-0.6)
   const aPre = zAbs.add(aNoise)
   const aRadial = min(float(1), max(float(0), float(1.05).sub(xyLen)))
