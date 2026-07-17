@@ -1,10 +1,14 @@
 /**
  * Derived / science HUD — non-controllable readouts under free bases.
- * ṁ from free bases (ρ₀, H/r, Γ, β₀, r_in); ℓ̃ from r_in; ISCO reference.
+ * ṁ from free bases; ℓ̃ from r_in; ISCO ref; T_peak optical viz from NT edge.
  */
 import {
+  densRestTemperatureK,
+  diskPeakTemperatureK,
   mdotTemperatureScale,
   novikovThorneEfficiency,
+  novikovThornePeakRadius,
+  observedTemperatureK,
 } from '../physics/disk'
 import {
   keplerSpecificL,
@@ -12,10 +16,12 @@ import {
   type DiskParams,
 } from '../physics/diskParams'
 import { effectiveDiskGeom } from '../physics/diskGeometry'
+import { orbitingRedshiftFactor } from '../physics/geodesic/doppler'
 import { jetEffectivePower } from '../physics/jets'
 import { shadowDiagnostics } from '../physics/diagnostics'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
-import { fmt, fmtMdot } from './format'
+import { spinLength } from '../physics/types'
+import { fmt, fmtMdot, fmtTempK } from './format'
 
 export function renderDerivedHud(
   root: HTMLElement,
@@ -39,6 +45,22 @@ export function renderDerivedHud(
   const tiltDeg = (disk.tiltRad * 180) / Math.PI
   const iscoDelta = geom.rinOverM - geom.iscoOverM
 
+  // Optical-viz peak T (rest) at free r_in edge heating; dens path uses Schw NT peak
+  const tPeakRest = diskPeakTemperatureK(disk.mdot, geom.rinOverM, params.spinStar)
+  const rIn = geom.rIn
+  const rPeakNt = novikovThornePeakRadius(rIn)
+  const tPeakDens = densRestTemperatureK(rPeakNt, rIn, disk.mdot, m)
+  const aLen = spinLength(params)
+  const face = orbitingRedshiftFactor({
+    mass: m,
+    r: rPeakNt,
+    spinLength: aLen,
+    charge: params.charge,
+    mu: 0,
+    prograde: true,
+  })
+  const tPeakFace = observedTemperatureK(tPeakDens, face.g)
+
   root.innerHTML = `
       <div class="diag-title">Black hole (derived)</div>
       <div><dt>family</dt><dd>${derived.family}</dd></div>
@@ -49,11 +71,13 @@ export function renderDerivedHud(
 
       <div class="diag-title">Disk (derived · expert)</div>
       <div><dt>ṁ / ṁ_Edd</dt><dd><strong>${fmtMdot(disk.mdot)}</strong> <span class="dim">from ρ₀·H/r·Γ·β₀·r_in</span></dd></div>
-      <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
+      <div><dt>T_peak</dt><dd><strong>${fmtTempK(tPeakRest)}</strong> <span class="dim">rest · optical viz · free r_in edge</span></dd></div>
+      <div><dt>T_peak dens</dt><dd>${fmtTempK(tPeakDens)} <span class="dim">NT r_peak · face-on ${fmtTempK(tPeakFace)} (g=${fmt(face.g, 3)})</span></dd></div>
+      <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)} <span class="dim">vs ṁ=0.1</span></dd></div>
       <div><dt>η_NT</dt><dd>${(eta * 100).toFixed(2)}%</dd></div>
       <div><dt>ℓ̃</dt><dd>${fmt(ell, 2)} <span class="dim">≈√(r_in/M) from free r_in</span></dd></div>
       <div><dt>r_ISCO</dt><dd>${fmt(geom.iscoOverM, 2)} M <span class="dim">ref · Δr_in=${fmt(iscoDelta, 2)} M</span></dd></div>
-      <div><dt>r_peak</dt><dd>${fmt(geom.rPeakOverM, 1)} M</dd></div>
+      <div><dt>r_peak</dt><dd>${fmt(geom.rPeakOverM, 1)} M <span class="dim">dens ℓ · NT ${fmt(rPeakNt / m, 2)} M</span></dd></div>
       <div><dt>orbit</dt><dd>${orbit}</dd></div>
       <div><dt>β class</dt><dd>${magClass.toUpperCase()} <span class="dim">from β₀</span></dd></div>
       <div><dt>jet_eff</dt><dd>${fmt(jetEff, 3)} <span class="dim">∝ a★² ṁ^0.4 · strength</span></dd></div>
@@ -70,6 +94,6 @@ export function renderDerivedHud(
       <div><dt>⌀_shad</dt><dd>${fmt(diag.shadowDiameter)} <span class="dim">(~${fmt(diag.shadowDiameter / m, 2)} M)</span></dd></div>
       <div><dt>r_ergo</dt><dd>${fmt(derived.rErgoEquator)}</dd></div>
       <div><dt>Δ_ext</dt><dd>${fmt(derived.extremalityDelta)}</dd></div>
-      <p class="ctrl-hint" style="margin-top:6px">Free: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet · ṁ & ℓ̃ derived · ISCO ref</p>
+      <p class="ctrl-hint" style="margin-top:6px">Free: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet · ṁ & T_peak derived · ISCO ref · g Doppler on dens</p>
     `
 }
