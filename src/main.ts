@@ -4,6 +4,7 @@ import * as THREE from 'three/webgpu'
 
 import { createSceneBridge } from './app/sceneBridge'
 import { loadGrmhdFromUrl } from './app/grmhdLoader'
+import { publicUrl } from './app/publicUrl'
 import { getDebug } from './debug/state'
 import { createBloomPipeline } from './render/bloomPipeline'
 import { createGeodesicTracer } from './render/geodesicTracer'
@@ -108,7 +109,7 @@ async function boot(): Promise<void> {
   // Default dens = analytic (demo cube still has high-m lace → face-on rings)
   // User can enable GRMHD cube via Numerics.
   try {
-    await loadGrmhdFromUrl('/cubes/demo.bhcm', tracer, {
+    await loadGrmhdFromUrl(publicUrl('cubes/demo.bhcm'), tracer, {
       enable: false,
       mix: 0,
       label: 'demo',

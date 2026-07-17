@@ -47,6 +47,7 @@ import { processDiskVolumeSample } from './tsl/diskLayerHit'
 import { singularityDiskComposite } from './tsl/singularityDisk'
 import { orbitingDiskG } from './tsl/orbitingG'
 import { knNullAccelTsl } from './tsl/knNullAccelTsl'
+import { publicUrl } from '../app/publicUrl'
 
 export type {
   CameraTraceParams,
@@ -135,7 +136,8 @@ export function createGeodesicTracer(): GeodesicTracer {
   const cubeTexNode = texture3D(stubTex)
 
   // Singularity-style deep noise dens layer (2D, spiral UV)
-  const noiseDeepMap = new THREE.TextureLoader().load('/noise_deep.png')
+  // publicUrl() — must work under Vite base (e.g. /black-hole/ on GitHub Pages)
+  const noiseDeepMap = new THREE.TextureLoader().load(publicUrl('noise_deep.png'))
   noiseDeepMap.wrapS = THREE.RepeatWrapping
   noiseDeepMap.wrapT = THREE.RepeatWrapping
   noiseDeepMap.minFilter = THREE.LinearFilter
