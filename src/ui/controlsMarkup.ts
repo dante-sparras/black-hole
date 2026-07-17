@@ -4,7 +4,8 @@ import { CAMERA_LIMITS, radToDeg } from '../state/camera'
 import { ALL_PRESETS } from '../state/presets'
 
 function infoBtn(helpId: string, label: string): string {
-  return `<button type="button" class="ctrl-info" data-help="${helpId}" aria-label="About ${label}" aria-expanded="false" title="About ${label}">🛈</button>`
+  // No `title` attr — browser native tooltip stacks on top of our card.
+  return `<button type="button" class="ctrl-info" data-help="${helpId}" aria-label="About ${label}" aria-expanded="false">🛈</button>`
 }
 
 function ctrlRow(
