@@ -17,10 +17,13 @@ export type SkyState = {
 }
 
 export const SKY_DEFAULTS: SkyState = {
-  starDensity: 1.85,
-  starBrightness: 1.4,
-  nebula: 0.55,
-  milky: 0.7,
+  /** Dense field like space.jpg */
+  starDensity: 2.4,
+  starBrightness: 1.55,
+  /** Cool void dust + magenta patches */
+  nebula: 0.85,
+  /** Warm core + dust lanes */
+  milky: 1.15,
 }
 
 export const SKY_LIMITS = {

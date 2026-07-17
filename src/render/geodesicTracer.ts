@@ -145,16 +145,6 @@ export function createGeodesicTracer(): GeodesicTracer {
   noiseDeepMap.colorSpace = THREE.NoColorSpace
   noiseDeepMap.generateMipmaps = false
 
-  // Equirectangular deep-space backdrop (user-provided)
-  const spaceMap = new THREE.TextureLoader().load(publicUrl('space.jpg'))
-  spaceMap.wrapS = THREE.RepeatWrapping
-  spaceMap.wrapT = THREE.ClampToEdgeWrapping
-  spaceMap.minFilter = THREE.LinearFilter
-  spaceMap.magFilter = THREE.LinearFilter
-  spaceMap.colorSpace = THREE.SRGBColorSpace
-  spaceMap.generateMipmaps = false
-  spaceMap.flipY = true
-
   const STEPS = RT.maxSteps
 
   const colorNode = Fn(() => {
@@ -979,7 +969,7 @@ export function createGeodesicTracer(): GeodesicTracer {
 
     If(escaped.greaterThan(0.5), () => {
       const d = vel.normalize()
-      const sky = sampleDeepSpaceSky(d, spaceMap, uStarBright)
+      const sky = sampleDeepSpaceSky(d, uStarDensity, uStarBright, uNebula, uMilky)
       col.addAssign(sky.mul(transm))
     })
 
