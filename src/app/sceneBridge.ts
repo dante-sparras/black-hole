@@ -12,8 +12,6 @@ import {
   rhoTemperatureScale,
 } from '../physics/diskParams'
 import { effectiveDiskGeom } from '../physics/diskGeometry'
-import { resolveCameraDistance } from '../physics/observer'
-import { realtimeModeTag } from '../physics/metricFamily'
 import type { createBloomPipeline } from '../render/bloomPipeline'
 import type { GeodesicTracer } from '../render/geodesicTracerTypes'
 import { getCamera, subscribeCamera } from '../state/camera'
@@ -231,41 +229,11 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     }
   }
 
-  function formatStats(fps: number, healthLine?: string): string {
-    const {
-      params: p,
-      derived: d,
-      disk,
-      camera: c,
-      look,
-      geodesic,
-      scaleFree,
-      idealBeam,
-      quality,
-      grmhd,
-    } = getScene()
-    const m = p.mass.toFixed(2)
-    const a = p.spinStar.toFixed(3)
-    const q = p.charge.toFixed(3)
-    const md = disk.mdot >= 0.01 ? disk.mdot.toFixed(2) : disk.mdot.toExponential(1)
-    const rp = Number.isFinite(d.rPlus) ? d.rPlus.toFixed(3) : '—'
-    const D = resolveCameraDistance(p.mass, c.distanceM, scaleFree)
-    const distTag = scaleFree
-      ? `d=${c.distanceM.toFixed(1)}M (D/M)`
-      : `D=${D.toFixed(1)} (fixed)`
-    const orbitTag = 'co' // disk always co-rotates; a★ sign sets sense
-    const beamTag = idealBeam ? 'g³' : 'g²'
-    const densTag =
-      grmhd.enabled && grmhd.hasCube ? `dens=${grmhd.label}` : 'dens=analytic'
-    const mode = realtimeModeTag(p, geodesic)
-    const bloomTag = look.bloomEnabled
-      ? `bloom=${look.bloomStrength.toFixed(2)}`
-      : 'bloom=off'
-    const dbg = getDebug().mode !== 0 ? ` · dbg=${getDebug().mode}` : ''
-    const base = `${fps} fps · ${mode} · ${densTag} · ${d.family} · M=${m} a★=${a} Q=${q} ṁ=${md} · ${orbitTag} · ${beamTag} · q=${quality.level} · r_out=${disk.outerM.toFixed(0)}M · ${bloomTag} · r₊=${rp} · ${distTag}${dbg}`
-    return healthLine ? `${base}
-${healthLine}` : base
-  }
+  function formatStats(fps: number, _healthLine?: string): string {
+      const { quality } = getScene()
+      // Top bar: FPS + quality only — science lives in Readouts
+      return `${fps} fps · ${quality.level}`
+    }
 
   return {
     applyPhysics,

@@ -163,12 +163,8 @@ async function boot(): Promise<void> {
       frames = 0
       fpsAccum = 0
       if (statsEl) {
-        const health = debugHud?.getLastHealth()
-        statsEl.textContent = bridge.formatStats(
-          fps,
-          health ? `health: ${health.summary}` : undefined,
-        )
-      }
+              statsEl.textContent = bridge.formatStats(fps)
+            }
     }
   }
 

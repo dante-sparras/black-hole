@@ -13,18 +13,12 @@ const MQ = '(max-width: 768px), (pointer: coarse) and (max-height: 900px)'
 export function mountMobileHud(): MobileHudHandles {
   const hud = document.getElementById('hud')
   const toggle = document.getElementById('hud-toggle') as HTMLButtonElement | null
-  const hint = document.getElementById('hud-hint')
 
   const mq = window.matchMedia(MQ)
 
   function applyLayout(): void {
     const mobile = mq.matches
     document.documentElement.classList.toggle('is-mobile', mobile)
-    if (hint) {
-      hint.textContent = mobile
-        ? 'Drag canvas to orbit · pinch zoom · tap Panels for controls.'
-        : 'Drag to orbit · scroll zoom · free controls · science readouts below.'
-    }
     if (!mobile && hud) {
       hud.classList.remove('hud-collapsed')
       toggle?.setAttribute('aria-expanded', 'true')
