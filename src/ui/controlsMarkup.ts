@@ -8,12 +8,8 @@ function infoBtn(helpId: string, label: string): string {
   return `<button type="button" class="ctrl-info" data-help="${helpId}" aria-label="About ${label}" aria-expanded="false">🛈</button>`
 }
 
-function ctrlRow(
-  helpId: string,
-  name: string,
-  controlHtml: string,
-  valAttr: string,
-): string {
+/** Select / non-numeric value readout (quality, dens src). */
+function selectRow(helpId: string, name: string, controlHtml: string, valAttr: string): string {
   return `
     <div class="ctrl">
       <span class="ctrl-label">
@@ -26,9 +22,41 @@ function ctrlRow(
 }
 
 /**
+ * Slider + editable number. `num*` may differ from range (log-mapped ρ₀/β₀).
+ */
+function sliderRow(
+  helpId: string,
+  name: string,
+  id: string,
+  range: { min: number; max: number; step: number },
+  valAttr: string,
+  num: { min: number; max: number; step: number | string },
+): string {
+  return `
+    <div class="ctrl">
+      <span class="ctrl-label">
+        <span class="ctrl-name">${name}</span>
+        ${infoBtn(helpId, name)}
+      </span>
+      <input type="range" id="${id}" min="${range.min}" max="${range.max}" step="${range.step}" />
+      <input
+        type="number"
+        class="ctrl-num"
+        data-val="${valAttr}"
+        min="${num.min}"
+        max="${num.max}"
+        step="${num.step}"
+        inputmode="decimal"
+        aria-label="${name} value"
+      />
+    </div>`
+}
+
+/**
  * Expert free bases: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet.
  * ṁ is scenario/preset — derived HUD only.
  * Mass locked M=1 (scale-free camera) — not a free look lever.
+ * Each slider has a paired number field (drag or type).
  */
 export function buildControlsHtml(): string {
   const distLim = CAMERA_LIMITS.distanceM
@@ -39,6 +67,9 @@ export function buildControlsHtml(): string {
   const h = DISK_LIMITS.scaleHeight
   const g = DISK_LIMITS.gamma
   const rin = DISK_LIMITS.rinOverM
+  const rho = DISK_LIMITS.rho0
+  const beta = DISK_LIMITS.plasmaBeta
+  const outer = DISK_LIMITS.outerM
 
   return `
     <div class="ctrl-section">Presets</div>
@@ -51,100 +82,128 @@ export function buildControlsHtml(): string {
     <p class="ctrl-hint" id="preset-hint">Hot · Cool · Interstellar · ṁ derived on HUD</p>
 
     <div class="ctrl-section">Black hole (no-hair)</div>
-    ${ctrlRow(
+    ${sliderRow(
       'spin',
       'Spin a★',
-      `<input type="range" id="p-spin" min="${-MAX_SPIN_STAR}" max="${MAX_SPIN_STAR}" step="0.001" />`,
+      'p-spin',
+      { min: -MAX_SPIN_STAR, max: MAX_SPIN_STAR, step: 0.001 },
       'spin',
+      { min: -MAX_SPIN_STAR, max: MAX_SPIN_STAR, step: 0.001 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'charge',
       'Charge Q',
-      `<input type="range" id="p-charge" min="0" max="0.95" step="0.01" />`,
+      'p-charge',
+      { min: 0, max: 0.95, step: 0.01 },
       'charge',
+      { min: 0, max: 0.95, step: 0.01 },
     )}
-    <p class="ctrl-hint">M = 1 locked (scale-free) · a★ ∈ [−0.998, +0.998]</p>
+    <p class="ctrl-hint">M = 1 locked (scale-free) · a★ ∈ [−0.998, +0.998] · drag or type</p>
 
     <div class="ctrl-section">Accretion disk (free bases)</div>
-    ${ctrlRow(
+    ${sliderRow(
       'rho0',
       'ρ₀ dens',
-      `<input type="range" id="d-rho0" min="0" max="1000" step="1" />`,
+      'd-rho0',
+      { min: 0, max: 1000, step: 1 },
       'rho0',
+      { min: rho.min, max: rho.max, step: 'any' },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'scaleH',
       'H/r',
-      `<input type="range" id="d-hr" min="${h.min}" max="${h.max}" step="0.002" />`,
+      'd-hr',
+      { min: h.min, max: h.max, step: 0.002 },
       'hr',
+      { min: h.min, max: h.max, step: 0.002 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'gamma',
       'Γ EOS',
-      `<input type="range" id="d-gamma" min="${g.min}" max="${g.max}" step="0.01" />`,
+      'd-gamma',
+      { min: g.min, max: g.max, step: 0.01 },
       'gamma',
+      { min: g.min, max: g.max, step: 0.01 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'beta',
       'β₀ plasma',
-      `<input type="range" id="d-beta" min="0" max="1000" step="1" />`,
+      'd-beta',
+      { min: 0, max: 1000, step: 1 },
       'beta',
+      { min: beta.min, max: beta.max, step: 'any' },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'rin',
       'r_in / M',
-      `<input type="range" id="d-rin" min="${rin.min}" max="${rin.max}" step="0.1" />`,
+      'd-rin',
+      { min: rin.min, max: rin.max, step: 0.1 },
       'rin',
+      { min: rin.min, max: rin.max, step: 0.1 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'outer',
       'r_out / M',
-      `<input type="range" id="d-outer" min="${DISK_LIMITS.outerM.min}" max="${DISK_LIMITS.outerM.max}" step="1" />`,
+      'd-outer',
+      { min: outer.min, max: outer.max, step: 1 },
       'outer',
+      { min: outer.min, max: outer.max, step: 1 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'tilt',
       'Tilt °',
-      `<input type="range" id="d-tilt" min="0" max="${tiltDegMax.toFixed(0)}" step="0.5" />`,
+      'd-tilt',
+      { min: 0, max: Number(tiltDegMax.toFixed(0)), step: 0.5 },
       'tilt',
+      { min: 0, max: Number(tiltDegMax.toFixed(0)), step: 0.5 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'jet',
       'Jet strength',
-      `<input type="range" id="d-jet" min="0" max="1" step="0.01" />`,
+      'd-jet',
+      { min: 0, max: 1, step: 0.01 },
       'jet',
+      { min: 0, max: 1, step: 0.01 },
     )}
-    <p class="ctrl-hint">Free: ρ₀ · H/r · Γ · β₀ · r_in · r_out · tilt · jet · ℓ̃ & ṁ on HUD</p>
+    <p class="ctrl-hint">Free: ρ₀ · H/r · Γ · β₀ · r_in · r_out · tilt · jet · type or drag</p>
 
     <div class="ctrl-section">Observer</div>
-    ${ctrlRow(
+    ${sliderRow(
       'dist',
       'Distance / M',
-      `<input type="range" id="c-dist" min="${distLim.min}" max="${distLim.max}" step="0.5" />`,
+      'c-dist',
+      { min: distLim.min, max: distLim.max, step: 0.5 },
       'dist',
+      { min: distLim.min, max: distLim.max, step: 0.5 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'inc',
       'Incl °',
-      `<input type="range" id="c-inc" min="${incDegMin.toFixed(0)}" max="${incDegMax.toFixed(0)}" step="0.5" />`,
+      'c-inc',
+      { min: Number(incDegMin.toFixed(0)), max: Number(incDegMax.toFixed(0)), step: 0.5 },
       'inc',
+      { min: Number(incDegMin.toFixed(0)), max: Number(incDegMax.toFixed(0)), step: 0.5 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'azim',
       'Azim °',
-      `<input type="range" id="c-az" min="0" max="360" step="0.5" />`,
+      'c-az',
+      { min: 0, max: 360, step: 0.5 },
       'azim',
+      { min: 0, max: 360, step: 0.5 },
     )}
-    ${ctrlRow(
+    ${sliderRow(
       'fov',
       'FOV',
-      `<input type="range" id="c-fov" min="${fovLim.min}" max="${fovLim.max}" step="0.01" />`,
+      'c-fov',
+      { min: fovLim.min, max: fovLim.max, step: 0.01 },
       'fov',
+      { min: fovLim.min, max: fovLim.max, step: 0.01 },
     )}
     <p class="ctrl-hint">Scale-free D = d·M · drag canvas to orbit</p>
 
     <div class="ctrl-section">Numerics (not physics)</div>
-    ${ctrlRow(
+    ${selectRow(
       'quality',
       'Quality',
       `<select id="q-level" class="ctrl-select">
@@ -154,7 +213,7 @@ export function buildControlsHtml(): string {
       </select>`,
       'quality',
     )}
-    ${ctrlRow(
+    ${selectRow(
       'grmhd',
       'Density src',
       `<select id="grmhd-src" class="ctrl-select">
