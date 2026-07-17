@@ -15,12 +15,9 @@ import {
   getPresetById,
   listPresetIds,
   PRESET_COOL,
-  PRESET_DEFAULT,
-  PRESET_EXTREMAL,
   PRESET_HOT,
   PRESET_INTERSTELLAR,
-  PRESET_RN,
-  PRESET_SCHWARZSCHILD,
+  PRESET_MASS,
   type ScenePreset,
 } from '../../src/state/presets'
 
@@ -33,10 +30,10 @@ function peakT(preset: ScenePreset): number {
 }
 
 describe('presets', () => {
-  test('all presets have unique ids', () => {
+  test('UI presets are Cool · Interstellar · Hot only', () => {
     const ids = listPresetIds()
-    expect(new Set(ids).size).toBe(ids.length)
-    expect(ids.length).toBe(9)
+    expect(ids).toEqual(['cool', 'interstellar', 'hot'])
+    expect(new Set(ids).size).toBe(3)
   })
 
   test('getPresetById finds interstellar', () => {
@@ -45,19 +42,19 @@ describe('presets', () => {
 
   test('every preset declares full no-hair + disk free bases', () => {
     for (const p of ALL_PRESETS) {
-      expect(p.params.mass).toBeGreaterThan(0)
+      expect(p.params.mass).toBe(PRESET_MASS)
       expect(p.params.spinStar).toBeGreaterThanOrEqual(-0.998)
       expect(p.params.spinStar).toBeLessThanOrEqual(0.998)
       expect(p.disk.outerM).toBeGreaterThan(6)
       expect(Number.isFinite(p.params.charge)).toBe(true)
-      // ṁ is derived from free bases on apply
       const d = normalizeDisk(p.disk)
       expect(d.mdot).toBeGreaterThan(0)
     }
   })
 
-  test('apply interstellar sets near-extremal spin, no charge', () => {
+  test('apply interstellar sets near-extremal spin, no charge, locked M', () => {
     applyPreset(PRESET_INTERSTELLAR)
+    expect(getParams().mass).toBe(PRESET_MASS)
     expect(getParams().spinStar).toBeCloseTo(0.998, 3)
     expect(getParams().charge).toBe(0)
     expect(getDisk().mdot).toBeCloseTo(0.1, 2)
@@ -68,6 +65,7 @@ describe('presets', () => {
 
   test('apply hot raises ṁ via free dens/H without nuking bloom', () => {
     applyPreset(PRESET_HOT)
+    expect(getParams().mass).toBe(PRESET_MASS)
     expect(getDisk().mdot).toBeGreaterThan(0.8)
     expect(getDisk().rho0).toBeGreaterThan(2)
     expect(getLook().bloomStrength).toBeLessThan(0.5)
@@ -78,23 +76,6 @@ describe('presets', () => {
     applyPreset(PRESET_COOL)
     expect(getDisk().mdot).toBeLessThan(0.05)
     expect(getLook().bloomStrength).toBeLessThanOrEqual(0.25)
-  })
-
-  test('apply schwarzschild zeros spin and charge', () => {
-    applyPreset(PRESET_SCHWARZSCHILD)
-    expect(getParams().spinStar).toBe(0)
-    expect(getParams().charge).toBe(0)
-  })
-
-  test('apply RN has charge and no spin', () => {
-    applyPreset(PRESET_RN)
-    expect(getParams().spinStar).toBe(0)
-    expect(getParams().charge).toBeGreaterThan(0.5)
-  })
-
-  test('apply extremal by id string', () => {
-    applyPreset('extremal')
-    expect(getParams().spinStar).toBeCloseTo(PRESET_EXTREMAL.params.spinStar, 3)
   })
 
   test('unknown id throws', () => {
@@ -130,9 +111,9 @@ describe('presets', () => {
     for (const p of ALL_PRESETS) {
       applyPreset(p)
       const phys = getParams()
-      expect(phys.mass).toBeGreaterThan(0)
+      expect(phys.mass).toBe(PRESET_MASS)
       expect(phys.spinStar).toBeGreaterThanOrEqual(-0.998)
-            expect(phys.spinStar).toBeLessThanOrEqual(0.998)
+      expect(phys.spinStar).toBeLessThanOrEqual(0.998)
       expect(getDisk().mdot).toBeGreaterThan(0)
       const a = phys.spinStar * phys.mass
       expect(phys.mass * phys.mass).toBeGreaterThanOrEqual(
@@ -141,21 +122,12 @@ describe('presets', () => {
     }
   })
 
-  test('preset peak-T ladder is physical', () => {
+  test('peak-T ladder Cool < Interstellar < Hot', () => {
     const cool = peakT(PRESET_COOL)
-    const schw = peakT(PRESET_SCHWARZSCHILD)
-    const rn = peakT(PRESET_RN)
-    const def = peakT(PRESET_DEFAULT)
     const inter = peakT(PRESET_INTERSTELLAR)
-    const ext = peakT(PRESET_EXTREMAL)
     const hot = peakT(PRESET_HOT)
-
-    expect(cool).toBeLessThan(schw)
-    expect(schw).toBeLessThanOrEqual(rn * 1.001)
-    expect(rn).toBeLessThan(def)
-    expect(def).toBeLessThan(inter)
-    expect(inter).toBeLessThan(ext)
-    expect(ext).toBeLessThan(hot)
+    expect(cool).toBeLessThan(inter)
+    expect(inter).toBeLessThan(hot)
   })
 
   test('Hot is hottest; Cool is coolest', () => {
@@ -166,21 +138,9 @@ describe('presets', () => {
     expect(coolest.id).toBe('cool')
   })
 
-  test('Interstellar hotter than Default at similar ṁ (spin heating)', () => {
-    expect(peakT(PRESET_INTERSTELLAR)).toBeGreaterThan(peakT(PRESET_DEFAULT) * 1.5)
-  })
-
-  test('apply clears charge when switching RN → Schwarzschild', () => {
-    applyPreset(PRESET_RN)
-    expect(getParams().charge).toBeGreaterThan(0)
-    applyPreset(PRESET_SCHWARZSCHILD)
-    expect(getParams().charge).toBe(0)
-    expect(getParams().spinStar).toBe(0)
-  })
-
-  test('apply clears spin when switching Extremal → Cool', () => {
-    applyPreset(PRESET_EXTREMAL)
-    expect(getParams().spinStar).toBeCloseTo(0.998, 2)
+  test('apply clears spin when switching Hot → Cool', () => {
+    applyPreset(PRESET_HOT)
+    expect(getParams().spinStar).toBeGreaterThan(0.8)
     applyPreset(PRESET_COOL)
     expect(getParams().spinStar).toBeLessThan(0.3)
     expect(getDisk().mdot).toBeLessThan(0.05)

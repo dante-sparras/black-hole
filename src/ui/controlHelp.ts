@@ -15,23 +15,14 @@ export type ControlHelp = {
 
 /** Keys match data-help attributes on control info buttons. */
 export const CONTROL_HELP: Record<string, ControlHelp> = {
-  mass: {
-    title: 'Mass M',
-    summary: 'Black-hole mass in geometric units (G = c = 1).',
-    body: `M sets the overall scale of horizons, ISCO, and the disk in geometric lengths.
-
-With scale-free camera ON (default), distance is d·M so the angular size of the shadow stays roughly constant when you change M — mass is a pure scale.
-
-With scale-free OFF, fixed geometric D makes a heavier hole larger on screen.`,
-  },
   spin: {
     title: 'Spin a★',
     summary: 'Dimensionless spin a★ = J/M² (signed).',
-    body: `Range ≈ −0.998…+0.998 (default +0.9). Kerr length a = a★·M.
+    body: `Range ≈ −0.998…+0.998 (default +0.9). Kerr length a = a★·M with M locked at 1 (scale-free).
 
 Sign sets rotation sense and which way the disk co-rotates (L ‖ J). Magnitude shrinks the prograde ISCO and photon orbit, warps the shadow, and enables frame-drag / jet power.
 
-Negative a★ is the Retrograde preset sense — spin reversed, disk still co-rotating.`,
+Negative a★ reverses spin; the disk still co-rotates with J.`,
   },
   charge: {
     title: 'Charge Q',
@@ -105,9 +96,9 @@ Educational BZ-like jet, not full GRMHD. ṁ is scenario/preset; this is the fre
   dist: {
     title: 'Distance / M',
     summary: 'Observer distance in units of M (scale-free d).',
-    body: `With scale-free ON (default): slider is d such that D = d·M — angular lensing is mass-invariant.
+    body: `Scale-free camera (always on): slider is d with D = d·M and M locked at 1 — angular framing in units of M.
 
-With scale-free OFF: slider is absolute geometric D. Drag the canvas to orbit; wheel/pinch to zoom when available.`,
+Drag the canvas to orbit; wheel/pinch to zoom when available.`,
   },
   inc: {
     title: 'Inclination',

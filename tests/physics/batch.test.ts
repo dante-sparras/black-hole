@@ -49,7 +49,7 @@ describe('store batching', () => {
       n++
     })
     const before = n
-    applyPreset('default')
+    applyPreset('interstellar')
     // one params notify from batched preset (not 4 separate storms on params)
     expect(n).toBe(before + 1)
     u()

@@ -3,7 +3,6 @@ import { CONTROL_HELP, getControlHelp } from '../../src/ui/controlHelp'
 import { buildControlsHtml } from '../../src/ui/controlsMarkup'
 
 const EXPECTED_KEYS = [
-  'mass',
   'spin',
   'charge',
   'rho0',
@@ -33,12 +32,13 @@ describe('control 🛈 help', () => {
     }
   })
 
-  test('CONTROL_HELP keys match free UI set (no free ṁ)', () => {
+  test('CONTROL_HELP keys match free UI set (no free ṁ / mass)', () => {
     expect(Object.keys(CONTROL_HELP).sort()).toEqual([...EXPECTED_KEYS].sort())
     expect(CONTROL_HELP.mdot).toBeUndefined()
+    expect(CONTROL_HELP.mass).toBeUndefined()
   })
 
-  test('markup has expert free bases and no ṁ slider', () => {
+  test('markup has expert free bases, three presets, no mass/ṁ sliders', () => {
     const html = buildControlsHtml()
     for (const k of EXPECTED_KEYS) {
       expect(html).toContain(`data-help="${k}"`)
@@ -47,6 +47,13 @@ describe('control 🛈 help', () => {
     expect(html).toContain('id="d-gamma"')
     expect(html).toContain('id="d-rin"')
     expect(html).not.toContain('id="d-mdot"')
+    expect(html).not.toContain('id="p-mass"')
     expect(html).toContain('Jet strength')
+    expect(html).toContain('data-preset="cool"')
+    expect(html).toContain('data-preset="interstellar"')
+    expect(html).toContain('data-preset="hot"')
+    expect(html).not.toContain('data-preset="schwarzschild"')
+    expect(html).not.toContain('data-preset="default"')
+    expect(html).toContain('M = 1 locked')
   })
 })

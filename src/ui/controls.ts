@@ -51,71 +51,69 @@ export function mountControls(
   derivedRoot: HTMLElement | null,
 ): void {
   root.innerHTML = buildControlsHtml()
-  setScaleFree(true)
-  setIdealBeam(true)
-  mountControlInfo(root)
+    setScaleFree(true)
+    setIdealBeam(true)
+    // Scale-free: free M is pure scale — lock geometric mass
+    setParams({ mass: 1 })
+    mountControlInfo(root)
 
-  const massInput = qs<HTMLInputElement>(root, '#p-mass')
-  const spinInput = qs<HTMLInputElement>(root, '#p-spin')
-  const chargeInput = qs<HTMLInputElement>(root, '#p-charge')
-  const rho0Input = qs<HTMLInputElement>(root, '#d-rho0')
-  const hrInput = qs<HTMLInputElement>(root, '#d-hr')
-  const gammaInput = qs<HTMLInputElement>(root, '#d-gamma')
-  const betaInput = qs<HTMLInputElement>(root, '#d-beta')
-  const rinInput = qs<HTMLInputElement>(root, '#d-rin')
-  const outerInput = qs<HTMLInputElement>(root, '#d-outer')
-  const tiltInput = qs<HTMLInputElement>(root, '#d-tilt')
-  const jetInput = qs<HTMLInputElement>(root, '#d-jet')
+    const spinInput = qs<HTMLInputElement>(root, '#p-spin')
+    const chargeInput = qs<HTMLInputElement>(root, '#p-charge')
+    const rho0Input = qs<HTMLInputElement>(root, '#d-rho0')
+    const hrInput = qs<HTMLInputElement>(root, '#d-hr')
+    const gammaInput = qs<HTMLInputElement>(root, '#d-gamma')
+    const betaInput = qs<HTMLInputElement>(root, '#d-beta')
+    const rinInput = qs<HTMLInputElement>(root, '#d-rin')
+    const outerInput = qs<HTMLInputElement>(root, '#d-outer')
+    const tiltInput = qs<HTMLInputElement>(root, '#d-tilt')
+    const jetInput = qs<HTMLInputElement>(root, '#d-jet')
 
-  const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
-  const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
-  const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
-  const rho0Val = qs<HTMLElement>(root, '[data-val="rho0"]')
-  const hrVal = qs<HTMLElement>(root, '[data-val="hr"]')
-  const gammaVal = qs<HTMLElement>(root, '[data-val="gamma"]')
-  const betaVal = qs<HTMLElement>(root, '[data-val="beta"]')
-  const rinVal = qs<HTMLElement>(root, '[data-val="rin"]')
-  const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
-  const tiltVal = qs<HTMLElement>(root, '[data-val="tilt"]')
-  const jetVal = qs<HTMLElement>(root, '[data-val="jet"]')
+    const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
+    const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
+    const rho0Val = qs<HTMLElement>(root, '[data-val="rho0"]')
+    const hrVal = qs<HTMLElement>(root, '[data-val="hr"]')
+    const gammaVal = qs<HTMLElement>(root, '[data-val="gamma"]')
+    const betaVal = qs<HTMLElement>(root, '[data-val="beta"]')
+    const rinVal = qs<HTMLElement>(root, '[data-val="rin"]')
+    const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
+    const tiltVal = qs<HTMLElement>(root, '[data-val="tilt"]')
+    const jetVal = qs<HTMLElement>(root, '[data-val="jet"]')
 
-  const distInput = qs<HTMLInputElement>(root, '#c-dist')
-  const incInput = qs<HTMLInputElement>(root, '#c-inc')
-  const azInput = qs<HTMLInputElement>(root, '#c-az')
-  const fovInput = qs<HTMLInputElement>(root, '#c-fov')
-  const distVal = qs<HTMLElement>(root, '[data-val="dist"]')
-  const incVal = qs<HTMLElement>(root, '[data-val="inc"]')
-  const azVal = qs<HTMLElement>(root, '[data-val="az"]')
-  const fovVal = qs<HTMLElement>(root, '[data-val="fov"]')
+    const distInput = qs<HTMLInputElement>(root, '#c-dist')
+    const incInput = qs<HTMLInputElement>(root, '#c-inc')
+    const azInput = qs<HTMLInputElement>(root, '#c-az')
+    const fovInput = qs<HTMLInputElement>(root, '#c-fov')
+    const distVal = qs<HTMLElement>(root, '[data-val="dist"]')
+    const incVal = qs<HTMLElement>(root, '[data-val="inc"]')
+    const azVal = qs<HTMLElement>(root, '[data-val="az"]')
+    const fovVal = qs<HTMLElement>(root, '[data-val="fov"]')
 
-  const presetHint = qs<HTMLElement>(root, '#preset-hint')
-  const presetBtns = root.querySelectorAll<HTMLButtonElement>('[data-preset]')
-  let activePresetId: string | null = null
+    const presetHint = qs<HTMLElement>(root, '#preset-hint')
+    const presetBtns = root.querySelectorAll<HTMLButtonElement>('[data-preset]')
+    let activePresetId: string | null = null
 
-  function setActivePresetUi(id: string | null, hint?: string): void {
-    activePresetId = id
-    for (const btn of presetBtns) {
-      const on = btn.dataset.preset === id
-      btn.classList.toggle('active', on)
-      btn.setAttribute('aria-pressed', on ? 'true' : 'false')
+    function setActivePresetUi(id: string | null, hint?: string): void {
+      activePresetId = id
+      for (const btn of presetBtns) {
+        const on = btn.dataset.preset === id
+        btn.classList.toggle('active', on)
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false')
+      }
+      if (presetHint) {
+        presetHint.textContent =
+          hint ?? 'Cool · Interstellar · Hot · ṁ derived on HUD'
+      }
     }
-    if (presetHint) {
-      presetHint.textContent =
-        hint ?? 'Expert free bases · ṁ derived (HUD) · 🛈 for details'
+    function onUserTweaked(): void {
+      if (activePresetId !== null) setActivePresetUi(null)
     }
-  }
-  function onUserTweaked(): void {
-    if (activePresetId !== null) setActivePresetUi(null)
-  }
 
-  function syncPhysicsInputs(p: BlackHoleParams): void {
-    setRangeValue(massInput, p.mass)
-    setRangeValue(spinInput, p.spinStar)
-    setRangeValue(chargeInput, p.charge)
-    setText(massVal, fmt(p.mass, 2))
-    setText(spinVal, fmt(p.spinStar, 3))
-    setText(chargeVal, fmt(p.charge, 3))
-  }
+    function syncPhysicsInputs(p: BlackHoleParams): void {
+      setRangeValue(spinInput, p.spinStar)
+      setRangeValue(chargeInput, p.charge)
+      setText(spinVal, fmt(p.spinStar, 3))
+      setText(chargeVal, fmt(p.charge, 3))
+    }
 
   function syncDiskInputs(d: DiskParams): void {
     setRangeValue(
@@ -158,18 +156,14 @@ export function mountControls(
     if (derivedRoot) renderDerivedHud(derivedRoot, getParams(), d, getDisk())
   }
 
-  bindRange(massInput, (v) => {
-    onUserTweaked()
-    setParams({ mass: v })
-  })
   bindRange(spinInput, (v) => {
-    onUserTweaked()
-    setParams({ spinStar: v })
-  })
-  bindRange(chargeInput, (v) => {
-    onUserTweaked()
-    setParams({ charge: v })
-  })
+      onUserTweaked()
+      setParams({ spinStar: v })
+    })
+    bindRange(chargeInput, (v) => {
+      onUserTweaked()
+      setParams({ charge: v })
+    })
   bindRange(rho0Input, (v) => {
     onUserTweaked()
     setDisk({ rho0: logFromSlider(v, DISK_LIMITS.rho0.min, DISK_LIMITS.rho0.max) })

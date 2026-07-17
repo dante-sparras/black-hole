@@ -28,6 +28,7 @@ function ctrlRow(
 /**
  * Expert free bases: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet.
  * ṁ is scenario/preset — derived HUD only.
+ * Mass locked M=1 (scale-free camera) — not a free look lever.
  */
 export function buildControlsHtml(): string {
   const distLim = CAMERA_LIMITS.distanceM
@@ -47,15 +48,9 @@ export function buildControlsHtml(): string {
           `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
       ).join('')}
     </div>
-    <p class="ctrl-hint" id="preset-hint">Expert free bases · ṁ derived (HUD) · 🛈 for details</p>
+    <p class="ctrl-hint" id="preset-hint">Cool · Interstellar · Hot · ṁ derived on HUD</p>
 
     <div class="ctrl-section">Black hole (no-hair)</div>
-    ${ctrlRow(
-      'mass',
-      'Mass M',
-      `<input type="range" id="p-mass" min="0.1" max="10" step="0.01" />`,
-      'mass',
-    )}
     ${ctrlRow(
       'spin',
       'Spin a★',
@@ -68,7 +63,7 @@ export function buildControlsHtml(): string {
       `<input type="range" id="p-charge" min="0" max="0.95" step="0.01" />`,
       'charge',
     )}
-    <p class="ctrl-hint">a★ ∈ [−0.998, +0.998] · default +0.9</p>
+    <p class="ctrl-hint">M = 1 locked (scale-free) · a★ ∈ [−0.998, +0.998]</p>
 
     <div class="ctrl-section">Accretion disk (free bases)</div>
     ${ctrlRow(

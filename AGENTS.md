@@ -23,7 +23,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 ## Preferences
 
 - **Realism first** — default to physical behavior over film look. Soft display hacks are optional toggles, not defaults (e.g. ideal \(I\propto g^3\) ON; soft \(g^2\) is opt-out). Prefer GR root-causes over bloom/fill/fake rings.
-- **Base parameters only in UI** — free: no-hair \((M,a_★,Q)\), disk \((\rho_0,\,H/r,\,\Gamma,\,\beta_0,\,r_\mathrm{in}/M,\,r_\mathrm{out},\) tilt, jet strength\()\), observer. Disk always co-rotates with spin (L ‖ J); **a★ sign** sets direction. **Derived (HUD only):** \(\dot m\) from free dens/geometry, \(\ell̃\approx\sqrt{r_\mathrm{in}/M}\), ISCO reference, SANE/MAD from \(\beta_0\), jet_eff. No orbit toggle, structure/bloom/look knobs.
+- **Base parameters only in UI** — free: no-hair **signed a★, Q** (mass **locked M=1** with scale-free camera), disk \((\rho_0,\,H/r,\,\Gamma,\,\beta_0,\,r_\mathrm{in}/M,\,r_\mathrm{out},\) tilt, jet strength\()\), observer. Disk always co-rotates with spin (L ‖ J); **a★ sign** sets direction. **Derived (HUD only):** \(\dot m\) from free dens/geometry, \(\ell̃\approx\sqrt{r_\mathrm{in}/M}\), ISCO reference, SANE/MAD from \(\beta_0\), jet_eff. Presets: **Cool · Interstellar · Hot** only.
 - Write Test-Driven Code — add unit tests for new features and bug fixes. Use `bun test` to run them.
 - Geometric units: \(G = c = 1\). Schwarzschild: \(r_s = 2M\), \(r_{ph} = 3M\), \(b_c = 3\sqrt{3}\,M\). Kerr: \(r_+=M+\sqrt{M^2-a^2}\); prograde ISCO/photon sphere shrink with \(a_\star\).
 - Pure-black voids for captured rays (no fake fill). Blackbody disk color (not film palette as primary).
@@ -34,7 +34,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 
 | Param | Code | Range (UI) | Notes |
 | ----- | ---- | ---------- | ----- |
-| Mass \(M\) | `mass` | \(0.1\)–\(10\) (default \(1\)) | Scale; angular image invariant if scale-free ON |
+| Mass \(M\) | `mass` | **locked 1** | Scale-free ON → free M is pure scale, not a look lever |
 | Dimensionless spin \(a_\star = J/M^2\) | `spinStar` | **−0.998…+0.998** (default **+0.9**) | Kerr length \(a = a_\star M\) — **affects rays** (signed) |
 | Charge \(Q\) | `charge` | default 0 | Affects rays (RN/KN) |
 
