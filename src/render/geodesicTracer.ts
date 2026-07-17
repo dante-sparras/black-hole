@@ -148,7 +148,9 @@ export function createGeodesicTracer(): GeodesicTracer {
 
   const STEPS = RT.maxSteps
 
-  const colorNode = Fn(() => {
+  /** RT-only vs BL-only color graphs — JS if strips the other path from TSL. */
+  function buildColorNode(includeBl: boolean) {
+  return Fn(() => {
     const M = uMass
     const aStar = uSpinStar
     const a = aStar.mul(M)
@@ -206,57 +208,70 @@ export function createGeodesicTracer(): GeodesicTracer {
 
     const col = vec3(0, 0, 0).toVar()
     const transm = float(1).toVar()
-    const prevY = camPos.y.toVar()
-    const done = float(0).toVar()
-    const escaped = float(0).toVar()
-    const captured = float(0).toVar()
-    const minR = camD.toVar()
-    const hits = float(0).toVar()
-    /** Disk volume optical depth (Beer's law) — caps edge-on stacking */
-    const diskTau = float(0).toVar()
-    const stepCount = float(0).toVar()
-    const dbgG = float(0).toVar()
-    const dbgT = float(0).toVar()
-    const dbgFlux = float(0).toVar()
-    // Impact parameter scale |r × n| at camera
-    const impactB = cross(camPos, dir0).length().toVar()
+        const done = float(0).toVar()
+        const escaped = float(0).toVar()
+        const captured = float(0).toVar()
+        const minR = camD.toVar()
+        const hits = float(0).toVar()
+        /** Disk volume optical depth (Beer's law) — caps edge-on stacking */
+        const diskTau = float(0).toVar()
+        const stepCount = float(0).toVar()
+        const dbgG = float(0).toVar()
+        const dbgT = float(0).toVar()
+        const dbgFlux = float(0).toVar()
+        // Impact parameter scale |r × n| at camera
+        const impactB = cross(camPos, dir0).length().toVar()
 
-    // --- BL camera init (asymptotic spherical frame, Phase 2/4) ---
-    const useBl = uIntegratorMode.greaterThan(0.5)
-    const rHat = camPos.normalize()
-    const stCam = max(sin(th), float(1e-5))
-    const ctCam = cos(th)
-    const spCam = sin(ph)
-    const cpCam = cos(ph)
-    const thetaHat = vec3(ctCam.mul(cpCam), stCam.mul(-1), ctCam.mul(spCam))
-    const phiHat = vec3(spCam.mul(-1), float(0), cpCam)
-    const n_r = dot(dir0, rHat)
-    const n_th = dot(dir0, thetaHat)
-    const n_ph = dot(dir0, phiHat)
-    const blE = float(1)
-    const blLz = camD.mul(stCam).mul(n_ph).mul(blE).toVar()
-    const pTheta = camD.mul(n_th).mul(blE)
-    const blQ = pTheta
-      .mul(pTheta)
-      .add(
-        ctCam
-          .mul(ctCam)
-          .mul(a.mul(a).mul(blE).mul(blE).mul(-1).add(blLz.mul(blLz).div(stCam.mul(stCam)))),
-      )
-      .toVar()
-    const blR = camD.toVar()
-    const blTh = th.toVar()
-    const blPh = ph.toVar()
-    const blSr = n_r.lessThan(0).select(float(-1), float(1)).toVar()
-    const blSt = blQ
-      .abs()
-      .greaterThan(1e-8)
-      .select(n_th.greaterThanEqual(0).select(float(1), float(-1)), float(0))
-      .toVar()
-    const prevTh = th.toVar()
-    const prevBlR = camD.toVar()
-    const prevBlPh = ph.toVar()
-    const halfPi = float(1.57079632679)
+    // Hoisted BL state (only assigned when includeBl builds the BL graph)
+        let blLz
+        let blQ
+        let blR
+        let blTh
+        let blPh
+        let blSr
+        let blSt
+        let prevTh
+        let prevBlR
+        let prevBlPh
+        let blE, halfPi
+        if (includeBl) {
+
+        // --- BL camera init (asymptotic spherical frame, Phase 2/4) ---
+        const rHat = camPos.normalize()
+        const stCam = max(sin(th), float(1e-5))
+        const ctCam = cos(th)
+        const spCam = sin(ph)
+        const cpCam = cos(ph)
+        const thetaHat = vec3(ctCam.mul(cpCam), stCam.mul(-1), ctCam.mul(spCam))
+        const phiHat = vec3(spCam.mul(-1), float(0), cpCam)
+        const n_r = dot(dir0, rHat)
+        const n_th = dot(dir0, thetaHat)
+        const n_ph = dot(dir0, phiHat)
+        blE = float(1)
+        blLz = camD.mul(stCam).mul(n_ph).mul(blE).toVar()
+        const pTheta = camD.mul(n_th).mul(blE)
+        blQ = pTheta
+          .mul(pTheta)
+          .add(
+            ctCam
+              .mul(ctCam)
+              .mul(a.mul(a).mul(blE).mul(blE).mul(-1).add(blLz.mul(blLz).div(stCam.mul(stCam)))),
+          )
+          .toVar()
+        blR = camD.toVar()
+        blTh = th.toVar()
+        blPh = ph.toVar()
+        blSr = n_r.lessThan(0).select(float(-1), float(1)).toVar()
+        blSt = blQ
+          .abs()
+          .greaterThan(1e-8)
+          .select(n_th.greaterThanEqual(0).select(float(1), float(-1)), float(0))
+          .toVar()
+        prevTh = th.toVar()
+        prevBlR = camD.toVar()
+        prevBlPh = ph.toVar()
+        halfPi = float(1.57079632679)
+        }
 
     Loop({ start: int(0), end: int(STEPS), type: 'int', condition: '<' }, () => {
           If(done.greaterThan(0.5).or(stepCount.greaterThanEqual(int(uMaxSteps))), () => {
@@ -271,7 +286,9 @@ export function createGeodesicTracer(): GeodesicTracer {
           stepCount.addAssign(1)
 
       // ========== BL Mino path ==========
-      If(useBl, () => {
+      
+      if (includeBl) {
+
         minR.assign(min(minR, blR))
         If(blR.lessThanEqual(rCapture), () => {
           captured.assign(1)
@@ -514,10 +531,14 @@ export function createGeodesicTracer(): GeodesicTracer {
             },
           )
         })
-      })
+      
+      }
+
 
       // ========== RT Cartesian path (default) ==========
-      If(useBl.not(), () => {
+      
+      if (!includeBl) {
+
       const r = pos.length()
       minR.assign(min(minR, r))
 
@@ -549,53 +570,56 @@ export function createGeodesicTracer(): GeodesicTracer {
       )
       const ds = uBaseStepM.mul(M).mul(adapt)
 
-      prevY.assign(pos.y)
-      const p0x = pos.x.toVar()
-      const p0z = pos.z.toVar()
+            const a1 = knNullAccelTsl(pos, vel, rs, a, Q, M)
+            const pm = pos.add(vel.mul(ds.mul(0.5)))
+            const vm = vel.add(a1.mul(ds.mul(0.5)))
+            const a2 = knNullAccelTsl(pm, vm, rs, a, Q, M)
 
-      const a1 = knNullAccelTsl(pos, vel, rs, a, Q, M)
-      const pm = pos.add(vel.mul(ds.mul(0.5)))
-      const vm = vel.add(a1.mul(ds.mul(0.5)))
-      const a2 = knNullAccelTsl(pm, vm, rs, a, Q, M)
+            pos.addAssign(vel.add(vm).mul(ds.mul(0.5)))
+            vel.addAssign(a1.add(a2).mul(ds.mul(0.5)))
 
-      pos.addAssign(vel.add(vm).mul(ds.mul(0.5)))
-      vel.addAssign(a1.add(a2).mul(ds.mul(0.5)))
+            // Frame-drag twist about +Y (skip when a≈0 — identity)
+            If(a.abs().greaterThan(1e-8), () => {
+              const rr = max(pos.length(), float(1e-6))
+              const r3f = rr.mul(rr).mul(rr)
+              const dphi = a.mul(M).mul(2).mul(ds).div(r3f.add(a.mul(a).mul(rr)).add(1e-12))
+              const cph = cos(dphi)
+              const sph = sin(dphi)
+              const vx = vel.x.mul(cph).add(vel.z.mul(sph))
+              const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
+              vel.assign(vec3(vx, vel.y, vz))
+            })
 
-      // Frame-drag twist about +Y
-      const rr = max(pos.length(), float(1e-6))
-      const r3f = rr.mul(rr).mul(rr)
-      const dphi = a.mul(M).mul(2).mul(ds).div(r3f.add(a.mul(a).mul(rr)).add(1e-12))
-      const cph = cos(dphi)
-      const sph = sin(dphi)
-      const vx = vel.x.mul(cph).add(vel.z.mul(sph))
-      const vz = vel.x.mul(sph.mul(-1)).add(vel.z.mul(cph))
-      vel.assign(vec3(vx, vel.y, vz))
-
-      // Disk-frame coords (tilt about line of nodes; tilt=0 → identity)
-      const cN = cos(uTiltNode)
-      const sN = sin(uTiltNode)
-      const x1 = pos.x.mul(cN).add(pos.z.mul(sN))
-      const z1 = pos.z.mul(cN).sub(pos.x.mul(sN))
-      const y1 = pos.y
-      const cT = cos(uTilt)
-      const sT = sin(uTilt)
-      const diskX = x1
-      const diskY = y1.mul(cT).sub(z1.mul(sT))
-      const diskZ = y1.mul(sT).add(z1.mul(cT))
-      const diskPos = vec3(diskX, diskY, diskZ)
-      // Cheap reject before heavy dens (most steps outside the slab)
-      const hxV = diskX
-      const hzV = diskZ
-      const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
-      const absY = abs(diskY)
-      const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(5), M.mul(0.4))
-      // Sample denser near midplane (stride 1–2) so thin far-side isn't skipped
-      const midStride = absY.lessThan(roughH.mul(1.1)).select(int(1), int(uVolumeStride))
-      // High-ṁ factor in RT scope (corona + dens both need it — never nest-only)
-      const mdotHi = min(
-        float(1),
-        max(float(0), mdot.sub(float(0.35)).div(float(1.15))),
-      )
+            // Disk-frame coords (tilt about line of nodes; tilt=0 → identity, default free path)
+            const diskX = pos.x.toVar()
+            const diskY = pos.y.toVar()
+            const diskZ = pos.z.toVar()
+            If(uTilt.abs().greaterThan(1e-5), () => {
+              const cN = cos(uTiltNode)
+              const sN = sin(uTiltNode)
+              const x1 = pos.x.mul(cN).add(pos.z.mul(sN))
+              const z1 = pos.z.mul(cN).sub(pos.x.mul(sN))
+              const y1 = pos.y
+              const cT = cos(uTilt)
+              const sT = sin(uTilt)
+              diskX.assign(x1)
+              diskY.assign(y1.mul(cT).sub(z1.mul(sT)))
+              diskZ.assign(y1.mul(sT).add(z1.mul(cT)))
+            })
+            const diskPos = vec3(diskX, diskY, diskZ)
+            // Cheap reject before heavy dens (most steps outside the slab)
+            const hxV = diskX
+            const hzV = diskZ
+            const rhoV = hxV.mul(hxV).add(hzV.mul(hzV)).sqrt()
+            const absY = abs(diskY)
+            const roughH = max(uScaleH.mul(max(rhoV, M.mul(2))).mul(5), M.mul(0.4))
+            // Sample denser near midplane (stride 1–2) so thin far-side isn't skipped
+            const midStride = absY.lessThan(roughH.mul(1.1)).select(int(1), int(uVolumeStride))
+            // High-ṁ factor in RT scope (corona + dens both need it — never nest-only)
+            const mdotHi = min(
+              float(1),
+              max(float(0), mdot.sub(float(0.35)).div(float(1.15))),
+            )
       If(
         rhoV
           .greaterThan(rin.mul(0.9))
@@ -852,7 +876,9 @@ export function createGeodesicTracer(): GeodesicTracer {
           )
         },
       )
-      }) // end RT path (useBl.not)
+      
+      }
+ // end RT path (useBl.not)
 
     })
 
@@ -878,7 +904,9 @@ export function createGeodesicTracer(): GeodesicTracer {
     )
 
     // BL → Cartesian exit direction for lensed sky (RT already updates vel)
-    If(useBl, () => {
+    
+      if (includeBl) {
+
       const stE = max(sin(blTh), float(1e-5))
       const ctE = cos(blTh)
       const spE = sin(blPh)
@@ -911,7 +939,9 @@ export function createGeodesicTracer(): GeodesicTracer {
         .add(ephE.mul(blR.mul(stE).mul(dphE)))
       const vLen = vCart.length()
       vel.assign(vLen.greaterThan(1e-12).select(vCart.normalize(), erE.mul(blSr)))
-    })
+    
+      }
+
 
     If(escaped.greaterThan(0.5), () => {
       const d = vel.normalize()
@@ -938,27 +968,35 @@ export function createGeodesicTracer(): GeodesicTracer {
     const colSat = colT.mul(sat).sub(vec3(toned).mul(sat.sub(1)))
     col.assign(hasLight.select(max(colSat, vec3(0)), col))
 
-    applyDebugFalseColor({
-      mode: uDebugMode,
-      col,
-      hits,
-      captured,
-      escaped,
-      minR,
-      M,
-      stepCount,
-      STEPS,
-      dbgG,
-      dbgT,
-      dbgFlux,
-      impactB,
-    })
+        // Debug false-color only when enabled (mode 0 = normal look, free path)
+        If(uDebugMode.greaterThan(0.5), () => {
+          applyDebugFalseColor({
+            mode: uDebugMode,
+            col,
+            hits,
+            captured,
+            escaped,
+            minR,
+            M,
+            stepCount,
+            STEPS,
+            dbgG,
+            dbgT,
+            dbgFlux,
+            impactB,
+          })
+        })
 
-    return vec4(col, 1)
-  })()
+        return vec4(col, 1)
+    })()
+  }
+
+  const colorNodeRt = buildColorNode(false)
+  let colorNodeBl: ReturnType<typeof buildColorNode> | null = null
+
 
   const material = new THREE.MeshBasicNodeMaterial()
-  material.colorNode = colorNode
+  material.colorNode = colorNodeRt
   material.depthWrite = false
   material.depthTest = false
   material.side = THREE.DoubleSide
@@ -1025,6 +1063,13 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setIntegratorMode: (mode) => {
       uIntegratorMode.value = mode
+      if (mode === 1) {
+        if (!colorNodeBl) colorNodeBl = buildColorNode(true)
+        material.colorNode = colorNodeBl
+      } else {
+        material.colorNode = colorNodeRt
+      }
+      material.needsUpdate = true
     },
     setScaleFree: (on) => {
       uScaleFree.value = on ? 1 : 0
