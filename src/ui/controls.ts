@@ -61,6 +61,8 @@ export type ControlsOptions = {
   getCanvas?: () => HTMLCanvasElement
   /** Run one frame of the post stack before capture. */
   renderFrame?: () => void
+  /** Show/hide the debug tools panel (from Debug mode checkbox). */
+  setDebugOpen?: (on: boolean) => void
 }
 
 export function mountControls(
@@ -418,45 +420,53 @@ export function mountControls(
     const shotBtn = qs<HTMLButtonElement>(root, '#btn-screenshot')
     const shotStatus = qs<HTMLElement>(root, '#screenshot-status')
     shotBtn?.addEventListener('click', () => {
-      void (async () => {
-        if (!options.getCanvas || !options.renderFrame) {
-          if (shotStatus) shotStatus.textContent = 'Screenshot not ready'
-          return
-        }
-        if (shotBtn) shotBtn.disabled = true
-        if (shotStatus) shotStatus.textContent = 'Capturing…'
-        try {
-          const p = getParams()
-          const q = getQuality()
-          const result = await captureAndDownloadScreenshot({
-            getCanvas: options.getCanvas,
-            renderFrame: options.renderFrame,
-            tags: [
-              q.level,
-              `a${fmt(p.spinStar, 2)}`,
-              p.charge > 1e-4 ? `Q${fmt(p.charge, 2)}` : '',
-            ],
-          })
-          if (shotStatus) {
-            shotStatus.textContent = `Saved ${result.width}×${result.height}`
-          }
-        } catch (err) {
-          if (shotStatus) {
-            shotStatus.textContent =
-              err instanceof Error ? err.message : 'Screenshot failed'
-          }
-        } finally {
-          if (shotBtn) shotBtn.disabled = false
-          window.setTimeout(() => {
-            if (shotStatus && shotStatus.textContent?.startsWith('Saved')) {
-              shotStatus.textContent = ''
+          void (async () => {
+            if (!options.getCanvas || !options.renderFrame) {
+              if (shotStatus) shotStatus.textContent = 'Screenshot not ready'
+              return
             }
-          }, 4_000)
-        }
-      })()
-    })
+            if (shotBtn) shotBtn.disabled = true
+            if (shotStatus) shotStatus.textContent = 'Capturing…'
+            try {
+              const p = getParams()
+              const q = getQuality()
+              const result = await captureAndDownloadScreenshot({
+                getCanvas: options.getCanvas,
+                renderFrame: options.renderFrame,
+                tags: [
+                  q.level,
+                  `a${fmt(p.spinStar, 2)}`,
+                  p.charge > 1e-4 ? `Q${fmt(p.charge, 2)}` : '',
+                ],
+              })
+              if (shotStatus) {
+                shotStatus.textContent = `Saved ${result.width}×${result.height}`
+              }
+            } catch (err) {
+              if (shotStatus) {
+                shotStatus.textContent =
+                  err instanceof Error ? err.message : 'Screenshot failed'
+              }
+            } finally {
+              if (shotBtn) shotBtn.disabled = false
+              window.setTimeout(() => {
+                if (shotStatus && shotStatus.textContent?.startsWith('Saved')) {
+                  shotStatus.textContent = ''
+                }
+              }, 4_000)
+            }
+          })()
+        })
 
-    subscribe((p) => {
+      const dbgMaster = qs<HTMLInputElement>(root, '#dbg-master')
+      const dbgMasterVal = qs<HTMLElement>(root, '#dbg-master-val')
+      dbgMaster?.addEventListener('change', () => {
+        const on = Boolean(dbgMaster.checked)
+        if (dbgMasterVal) dbgMasterVal.textContent = on ? 'on' : 'off'
+        options.setDebugOpen?.(on)
+      })
+
+        subscribe((p) => {
     syncPhysicsInputs(p)
     syncDerived(getDerived())
   })

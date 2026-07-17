@@ -136,17 +136,66 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 4px;
+  padding-top: 8px;
   border-top: 1px solid #2a2a30;
 }
 
+.controls:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
 .ctrl-section {
-  margin-top: 4px;
+  margin-top: 6px;
+  padding-bottom: 2px;
   color: #7aa2ff;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.ctrl-section:first-child {
+  margin-top: 0;
+}
+
+.hud-readouts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #2a2a30;
+  pointer-events: auto;
+}
+
+.debug-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 4px;
+  border-top: 1px dashed #3a4560;
+  margin-top: 2px;
+}
+
+.debug-panel[hidden] {
+  display: none !important;
+}
+
+.debug-master-row,
+.dbg-check-row {
+  cursor: pointer;
+}
+
+.debug-master-row input[type='checkbox'],
+.dbg-check-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  justify-self: start;
+  accent-color: #7aa2ff;
+}
+
+#hud.debug-on .debug-master-row .ctrl-name {
+  color: #c8e0ff;
 }
 
 .ctrl-hint {

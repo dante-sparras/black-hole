@@ -1,5 +1,6 @@
 /**
  * Debug HUD: mode select, health strip, probe log.
+ * Panel is shown only when master “Debug mode” is on (see mountControls).
  */
 import {
   DEBUG_MODE_OPTIONS,
@@ -31,41 +32,48 @@ export type DebugHudApi = {
   ) => ProbeResult
   getLastHealth: () => HealthReport | null
   getLastProbe: () => ProbeResult | null
+  /** Whether the debug panel is visible / active for probes */
+  isOpen: () => boolean
+  setOpen: (on: boolean) => void
 }
 
 export function mountDebugHud(root: HTMLElement): DebugHudApi {
+  root.hidden = true
+  root.classList.add('debug-panel')
   root.innerHTML = `
-    <div class="ctrl-section">Debug</div>
-    <label class="ctrl">
-      <span class="ctrl-name">View mode</span>
-      <select id="dbg-mode" class="ctrl-select"></select>
-    </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Health</span>
+    <div class="ctrl-section">Debug tools</div>
+    <p class="ctrl-hint">False-color modes · health strip · click-to-probe · log</p>
+    <div class="ctrl">
+      <span class="ctrl-label"><span class="ctrl-name">View mode</span></span>
+      <select id="dbg-mode" class="ctrl-select" aria-label="Debug view mode"></select>
+      <span class="ctrl-val" data-val="dbgMode"></span>
+    </div>
+    <label class="ctrl dbg-check-row">
+      <span class="ctrl-label"><span class="ctrl-name">Health</span></span>
       <input type="checkbox" id="dbg-health" />
       <span class="ctrl-val" data-val="dbgHealth"></span>
     </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Click probe</span>
+    <label class="ctrl dbg-check-row">
+      <span class="ctrl-label"><span class="ctrl-name">Click probe</span></span>
       <input type="checkbox" id="dbg-probe" />
       <span class="ctrl-val" data-val="dbgProbe"></span>
     </label>
-    <label class="ctrl">
-      <span class="ctrl-name">Console log</span>
+    <label class="ctrl dbg-check-row">
+      <span class="ctrl-label"><span class="ctrl-name">Console log</span></span>
       <input type="checkbox" id="dbg-console" />
       <span class="ctrl-val" data-val="dbgConsole"></span>
     </label>
     <div id="dbg-health-strip" class="dbg-health ok">health: …</div>
     <div id="dbg-checks" class="dbg-checks"></div>
-    <div id="dbg-probe-out" class="dbg-probe">Click canvas (with probe on) to inspect a ray.</div>
+    <div id="dbg-probe-out" class="dbg-probe">Enable click probe, then click the canvas.</div>
     <div id="dbg-log" class="dbg-log"></div>
-    <p class="ctrl-hint">Debug is global · not hair · not presets</p>
   `
 
   const modeSelect = root.querySelector<HTMLSelectElement>('#dbg-mode')
   const healthCb = root.querySelector<HTMLInputElement>('#dbg-health')
   const probeCb = root.querySelector<HTMLInputElement>('#dbg-probe')
   const consoleCb = root.querySelector<HTMLInputElement>('#dbg-console')
+  const modeVal = root.querySelector<HTMLElement>('[data-val="dbgMode"]')
   const healthVal = root.querySelector<HTMLElement>('[data-val="dbgHealth"]')
   const probeVal = root.querySelector<HTMLElement>('[data-val="dbgProbe"]')
   const consoleVal = root.querySelector<HTMLElement>('[data-val="dbgConsole"]')
@@ -86,12 +94,18 @@ export function mountDebugHud(root: HTMLElement): DebugHudApi {
   let lastHealth: HealthReport | null = null
   let lastProbe: ProbeResult | null = null
   let healthAccum = 0
+  let open = false
 
   function syncInputs(s: DebugState): void {
     if (modeSelect) modeSelect.value = String(s.mode)
     if (healthCb) healthCb.checked = s.healthEnabled
     if (probeCb) probeCb.checked = s.probeEnabled
     if (consoleCb) consoleCb.checked = s.consoleMirror
+    if (modeVal) {
+      const label =
+        DEBUG_MODE_OPTIONS.find((o) => o.id === s.mode)?.label ?? 'Normal'
+      modeVal.textContent = label
+    }
     if (healthVal) healthVal.textContent = s.healthEnabled ? 'on' : 'off'
     if (probeVal) probeVal.textContent = s.probeEnabled ? 'on' : 'off'
     if (consoleVal) consoleVal.textContent = s.consoleMirror ? 'on' : 'off'
@@ -156,11 +170,21 @@ export function mountDebugHud(root: HTMLElement): DebugHudApi {
   syncInputs(getDebug())
   renderLog()
 
+  function setOpen(on: boolean): void {
+    open = on
+    root.hidden = !on
+    document.getElementById('hud')?.classList.toggle('debug-on', on)
+    if (!on) {
+      // Leave the image in normal mode when closing the panel
+      setDebug({ mode: 0, probeEnabled: false })
+    }
+  }
+
   function tickHealth(): void {
+    if (!open) return
     const s = getDebug()
     if (!s.healthEnabled) return
     healthAccum++
-    // ~ every 90 frames — multi-pixel CPU probe; keep off the hot path
     if (healthAccum > 1 && healthAccum % 90 !== 0) return
     try {
       const report = runHealthCheck({
@@ -209,13 +233,12 @@ export function mountDebugHud(root: HTMLElement): DebugHudApi {
     return p
   }
 
-  // Initial health
-  tickHealth()
-
   return {
     tickHealth,
     probeAtClient,
     getLastHealth: () => lastHealth,
     getLastProbe: () => lastProbe,
+    isOpen: () => open,
+    setOpen,
   }
 }

@@ -23,10 +23,9 @@ export function mountMobileHud(): MobileHudHandles {
     if (hint) {
       hint.textContent = mobile
         ? 'Drag canvas to orbit · pinch zoom · tap Panels for controls.'
-        : 'Drag to orbit · scroll/pinch zoom · click to probe ray (Debug).'
+        : 'Drag to orbit · scroll zoom · free controls · science readouts below.'
     }
     if (!mobile && hud) {
-      // Desktop: always expanded
       hud.classList.remove('hud-collapsed')
       toggle?.setAttribute('aria-expanded', 'true')
     }

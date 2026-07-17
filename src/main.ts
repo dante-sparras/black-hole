@@ -51,7 +51,6 @@ const bridge = createSceneBridge(tracer)
 bridge.connect()
 
 let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
-let debugHud: ReturnType<typeof mountDebugHud> | null = null
 const t0 = performance.now()
 
 /** One frame of the full post stack (used by the animation loop + screenshot). */
@@ -83,23 +82,28 @@ subscribeQuality((q) => {
 
 const mobileHud = mountMobileHud()
 
+let debugHud: ReturnType<typeof mountDebugHud> | null = null
+
+if (debugEl) {
+  debugHud = mountDebugHud(debugEl)
+}
+
 if (controlsEl) {
   mountControls(controlsEl, derivedEl, {
     getCanvas: () => renderer.domElement as HTMLCanvasElement,
     renderFrame: renderOneFrame,
+    setDebugOpen: (on) => debugHud?.setOpen(on),
   })
-}
-if (debugEl) {
-  debugHud = mountDebugHud(debugEl)
 }
 
 const orbit = mountOrbitControls(renderer.domElement, undefined, {
   touchDragBoost: mobileHud.isMobile() ? 1.35 : 1,
 })
 
-// Shift+click (or probe enabled + click without drag) for ray probe
+// Click-to-probe only when Debug mode is open + probe enabled
 renderer.domElement.addEventListener('click', (ev) => {
-  if (!debugHud || !getDebug().probeEnabled) return
+  if (!debugHud || !debugHud.isOpen()) return
+  if (!getDebug().probeEnabled) return
   if (orbit.didDrag()) return
   if (ev.button !== 0) return
   debugHud.probeAtClient(ev.clientX, ev.clientY, renderer.domElement)
