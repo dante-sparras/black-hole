@@ -112,11 +112,13 @@ export const PRESET_HOT: ScenePreset = {
   },
 }
 
-/** UI + apply list — Cool → Interstellar → Hot */
+/** Default boot / UI list — Hot → Cool → Interstellar */
+export const DEFAULT_PRESET_ID = 'hot' as const
+
 export const ALL_PRESETS: readonly ScenePreset[] = [
+  PRESET_HOT,
   PRESET_COOL,
   PRESET_INTERSTELLAR,
-  PRESET_HOT,
 ] as const
 
 export function getPresetById(id: string): ScenePreset | undefined {

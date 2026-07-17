@@ -48,7 +48,7 @@ export function buildControlsHtml(): string {
           `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
       ).join('')}
     </div>
-    <p class="ctrl-hint" id="preset-hint">Cool · Interstellar · Hot · ṁ derived on HUD</p>
+    <p class="ctrl-hint" id="preset-hint">Hot · Cool · Interstellar · ṁ derived on HUD</p>
 
     <div class="ctrl-section">Black hole (no-hair)</div>
     ${ctrlRow(

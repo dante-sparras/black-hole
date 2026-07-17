@@ -12,6 +12,7 @@ import { getParams } from '../../src/state/params'
 import {
   ALL_PRESETS,
   applyPreset,
+  DEFAULT_PRESET_ID,
   getPresetById,
   listPresetIds,
   PRESET_COOL,
@@ -30,11 +31,16 @@ function peakT(preset: ScenePreset): number {
 }
 
 describe('presets', () => {
-  test('UI presets are Cool · Interstellar · Hot only', () => {
-    const ids = listPresetIds()
-    expect(ids).toEqual(['cool', 'interstellar', 'hot'])
-    expect(new Set(ids).size).toBe(3)
-  })
+  test('UI presets are Hot · Cool · Interstellar', () => {
+      const ids = listPresetIds()
+      expect(ids).toEqual(['hot', 'cool', 'interstellar'])
+      expect(new Set(ids).size).toBe(3)
+    })
+
+    test('default boot preset is Hot', () => {
+      expect(DEFAULT_PRESET_ID).toBe('hot')
+      expect(getPresetById(DEFAULT_PRESET_ID)?.id).toBe('hot')
+    })
 
   test('getPresetById finds interstellar', () => {
     expect(getPresetById('interstellar')?.label).toBe('Interstellar')

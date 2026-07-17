@@ -49,11 +49,16 @@ describe('control 🛈 help', () => {
     expect(html).not.toContain('id="d-mdot"')
     expect(html).not.toContain('id="p-mass"')
     expect(html).toContain('Jet strength')
-    expect(html).toContain('data-preset="cool"')
-    expect(html).toContain('data-preset="interstellar"')
     expect(html).toContain('data-preset="hot"')
-    expect(html).not.toContain('data-preset="schwarzschild"')
-    expect(html).not.toContain('data-preset="default"')
-    expect(html).toContain('M = 1 locked')
+        expect(html).toContain('data-preset="cool"')
+        expect(html).toContain('data-preset="interstellar"')
+        // order: Hot first in markup
+        expect(html.indexOf('data-preset="hot"')).toBeLessThan(html.indexOf('data-preset="cool"'))
+        expect(html.indexOf('data-preset="cool"')).toBeLessThan(
+          html.indexOf('data-preset="interstellar"'),
+        )
+        expect(html).not.toContain('data-preset="schwarzschild"')
+        expect(html).not.toContain('data-preset="default"')
+        expect(html).toContain('M = 1 locked')
   })
 })

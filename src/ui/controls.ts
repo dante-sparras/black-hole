@@ -11,7 +11,7 @@ import {
 } from '../state/camera'
 import { getDisk, setDisk, subscribeDisk } from '../state/disk'
 import { getDerived, getParams, setParams, subscribe } from '../state/params'
-import { applyPreset } from '../state/presets'
+import { applyPreset, DEFAULT_PRESET_ID } from '../state/presets'
 import { setIdealBeam } from '../state/idealBeam'
 import { setScaleFree } from '../state/scaleFree'
 import {
@@ -53,8 +53,8 @@ export function mountControls(
   root.innerHTML = buildControlsHtml()
     setScaleFree(true)
     setIdealBeam(true)
-    // Scale-free: free M is pure scale — lock geometric mass
-    setParams({ mass: 1 })
+    // Boot on Hot (default look); scale-free + M=1 locked via applyPreset
+    const boot = applyPreset(DEFAULT_PRESET_ID)
     mountControlInfo(root)
 
     const spinInput = qs<HTMLInputElement>(root, '#p-spin')
@@ -101,7 +101,7 @@ export function mountControls(
       }
       if (presetHint) {
         presetHint.textContent =
-          hint ?? 'Cool · Interstellar · Hot · ṁ derived on HUD'
+          hint ?? 'Hot · Cool · Interstellar · ṁ derived on HUD'
       }
     }
     function onUserTweaked(): void {
@@ -265,8 +265,9 @@ export function mountControls(
   })
   subscribeCamera(syncCameraInputs)
 
-  syncPhysicsInputs(getParams())
-  syncDiskInputs(getDisk())
-  syncCameraInputs(getCamera())
-  syncDerived(getDerived())
-}
+    syncPhysicsInputs(getParams())
+    syncDiskInputs(getDisk())
+    syncCameraInputs(getCamera())
+    syncDerived(getDerived())
+    setActivePresetUi(boot.id, boot.hint)
+  }
