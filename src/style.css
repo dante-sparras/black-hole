@@ -35,20 +35,20 @@ canvas {
   max-width: min(320px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
   max-height: calc(var(--vv-height, 100dvh) - 24px - env(safe-area-inset-top));
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overflow: hidden;
   padding: 12px 14px;
   border: 1px solid #2a2a30;
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.62);
   backdrop-filter: blur(8px);
+  /* Header always clickable; body/controls enable their own events */
   pointer-events: none;
   user-select: none;
 }
 
 .hud-header {
   pointer-events: auto;
+  flex: 0 0 auto;
 }
 
 .hud-title-row {
@@ -88,6 +88,13 @@ canvas {
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  pointer-events: auto;
 }
 
 .hud.hud-collapsed .hud-body {
@@ -502,17 +509,33 @@ canvas {
     min-width: 0;
     width: auto;
     max-width: none;
-    max-height: min(58dvh, calc(var(--vv-height, 100dvh) * 0.58));
+    max-height: min(70dvh, calc(var(--vv-height, 100dvh) * 0.7));
     border-radius: 14px 14px 12px 12px;
     padding: 10px 12px;
     gap: 6px;
-    /* Keep canvas interactive above the sheet when collapsed */
+    /* Expanded panel must receive touch so .hud-body can scroll */
+    pointer-events: auto;
   }
 
   .hud.hud-collapsed {
     max-height: none;
     width: auto;
     right: auto;
+    pointer-events: none;
+  }
+
+  .hud.hud-collapsed .hud-header {
+    pointer-events: auto;
+  }
+
+  #hud:not(.hud-collapsed) .hud-body {
+    /* Explicit height budget so overflow scroll engages on iOS/Android */
+    max-height: min(58dvh, calc(var(--vv-height, 100dvh) * 0.58));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    pointer-events: auto;
   }
 
   .hud-toggle {
@@ -564,7 +587,7 @@ canvas {
   }
 
   /* Prefer finger scrolling inside panel without page bounce */
-  #hud {
+  #hud:not(.hud-collapsed) {
     overscroll-behavior: contain;
   }
 }
