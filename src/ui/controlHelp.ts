@@ -1,6 +1,7 @@
 /**
  * Educational blurbs for each free control (and numerics).
  * Shown in 🛈 hover/click cards — keep concise, realism-first.
+ * ṁ is not free: shown on derived HUD only (presets/scenario).
  */
 
 export type ControlHelp = {
@@ -41,23 +42,14 @@ Q shrinks the horizon and photon sphere and changes ray capture. Extremality enf
 
 Default Q = 0 (pure Kerr / Schwarzschild).`,
   },
-  mdot: {
-    title: 'ṁ / ṁ_Edd',
-    summary: 'Eddington-ratio accretion rate (thin-disk temperature & flux).',
-    body: `Dimensionless ṁ = Ṁ/Ṁ_Edd. Novikov–Thorne: flux F ∝ ṁ and T_eff ∝ ṁ^{1/4}.
-
-Low ṁ → cooler, redder, dimmer disk. High ṁ → hotter and brighter; super-Eddington values use compressive display + photosphere fixes so the image does not white-out.
-
-Not a free “temperature” slider — same physics under the astrophysical name.`,
-  },
   rho0: {
     title: 'ρ₀ dens',
     summary: 'Density normalization for volume opacity / dens weight.',
-    body: `Scales how optically thick the disk volume looks (relative dens / OD), independent of ṁ’s temperature scaling.
+    body: `Free dens scale for how optically thick the disk volume looks (relative dens / OD).
 
-Higher ρ₀ → denser-looking midplane and stronger extinction along the line of sight. Lower → thinner, more transparent volume.
+Higher ρ₀ → denser-looking midplane and stronger extinction. Lower → thinner, more transparent volume. Mild relative T scale from ρ₀ (poly-like).
 
-Temperature also gets a mild relative scale from ρ₀ (poly-like).`,
+Eddington ratio ṁ is not free here — it is a scenario/preset expert readout on the derived HUD (as in real sims where ṁ is measured, not dialed).`,
   },
   beta: {
     title: 'β₀ plasma',
@@ -85,7 +77,7 @@ Inner edge is not free — it is the co-rotating ISCO from (M, a★, Q). Keep r_
     summary: 'User scale on the analytic polar funnel (jets).',
     body: `0 = off (default). Raises a simple BZ-like funnel glow ∝ a★² · ṁ^{0.4} · boost.
 
-Not full GRMHD jets — a visual / educational funnel. HUD jet_eff reflects the physical scaling; this slider is the optional multiplier. No emission inside the capture silhouette.`,
+ṁ itself is scenario/preset (HUD). This slider is the optional multiplier. No emission inside the capture silhouette.`,
   },
   dist: {
     title: 'Distance / M',

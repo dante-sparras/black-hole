@@ -13,7 +13,7 @@ import { mountControls } from './ui/controls'
 import { mountDebugHud } from './ui/debugHud'
 import { mountOrbitControls } from './ui/orbit'
 
-// Geometric units G = c = 1. No-hair: M, a★, Q + disk ṁ (not hair).
+// Geometric units G = c = 1. No-hair: M, a★, Q · disk free bases (ṁ scenario/HUD).
 
 const errorEl = document.querySelector<HTMLElement>('#error')
 const statsEl = document.querySelector<HTMLElement>('#stats')

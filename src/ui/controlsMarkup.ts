@@ -25,8 +25,8 @@ function ctrlRow(
 }
 
 /**
- * Thin-disk free bases only.
- * Derived (HUD): r_in=ISCO, H/r, Γ, ℓ̃, SANE/MAD, jet_eff, …
+ * Free UI bases only (ṁ is derived / scenario — HUD + presets, not a slider).
+ * Derived HUD: ṁ, r_in=ISCO, H/r, Γ, ℓ̃, SANE/MAD, jet_eff, …
  */
 export function buildControlsHtml(): string {
   const distLim = CAMERA_LIMITS.distanceM
@@ -43,7 +43,7 @@ export function buildControlsHtml(): string {
           `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
       ).join('')}
     </div>
-    <p class="ctrl-hint" id="preset-hint">Thin-disk free bases · 🛈 on each control for details</p>
+    <p class="ctrl-hint" id="preset-hint">Free bases + presets · ṁ is derived (HUD) · 🛈 for details</p>
 
     <div class="ctrl-section">Black hole (no-hair)</div>
     ${ctrlRow(
@@ -67,12 +67,6 @@ export function buildControlsHtml(): string {
     <p class="ctrl-hint">a★ ∈ [−0.998, +0.998] · default +0.9</p>
 
     <div class="ctrl-section">Accretion disk (free bases)</div>
-    ${ctrlRow(
-      'mdot',
-      'ṁ / ṁ_Edd',
-      `<input type="range" id="d-mdot" min="0" max="1000" step="1" />`,
-      'mdot',
-    )}
     ${ctrlRow(
       'rho0',
       'ρ₀ dens',
@@ -103,7 +97,7 @@ export function buildControlsHtml(): string {
       `<input type="range" id="d-jet" min="0" max="1" step="0.01" />`,
       'jet',
     )}
-    <p class="ctrl-hint">Free: ṁ · ρ₀ · β₀ · r_out · tilt · jet · disk co-rotates with a★ (L ‖ J)</p>
+    <p class="ctrl-hint">Free: ρ₀ · β₀ · r_out · tilt · jet · ṁ derived (presets / scenario, see HUD)</p>
 
     <div class="ctrl-section">Observer</div>
     ${ctrlRow(

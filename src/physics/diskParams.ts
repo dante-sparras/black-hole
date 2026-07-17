@@ -1,10 +1,11 @@
 /**
  * Accretion disk parameters — NOT black-hole hair.
  *
- * Free (UI): ṁ, ρ₀, β₀, r_out, tilt, jetBoost
+ * Free (UI): ρ₀, β₀, r_out, tilt, jetBoost
+ * Scenario / derived display: ṁ (presets set it; HUD shows it — not a free slider)
  * Model defaults (presets/GPU texture, not free UI): structure, arms, clumps, dust, shear, animate
  *
- * Derived elsewhere (not stored): r_in=ISCO, H/r, Γ=5/3, ℓ, MAD class, perturb, co-rot always.
+ * Derived elsewhere (not stored free): r_in=ISCO, H/r, Γ=5/3, ℓ, MAD class, perturb, co-rot always.
  * No-hair = (M, a★, Q) only. G = c = 1.
  */
 import { DEFAULT_MDOT, MDOT_MAX, MDOT_MIN } from './constants'
@@ -14,7 +15,7 @@ import { clamp, finiteNumber } from './math'
 
 /** Thin-disk free bases + internal texture model (not free UI). */
 export type DiskParams = {
-  /** Eddington ratio ṁ = Ṁ/Ṁ_Edd. F ∝ ṁ, T ∝ ṁ^{1/4}. */
+  /** Eddington ratio ṁ = Ṁ/Ṁ_Edd (scenario / expert readout — not free UI). F ∝ ṁ, T ∝ ṁ^{1/4}. */
   readonly mdot: number
   /** Density normalization ρ₀ (relative dens / OD weight). */
   readonly rho0: number

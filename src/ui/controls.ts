@@ -1,9 +1,3 @@
-import { MDOT_MAX, MDOT_MIN } from '../physics/constants'
-import {
-  mdotFromSlider as mdotFromSliderRange,
-  mdotTemperatureScale,
-  sliderFromMdot as sliderFromMdotRange,
-} from '../physics/disk'
 import type { BlackHoleParams, DerivedGeometry } from '../physics/types'
 import { DISK_LIMITS, type DiskParams } from '../physics/diskParams'
 import { withBatch } from '../state/batch'
@@ -35,15 +29,9 @@ import {
 } from './controlBind'
 import { mountControlInfo } from './controlInfo'
 import { buildControlsHtml } from './controlsMarkup'
-import { fmt, fmtMdot } from './format'
+import { fmt } from './format'
 import { renderDerivedHud } from './hud'
 
-function mdotFromSlider(t: number): number {
-  return mdotFromSliderRange(t, MDOT_MIN, MDOT_MAX)
-}
-function sliderFromMdot(mdot: number): number {
-  return sliderFromMdotRange(mdot, MDOT_MIN, MDOT_MAX)
-}
 function logFromSlider(t: number, min: number, max: number): number {
   const lo = Math.log10(min)
   const hi = Math.log10(max)
@@ -57,7 +45,10 @@ function sliderFromLog(v: number, min: number, max: number): number {
   return Math.min(1000, Math.max(0, ((x - lo) / (hi - lo)) * 1000))
 }
 
-/** Thin-disk free-base panel only. */
+/**
+ * Free-base panel: no-hair + disk (ρ₀, β₀, r_out, tilt, jet) + observer + numerics.
+ * ṁ is not free — scenario/preset value, shown on derived HUD.
+ */
 export function mountControls(
   root: HTMLElement,
   derivedRoot: HTMLElement | null,
@@ -70,7 +61,6 @@ export function mountControls(
   const massInput = qs<HTMLInputElement>(root, '#p-mass')
   const spinInput = qs<HTMLInputElement>(root, '#p-spin')
   const chargeInput = qs<HTMLInputElement>(root, '#p-charge')
-  const mdotInput = qs<HTMLInputElement>(root, '#d-mdot')
   const rho0Input = qs<HTMLInputElement>(root, '#d-rho0')
   const betaInput = qs<HTMLInputElement>(root, '#d-beta')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
@@ -80,7 +70,6 @@ export function mountControls(
   const massVal = qs<HTMLElement>(root, '[data-val="mass"]')
   const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
   const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
-  const mdotVal = qs<HTMLElement>(root, '[data-val="mdot"]')
   const rho0Val = qs<HTMLElement>(root, '[data-val="rho0"]')
   const betaVal = qs<HTMLElement>(root, '[data-val="beta"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
@@ -107,7 +96,10 @@ export function mountControls(
       btn.classList.toggle('active', on)
       btn.setAttribute('aria-pressed', on ? 'true' : 'false')
     }
-    if (presetHint) presetHint.textContent = hint ?? 'Thin-disk free bases'
+    if (presetHint) {
+      presetHint.textContent =
+        hint ?? 'Free bases + presets · ṁ is derived (HUD) · 🛈 for details'
+    }
   }
   function onUserTweaked(): void {
     if (activePresetId !== null) setActivePresetUi(null)
@@ -123,7 +115,6 @@ export function mountControls(
   }
 
   function syncDiskInputs(d: DiskParams): void {
-    setRangeValue(mdotInput, sliderFromMdot(d.mdot))
     setRangeValue(
       rho0Input,
       sliderFromLog(d.rho0, DISK_LIMITS.rho0.min, DISK_LIMITS.rho0.max),
@@ -136,10 +127,6 @@ export function mountControls(
     setRangeValue(tiltInput, radToDeg(d.tiltRad))
     setRangeValue(jetInput, d.jetBoost)
 
-    if (mdotVal) {
-      const tScale = mdotTemperatureScale(d.mdot)
-      mdotVal.textContent = `${fmtMdot(d.mdot)}  (T×${fmt(tScale, 2)})`
-    }
     setText(rho0Val, fmt(d.rho0, 2))
     setText(betaVal, fmt(d.plasmaBeta, 1))
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
@@ -173,10 +160,6 @@ export function mountControls(
   bindRange(chargeInput, (v) => {
     onUserTweaked()
     setParams({ charge: v })
-  })
-  bindRange(mdotInput, (v) => {
-    onUserTweaked()
-    setDisk({ mdot: mdotFromSlider(v) })
   })
   bindRange(rho0Input, (v) => {
     onUserTweaked()

@@ -23,7 +23,7 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 ## Preferences
 
 - **Realism first** — default to physical behavior over film look. Soft display hacks are optional toggles, not defaults (e.g. ideal \(I\propto g^3\) ON; soft \(g^2\) is opt-out). Prefer GR root-causes over bloom/fill/fake rings.
-- **Base parameters only in UI** — free: no-hair \((M,a_★,Q)\), disk \((\dot m, \rho_0, \beta_0, r_\mathrm{out},\) tilt, jet boost\()\), observer. Disk always co-rotates with spin (L ‖ J); **a★ sign** sets direction. **Derived (HUD only):** \(r_\mathrm{in}=\mathrm{ISCO}\), \(H/r\), \(\Gamma=5/3\), \(\ell\), SANE/MAD from \(\beta_0\), jet_eff. No orbit toggle, structure/bloom/look knobs.
+- **Base parameters only in UI** — free: no-hair \((M,a_★,Q)\), disk \((\rho_0, \beta_0, r_\mathrm{out},\) tilt, jet boost\()\), observer. Disk always co-rotates with spin (L ‖ J); **a★ sign** sets direction. **Derived (HUD only):** \(\dot m\) (scenario/preset — not a free slider), \(r_\mathrm{in}=\mathrm{ISCO}\), \(H/r\), \(\Gamma=5/3\), \(\ell\), SANE/MAD from \(\beta_0\), jet_eff. No orbit toggle, structure/bloom/look knobs.
 - Write Test-Driven Code — add unit tests for new features and bug fixes. Use `bun test` to run them.
 - Geometric units: \(G = c = 1\). Schwarzschild: \(r_s = 2M\), \(r_{ph} = 3M\), \(b_c = 3\sqrt{3}\,M\). Kerr: \(r_+=M+\sqrt{M^2-a^2}\); prograde ISCO/photon sphere shrink with \(a_\star\).
 - Pure-black voids for captured rays (no fake fill). Blackbody disk color (not film palette as primary).
@@ -42,9 +42,9 @@ No-hair parameter core fully wired into GRRT: **Schwarzschild**, **Kerr**, **Rei
 
 ### Disk (not hair) — separate store `state/disk.ts`
 
-**Free (UI):** ṁ, ρ₀, β₀, r_out, tilt, jet boost.
+**Free (UI):** ρ₀, β₀, r_out, tilt, jet boost.
 
-**Derived / locked:** r_in = co-rotating ISCO; H/r thin-disk; Γ=5/3; ℓ; SANE/MAD from β₀; structure defaults; tilt node 0; B geometry single-loop. Disk always co-rotates (L ‖ J); use signed a★ for spin direction.
+**Derived / locked:** **ṁ** (scenario/preset expert readout — not free; Hot/Cool etc. set it), r_in = co-rotating ISCO; H/r thin-disk; Γ=5/3; ℓ; SANE/MAD from β₀; structure defaults; tilt node 0; B geometry single-loop. Disk always co-rotates (L ‖ J); use signed a★ for spin direction.
 
 **Not free:** counter-rotating disk toggle; film palette as primary color.
 

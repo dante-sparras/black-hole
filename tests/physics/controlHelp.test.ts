@@ -6,7 +6,6 @@ const EXPECTED_KEYS = [
   'mass',
   'spin',
   'charge',
-  'mdot',
   'rho0',
   'beta',
   'outer',
@@ -31,16 +30,19 @@ describe('control 🛈 help', () => {
     }
   })
 
-  test('CONTROL_HELP keys match expected set', () => {
+  test('CONTROL_HELP keys match free UI set (no free ṁ)', () => {
     expect(Object.keys(CONTROL_HELP).sort()).toEqual([...EXPECTED_KEYS].sort())
+    expect(CONTROL_HELP.mdot).toBeUndefined()
   })
 
-  test('markup includes info buttons for each help id', () => {
+  test('markup includes info buttons for each free help id and no ṁ slider', () => {
     const html = buildControlsHtml()
     for (const k of EXPECTED_KEYS) {
       expect(html).toContain(`data-help="${k}"`)
     }
     expect(html).toContain('class="ctrl-info"')
     expect(html).toContain('🛈')
+    expect(html).not.toContain('id="d-mdot"')
+    expect(html).toContain('ṁ derived')
   })
 })
