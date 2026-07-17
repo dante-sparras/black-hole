@@ -7,8 +7,8 @@
  *  2. Optional SSAA multi-jitter only on High (full re-trace; med uses spatial + SMAA)
  *  3. SMAA morphological clean-up on the linear composite
  *
- * Perf: med was ~1.65² × 2 SSAA ≈ 5× RT; now ~1.65² ≈ 2.7× with same spatial grit stack.
- * High keeps 2× SSAA (was 4×) for photon-ring edges.
+ * Perf (med): ~1.35² ≈ 1.8× RT vs native (was 1.65² ≈ 2.7×). SMAA keeps grit in check.
+ * High: 1.75² × 2 SSAA ≈ 6× (was 16×).
  */
 import * as THREE from 'three/webgpu'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
@@ -28,15 +28,16 @@ export type BloomPipeline = {
 
 /** Spatial supersample scale per quality (1 = native). */
 const AA_RES: Record<QualityLevel, number> = {
-  low: 1.35,
-  med: 1.65,
-  high: 2.0,
+  low: 1.2,
+  /** Match prior low AA floor + SMAA — biggest free FPS lever after SSAA removal */
+  med: 1.35,
+  high: 1.75,
 }
 
 /**
  * SSAA sampleLevel n → 2^n samples. 0 = single pass (no SSAA re-renders).
- * Med: spatial supersample + SMAA only (SSAA was ~2× extra RT for little grit gain).
- * High: 2 samples (was 4).
+ * Med: spatial supersample + SMAA only.
+ * High: 2 samples.
  */
 const AA_SSAA_LEVEL: Record<QualityLevel, number> = {
   low: 0,

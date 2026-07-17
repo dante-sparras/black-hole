@@ -3,7 +3,6 @@
  * Physics laws stay fixed — this is numerical resolution only.
  */
 import { emitStore } from './batch'
-import { RT } from '../physics/geodesic/rtConstants'
 
 export type QualityLevel = 'low' | 'med' | 'high'
 
@@ -19,14 +18,15 @@ export type QualityConfig = {
 
 export const QUALITY_PRESETS: Record<QualityLevel, Omit<QualityConfig, 'level'>> = {
   low: {
-    maxSteps: 340,
+    maxSteps: 320,
     /** Keep full pixel density so post-AA (SMAA) has room to work on mobile */
     dpr: 1,
     volumeStride: 4,
     baseStepM: 0.15,
   },
   med: {
-    maxSteps: RT.defaultMaxSteps,
+    /** Interactive target ≥55–60fps with 1.35× supersample + SMAA */
+    maxSteps: 480,
     dpr: 1,
     volumeStride: 2,
     baseStepM: 0.12,

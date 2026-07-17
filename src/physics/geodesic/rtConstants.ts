@@ -10,23 +10,23 @@ export const RT = {
   /** Hard loop ceiling (GPU). Effective steps clamped by uMaxSteps quality. */
   maxSteps: 720,
   /** Default effective max steps (med quality) */
-  defaultMaxSteps: 540,
+  defaultMaxSteps: 480,
   baseStepM: 0.12,
   adaptFloor: 0.21,
   /**
    * Cap on adaptive multiplier. Must be high enough that a cruise from
    * OBSERVER_LIMITS.distanceM.max reaches the hole within maxSteps:
    *   steps ≈ (D/M) / (baseStepM · adaptMax)
-   * With D/M=120, base=0.12, adaptMax=8.5 → ~120 vacuum steps + margin.
+   * With D/M=120, base=0.12, adaptMax=9.5 → ~105 vacuum steps + margin.
    * Old adaptMax=1.85 needed ~540 steps and failed at far zoom.
    */
-  adaptMax: 8.5,
+  adaptMax: 9.5,
   adaptScale: 10.5,
   /**
    * Extra refinement near photon sphere: adaptFloor *= (1 − phRefine * nearPh).
    * nearPh peaks at r≈3M — enables nested rings from geometry, not fake glow.
    */
-  phRefine: 0.58,
+  phRefine: 0.55,
   phCenterM: 3.0,
   phWidthM: 2.0,
   captureMargin: 1.02,
