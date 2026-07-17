@@ -4,9 +4,8 @@
  * (params+disk, presets) upload each channel at most once per turn.
  */
 import { getDebug, subscribeDebug } from '../debug/state'
-import { autoExposureFromPhysics, thinDiskScaleHeight } from '../physics/disk'
+import { autoExposureFromPhysics } from '../physics/disk'
 import {
-  DISK_GAMMA,
   magnetClassFromBeta,
   plasmaBetaToMriScale,
   perturbFromBeta,
@@ -81,10 +80,11 @@ export function createSceneBridge(tracer: GeodesicTracer): SceneBridge {
     const disk = getDisk()
     const geom = effectiveDiskGeom(p, disk)
     const rinM = geom.rinOverM
-    const scaleHeight = thinDiskScaleHeight(disk.mdot, rinM, DISK_GAMMA)
+    // Free H/r — no longer derived from ṁ
+    const scaleHeight = disk.scaleHeight
     const magnetClass = magnetClassFromBeta(disk.plasmaBeta)
     const mriTurbScale = plasmaBetaToMriScale(disk.plasmaBeta, magnetClass)
-    const polyTScale = rhoTemperatureScale(disk.rho0)
+    const polyTScale = rhoTemperatureScale(disk.rho0, disk.gamma)
     const madBoost = magnetClass === 'mad' ? 1 : 0
     const perturbAmp = perturbFromBeta(disk.plasmaBeta)
     tracer.setSpacetime({

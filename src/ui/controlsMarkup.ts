@@ -25,8 +25,8 @@ function ctrlRow(
 }
 
 /**
- * Free UI bases only (ṁ is derived / scenario — HUD + presets, not a slider).
- * Derived HUD: ṁ, r_in=ISCO, H/r, Γ, ℓ̃, SANE/MAD, jet_eff, …
+ * Expert free bases: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet.
+ * ṁ is scenario/preset — derived HUD only.
  */
 export function buildControlsHtml(): string {
   const distLim = CAMERA_LIMITS.distanceM
@@ -34,6 +34,9 @@ export function buildControlsHtml(): string {
   const incDegMax = radToDeg(CAMERA_LIMITS.inclination.max)
   const fovLim = CAMERA_LIMITS.fov
   const tiltDegMax = radToDeg(DISK_LIMITS.tiltRad.max)
+  const h = DISK_LIMITS.scaleHeight
+  const g = DISK_LIMITS.gamma
+  const rin = DISK_LIMITS.rinOverM
 
   return `
     <div class="ctrl-section">Presets</div>
@@ -43,7 +46,7 @@ export function buildControlsHtml(): string {
           `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
       ).join('')}
     </div>
-    <p class="ctrl-hint" id="preset-hint">Free bases + presets · ṁ is derived (HUD) · 🛈 for details</p>
+    <p class="ctrl-hint" id="preset-hint">Expert free bases · ṁ derived (HUD) · 🛈 for details</p>
 
     <div class="ctrl-section">Black hole (no-hair)</div>
     ${ctrlRow(
@@ -74,10 +77,28 @@ export function buildControlsHtml(): string {
       'rho0',
     )}
     ${ctrlRow(
+      'scaleH',
+      'H/r',
+      `<input type="range" id="d-hr" min="${h.min}" max="${h.max}" step="0.002" />`,
+      'hr',
+    )}
+    ${ctrlRow(
+      'gamma',
+      'Γ EOS',
+      `<input type="range" id="d-gamma" min="${g.min}" max="${g.max}" step="0.01" />`,
+      'gamma',
+    )}
+    ${ctrlRow(
       'beta',
       'β₀ plasma',
       `<input type="range" id="d-beta" min="0" max="1000" step="1" />`,
       'beta',
+    )}
+    ${ctrlRow(
+      'rin',
+      'r_in / M',
+      `<input type="range" id="d-rin" min="${rin.min}" max="${rin.max}" step="0.1" />`,
+      'rin',
     )}
     ${ctrlRow(
       'outer',
@@ -93,11 +114,11 @@ export function buildControlsHtml(): string {
     )}
     ${ctrlRow(
       'jet',
-      'Jet boost',
+      'Jet strength',
       `<input type="range" id="d-jet" min="0" max="1" step="0.01" />`,
       'jet',
     )}
-    <p class="ctrl-hint">Free: ρ₀ · β₀ · r_out · tilt · jet · ṁ derived (presets / scenario, see HUD)</p>
+    <p class="ctrl-hint">Free: ρ₀ · H/r · Γ · β₀ · r_in · r_out · tilt · jet · ℓ̃ & ṁ on HUD</p>
 
     <div class="ctrl-section">Observer</div>
     ${ctrlRow(

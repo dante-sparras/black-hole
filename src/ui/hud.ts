@@ -1,11 +1,10 @@
 /**
  * Derived / science HUD — non-controllable readouts under free bases.
- * ṁ is expert output (scenario/preset), not a free slider.
+ * ṁ is expert scenario output; ℓ̃ from free r_in; ISCO is reference only.
  */
 import {
   mdotTemperatureScale,
   novikovThorneEfficiency,
-  thinDiskScaleHeight,
 } from '../physics/disk'
 import {
   keplerSpecificL,
@@ -30,7 +29,6 @@ export function renderDerivedHud(
   const m = Math.max(params.mass, 1e-12)
   const orbit = 'co-rotating (L ‖ J)'
   const eta = novikovThorneEfficiency(params.spinStar, true)
-  const hOverR = thinDiskScaleHeight(disk.mdot, geom.rinOverM, 5 / 3)
   const ell = keplerSpecificL(geom.rinOverM)
   const magClass = magnetClassFromBeta(disk.plasmaBeta)
   const jetEff = jetEffectivePower({
@@ -39,6 +37,7 @@ export function renderDerivedHud(
     mdot: disk.mdot,
   })
   const tiltDeg = (disk.tiltRad * 180) / Math.PI
+  const iscoDelta = geom.rinOverM - geom.iscoOverM
 
   root.innerHTML = `
       <div class="diag-title">Black hole (derived)</div>
@@ -50,21 +49,20 @@ export function renderDerivedHud(
 
       <div class="diag-title">Disk (derived · expert)</div>
       <div><dt>ṁ / ṁ_Edd</dt><dd><strong>${fmtMdot(disk.mdot)}</strong> <span class="dim">scenario · not free</span></dd></div>
-      <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)} <span class="dim">from ṁ</span></dd></div>
-      <div><dt>η_NT</dt><dd>${(eta * 100).toFixed(2)}% <span class="dim">radiative efficiency</span></dd></div>
-      <div><dt>orbit</dt><dd>${orbit} <span class="dim">a★ sign sets sense</span></dd></div>
-      <div><dt>tilt</dt><dd>${fmt(tiltDeg, 1)}° <span class="dim">(free)</span></dd></div>
-      <div><dt>r_in</dt><dd>${fmt(geom.rinOverM, 2)} M <span class="dim">= ISCO</span></dd></div>
-      <div><dt>r_ISCO</dt><dd>${fmt(geom.iscoOverM, 2)} M</dd></div>
-      <div><dt>H/r</dt><dd>${fmt(hOverR, 3)} <span class="dim">thin-disk(ṁ,Γ)</span></dd></div>
-      <div><dt>Γ</dt><dd>5/3 <span class="dim">(fixed)</span></dd></div>
-      <div><dt>ℓ̃</dt><dd>${fmt(ell, 2)} <span class="dim">≈√(r_in/M)</span></dd></div>
+      <div><dt>T∝ṁ¼</dt><dd>×${fmt(tScale, 3)}</dd></div>
+      <div><dt>η_NT</dt><dd>${(eta * 100).toFixed(2)}%</dd></div>
+      <div><dt>ℓ̃</dt><dd>${fmt(ell, 2)} <span class="dim">≈√(r_in/M) from free r_in</span></dd></div>
+      <div><dt>r_ISCO</dt><dd>${fmt(geom.iscoOverM, 2)} M <span class="dim">ref · Δr_in=${fmt(iscoDelta, 2)} M</span></dd></div>
       <div><dt>r_peak</dt><dd>${fmt(geom.rPeakOverM, 1)} M</dd></div>
-      <div><dt>β class</dt><dd>${magClass.toUpperCase()} <span class="dim">from β₀=${fmt(disk.plasmaBeta, 1)}</span></dd></div>
-      <div><dt>ρ₀</dt><dd>${fmt(disk.rho0, 2)} <span class="dim">(free)</span></dd></div>
+      <div><dt>orbit</dt><dd>${orbit}</dd></div>
+      <div><dt>β class</dt><dd>${magClass.toUpperCase()} <span class="dim">from β₀</span></dd></div>
+      <div><dt>jet_eff</dt><dd>${fmt(jetEff, 3)} <span class="dim">∝ a★² ṁ^0.4 · strength</span></dd></div>
+      <div><dt>H/r</dt><dd>${fmt(disk.scaleHeight, 3)} <span class="dim">(free)</span></dd></div>
+      <div><dt>Γ</dt><dd>${fmt(disk.gamma, 3)} <span class="dim">(free)</span></dd></div>
+      <div><dt>r_in</dt><dd>${fmt(geom.rinOverM, 2)} M <span class="dim">(free · floored r₊)</span></dd></div>
       <div><dt>r_out</dt><dd>${fmt(disk.outerM, 1)} M <span class="dim">(free)</span></dd></div>
-      <div><dt>jet boost</dt><dd>${fmt(disk.jetBoost, 2)} <span class="dim">(free)</span></dd></div>
-      <div><dt>jet_eff</dt><dd>${fmt(jetEff, 3)} <span class="dim">∝ a★² ṁ^0.4 · boost</span></dd></div>
+      <div><dt>tilt</dt><dd>${fmt(tiltDeg, 1)}° <span class="dim">(free)</span></dd></div>
+      <div><dt>ρ₀</dt><dd>${fmt(disk.rho0, 2)} <span class="dim">(free)</span></dd></div>
 
       <div class="diag-title">Shadow (analytic HUD)</div>
       <div><dt>b_c⁺</dt><dd>${fmt(diag.bCritPro)} <span class="dim">(${fmt(diag.bCritProOverM, 2)} M)</span></dd></div>
@@ -72,6 +70,6 @@ export function renderDerivedHud(
       <div><dt>⌀_shad</dt><dd>${fmt(diag.shadowDiameter)} <span class="dim">(~${fmt(diag.shadowDiameter / m, 2)} M)</span></dd></div>
       <div><dt>r_ergo</dt><dd>${fmt(derived.rErgoEquator)}</dd></div>
       <div><dt>Δ_ext</dt><dd>${fmt(derived.extremalityDelta)}</dd></div>
-      <p class="ctrl-hint" style="margin-top:6px">Free UI: M,a★,Q · ρ₀,β₀,r_out,tilt,jet · observer · ṁ from presets/scenario (not a free slider)</p>
+      <p class="ctrl-hint" style="margin-top:6px">Free: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet · ṁ scenario · ℓ̃ & ISCO derived/ref</p>
     `
 }

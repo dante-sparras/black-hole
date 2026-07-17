@@ -1,11 +1,11 @@
 /**
  * Accretion disk parameters — NOT black-hole hair.
  *
- * Free (UI): ρ₀, β₀, r_out, tilt, jetBoost
- * Scenario / derived display: ṁ (presets set it; HUD shows it — not a free slider)
- * Model defaults (presets/GPU texture, not free UI): structure, arms, clumps, dust, shear, animate
+ * Free (UI): ρ₀, H/r, Γ, β₀, r_in/M, r_out/M, tilt, jet strength
+ * Scenario / derived display: ṁ (presets; HUD — not free)
+ * Derived (HUD): ℓ̃ ≈ √(r_in/M), ISCO (reference), MAD class, jet_eff, …
+ * Model defaults (not free UI): structure, arms, clumps, dust, shear, animate
  *
- * Derived elsewhere (not stored free): r_in=ISCO, H/r, Γ=5/3, ℓ, MAD class, perturb, co-rot always.
  * No-hair = (M, a★, Q) only. G = c = 1.
  */
 import { DEFAULT_MDOT, MDOT_MAX, MDOT_MIN } from './constants'
@@ -13,19 +13,25 @@ import { RT } from './geodesic/rtConstants'
 import { DISK_TEXTURE } from './diskTexture'
 import { clamp, finiteNumber } from './math'
 
-/** Thin-disk free bases + internal texture model (not free UI). */
+/** Thin-disk / torus free bases + internal texture model (not free UI). */
 export type DiskParams = {
-  /** Eddington ratio ṁ = Ṁ/Ṁ_Edd (scenario / expert readout — not free UI). F ∝ ṁ, T ∝ ṁ^{1/4}. */
+  /** Eddington ratio ṁ = Ṁ/Ṁ_Edd (scenario / expert readout — not free UI). */
   readonly mdot: number
   /** Density normalization ρ₀ (relative dens / OD weight). */
   readonly rho0: number
-  /** Outer disk radius in units of M. */
-  readonly outerM: number
+  /** Free scale height H/r (aspect ratio). */
+  readonly scaleHeight: number
+  /** Adiabatic index Γ (EOS). */
+  readonly gamma: number
   /** Plasma β₀ = p_gas/p_mag seed. */
   readonly plasmaBeta: number
+  /** Free luminous inner edge / M (not forced to ISCO). */
+  readonly rinOverM: number
+  /** Outer disk radius in units of M. */
+  readonly outerM: number
   /** Disk midplane tilt vs BH spin (rad). */
   readonly tiltRad: number
-  /** User jet boost 0…1 (scales BZ-like funnel; 0 = off). */
+  /** Jet strength 0…1 (scales BZ-like funnel; 0 = off). */
   readonly jetBoost: number
   /** Texture master 0–1 (preset/model; not free UI). */
   readonly structure: number
@@ -38,11 +44,20 @@ export type DiskParams = {
 
 export type MagnetClass = 'sane' | 'mad'
 
+/** Default Γ (also fallback when callers omit gamma). */
+export const DISK_GAMMA = 5 / 3
+
+/** Default free r_in/M ≈ Schwarzschild ISCO. */
+export const DEFAULT_RIN_OVER_M = 6
+
 export const DEFAULT_DISK: DiskParams = {
   mdot: DEFAULT_MDOT,
   rho0: 1,
-  outerM: RT.diskOuterM,
+  scaleHeight: 0.06,
+  gamma: DISK_GAMMA,
   plasmaBeta: 100,
+  rinOverM: DEFAULT_RIN_OVER_M,
+  outerM: RT.diskOuterM,
   tiltRad: 0,
   jetBoost: 0,
   structure: 1,
@@ -56,8 +71,11 @@ export const DEFAULT_DISK: DiskParams = {
 export const DISK_LIMITS = {
   mdot: { min: MDOT_MIN, max: MDOT_MAX },
   rho0: { min: 0.05, max: 20 },
-  outerM: { min: 8, max: 80 },
+  scaleHeight: { min: 0.02, max: 0.2 },
+  gamma: { min: 4 / 3, max: 5 / 3 },
   plasmaBeta: { min: 0.3, max: 1000 },
+  rinOverM: { min: 1.35, max: 40 },
+  outerM: { min: 8, max: 80 },
   tiltRad: { min: 0, max: (40 * Math.PI) / 180 },
   jetBoost: { min: 0, max: 1 },
   structure: { min: 0, max: 1 },
@@ -67,12 +85,22 @@ export const DISK_LIMITS = {
   shearRate: { min: 0, max: 4 },
 } as const
 
-/** Fixed thin-disk EOS (not free). */
-export const DISK_GAMMA = 5 / 3
-
 export type DiskInput = Partial<DiskParams>
 
 export function normalizeDisk(input: DiskInput = {}): DiskParams {
+  const outerM = clamp(
+    finiteNumber(input.outerM, DEFAULT_DISK.outerM),
+    DISK_LIMITS.outerM.min,
+    DISK_LIMITS.outerM.max,
+  )
+  // r_in must sit inside the annulus (leave room for outer edge)
+  const rinMax = Math.min(DISK_LIMITS.rinOverM.max, outerM - 0.5)
+  const rinOverM = clamp(
+    finiteNumber(input.rinOverM, DEFAULT_DISK.rinOverM),
+    DISK_LIMITS.rinOverM.min,
+    Math.max(DISK_LIMITS.rinOverM.min, rinMax),
+  )
+
   return {
     mdot: clamp(
       finiteNumber(input.mdot, DEFAULT_DISK.mdot),
@@ -84,16 +112,23 @@ export function normalizeDisk(input: DiskInput = {}): DiskParams {
       DISK_LIMITS.rho0.min,
       DISK_LIMITS.rho0.max,
     ),
-    outerM: clamp(
-      finiteNumber(input.outerM, DEFAULT_DISK.outerM),
-      DISK_LIMITS.outerM.min,
-      DISK_LIMITS.outerM.max,
+    scaleHeight: clamp(
+      finiteNumber(input.scaleHeight, DEFAULT_DISK.scaleHeight),
+      DISK_LIMITS.scaleHeight.min,
+      DISK_LIMITS.scaleHeight.max,
+    ),
+    gamma: clamp(
+      finiteNumber(input.gamma, DEFAULT_DISK.gamma),
+      DISK_LIMITS.gamma.min,
+      DISK_LIMITS.gamma.max,
     ),
     plasmaBeta: clamp(
       finiteNumber(input.plasmaBeta, DEFAULT_DISK.plasmaBeta),
       DISK_LIMITS.plasmaBeta.min,
       DISK_LIMITS.plasmaBeta.max,
     ),
+    rinOverM,
+    outerM,
     tiltRad: clamp(
       finiteNumber(input.tiltRad, DEFAULT_DISK.tiltRad),
       DISK_LIMITS.tiltRad.min,
@@ -158,7 +193,7 @@ export function perturbFromBeta(plasmaBeta: number): number {
   return Math.min(0.95, Math.max(0.2, 0.25 + 0.25 * mri))
 }
 
-/** Keplerian ℓ̃ ≈ √(r/M) at circular radius. */
+/** Keplerian ℓ̃ ≈ √(r/M) at circular radius (derived from free r_in). */
 export function keplerSpecificL(rinOverM: number): number {
   return Math.sqrt(Math.max(rinOverM, 1.2))
 }
@@ -172,10 +207,11 @@ export function densPeakRadiusM(specificL: number, rinM: number, outerM: number)
   return Math.min(outerM * 0.85, Math.max(rinM * 1.05, r))
 }
 
-/** Relative T scale from ρ₀ at fixed Γ=5/3 (no free K). */
-export function rhoTemperatureScale(rho0: number): number {
+/** Relative T scale from ρ₀ and free Γ (poly-like). */
+export function rhoTemperatureScale(rho0: number, gamma: number = DISK_GAMMA): number {
   const r = Math.max(rho0, 0.05)
-  const t = Math.pow(r, DISK_GAMMA - 1)
+  const g = clamp(gamma, DISK_LIMITS.gamma.min, DISK_LIMITS.gamma.max)
+  const t = Math.pow(r, g - 1)
   return Math.min(8, Math.max(0.15, t))
 }
 
@@ -199,5 +235,3 @@ export function effectiveDiskStructure(d: DiskParams): {
     mriTurbScale,
   }
 }
-
-

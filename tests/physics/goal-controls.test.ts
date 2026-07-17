@@ -100,9 +100,15 @@ describe('derived Γ / β helpers', () => {
       tiltRad: 9,
       jetBoost: 5,
       plasmaBeta: 1e-6,
+      scaleHeight: 9,
+      gamma: 1,
+      rinOverM: 0.5,
     })
     expect(d.tiltRad).toBeLessThanOrEqual((40 * Math.PI) / 180 + 1e-9)
     expect(d.jetBoost).toBe(1)
     expect(d.plasmaBeta).toBeCloseTo(DISK_LIMITS.plasmaBeta.min, 5)
+    expect(d.scaleHeight).toBe(DISK_LIMITS.scaleHeight.max)
+    expect(d.gamma).toBe(DISK_LIMITS.gamma.min)
+    expect(d.rinOverM).toBeGreaterThanOrEqual(DISK_LIMITS.rinOverM.min)
   })
 })

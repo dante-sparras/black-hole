@@ -7,7 +7,10 @@ const EXPECTED_KEYS = [
   'spin',
   'charge',
   'rho0',
+  'scaleH',
+  'gamma',
   'beta',
+  'rin',
   'outer',
   'tilt',
   'jet',
@@ -35,14 +38,15 @@ describe('control 🛈 help', () => {
     expect(CONTROL_HELP.mdot).toBeUndefined()
   })
 
-  test('markup includes info buttons for each free help id and no ṁ slider', () => {
+  test('markup has expert free bases and no ṁ slider', () => {
     const html = buildControlsHtml()
     for (const k of EXPECTED_KEYS) {
       expect(html).toContain(`data-help="${k}"`)
     }
-    expect(html).toContain('class="ctrl-info"')
-    expect(html).toContain('🛈')
+    expect(html).toContain('id="d-hr"')
+    expect(html).toContain('id="d-gamma"')
+    expect(html).toContain('id="d-rin"')
     expect(html).not.toContain('id="d-mdot"')
-    expect(html).toContain('ṁ derived')
+    expect(html).toContain('Jet strength')
   })
 })

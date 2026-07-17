@@ -45,10 +45,7 @@ function sliderFromLog(v: number, min: number, max: number): number {
   return Math.min(1000, Math.max(0, ((x - lo) / (hi - lo)) * 1000))
 }
 
-/**
- * Free-base panel: no-hair + disk (ρ₀, β₀, r_out, tilt, jet) + observer + numerics.
- * ṁ is not free — scenario/preset value, shown on derived HUD.
- */
+/** Expert free-base panel (ṁ not free). */
 export function mountControls(
   root: HTMLElement,
   derivedRoot: HTMLElement | null,
@@ -62,7 +59,10 @@ export function mountControls(
   const spinInput = qs<HTMLInputElement>(root, '#p-spin')
   const chargeInput = qs<HTMLInputElement>(root, '#p-charge')
   const rho0Input = qs<HTMLInputElement>(root, '#d-rho0')
+  const hrInput = qs<HTMLInputElement>(root, '#d-hr')
+  const gammaInput = qs<HTMLInputElement>(root, '#d-gamma')
   const betaInput = qs<HTMLInputElement>(root, '#d-beta')
+  const rinInput = qs<HTMLInputElement>(root, '#d-rin')
   const outerInput = qs<HTMLInputElement>(root, '#d-outer')
   const tiltInput = qs<HTMLInputElement>(root, '#d-tilt')
   const jetInput = qs<HTMLInputElement>(root, '#d-jet')
@@ -71,7 +71,10 @@ export function mountControls(
   const spinVal = qs<HTMLElement>(root, '[data-val="spin"]')
   const chargeVal = qs<HTMLElement>(root, '[data-val="charge"]')
   const rho0Val = qs<HTMLElement>(root, '[data-val="rho0"]')
+  const hrVal = qs<HTMLElement>(root, '[data-val="hr"]')
+  const gammaVal = qs<HTMLElement>(root, '[data-val="gamma"]')
   const betaVal = qs<HTMLElement>(root, '[data-val="beta"]')
+  const rinVal = qs<HTMLElement>(root, '[data-val="rin"]')
   const outerVal = qs<HTMLElement>(root, '[data-val="outer"]')
   const tiltVal = qs<HTMLElement>(root, '[data-val="tilt"]')
   const jetVal = qs<HTMLElement>(root, '[data-val="jet"]')
@@ -98,7 +101,7 @@ export function mountControls(
     }
     if (presetHint) {
       presetHint.textContent =
-        hint ?? 'Free bases + presets · ṁ is derived (HUD) · 🛈 for details'
+        hint ?? 'Expert free bases · ṁ derived (HUD) · 🛈 for details'
     }
   }
   function onUserTweaked(): void {
@@ -119,16 +122,22 @@ export function mountControls(
       rho0Input,
       sliderFromLog(d.rho0, DISK_LIMITS.rho0.min, DISK_LIMITS.rho0.max),
     )
+    setRangeValue(hrInput, d.scaleHeight)
+    setRangeValue(gammaInput, d.gamma)
     setRangeValue(
       betaInput,
       sliderFromLog(d.plasmaBeta, DISK_LIMITS.plasmaBeta.min, DISK_LIMITS.plasmaBeta.max),
     )
+    setRangeValue(rinInput, d.rinOverM)
     setRangeValue(outerInput, d.outerM)
     setRangeValue(tiltInput, radToDeg(d.tiltRad))
     setRangeValue(jetInput, d.jetBoost)
 
     setText(rho0Val, fmt(d.rho0, 2))
+    setText(hrVal, fmt(d.scaleHeight, 3))
+    setText(gammaVal, fmt(d.gamma, 3))
     setText(betaVal, fmt(d.plasmaBeta, 1))
+    setText(rinVal, fmt(d.rinOverM, 2))
     setText(outerVal, `${fmt(d.outerM, 0)} M`)
     setText(tiltVal, fmt(radToDeg(d.tiltRad), 1))
     setText(jetVal, fmt(d.jetBoost, 2))
@@ -165,15 +174,29 @@ export function mountControls(
     onUserTweaked()
     setDisk({ rho0: logFromSlider(v, DISK_LIMITS.rho0.min, DISK_LIMITS.rho0.max) })
   })
+  bindRange(hrInput, (v) => {
+    onUserTweaked()
+    setDisk({ scaleHeight: v })
+  })
+  bindRange(gammaInput, (v) => {
+    onUserTweaked()
+    setDisk({ gamma: v })
+  })
   bindRange(betaInput, (v) => {
     onUserTweaked()
     setDisk({
       plasmaBeta: logFromSlider(v, DISK_LIMITS.plasmaBeta.min, DISK_LIMITS.plasmaBeta.max),
     })
   })
+  bindRange(rinInput, (v) => {
+    onUserTweaked()
+    setDisk({ rinOverM: v })
+  })
   bindRange(outerInput, (v) => {
     onUserTweaked()
-    setDisk({ outerM: v })
+    // re-clamp r_in if outer shrinks
+    const cur = getDisk()
+    setDisk({ outerM: v, rinOverM: Math.min(cur.rinOverM, v - 0.5) })
   })
   bindRange(tiltInput, (v) => {
     onUserTweaked()

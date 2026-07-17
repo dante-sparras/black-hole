@@ -204,6 +204,9 @@ export function applyPreset(preset: ScenePreset | string): ScenePreset {
       ...(typeof p.disk.jetBoost === 'number' ? { jetBoost: p.disk.jetBoost } : {}),
       ...(typeof p.disk.plasmaBeta === 'number' ? { plasmaBeta: p.disk.plasmaBeta } : {}),
       ...(typeof p.disk.rho0 === 'number' ? { rho0: p.disk.rho0 } : {}),
+      ...(typeof p.disk.scaleHeight === 'number' ? { scaleHeight: p.disk.scaleHeight } : {}),
+      ...(typeof p.disk.gamma === 'number' ? { gamma: p.disk.gamma } : {}),
+      ...(typeof p.disk.rinOverM === 'number' ? { rinOverM: p.disk.rinOverM } : {}),
     })
     setCamera({ ...CAMERA_DEFAULTS })
     setLook({

@@ -47,37 +47,60 @@ Default Q = 0 (pure Kerr / Schwarzschild).`,
     summary: 'Density normalization for volume opacity / dens weight.',
     body: `Free dens scale for how optically thick the disk volume looks (relative dens / OD).
 
-Higher ρ₀ → denser-looking midplane and stronger extinction. Lower → thinner, more transparent volume. Mild relative T scale from ρ₀ (poly-like).
+Higher ρ₀ → denser midplane and stronger extinction. Mild relative T scale from ρ₀^Γ⁻¹.
 
-Eddington ratio ṁ is not free here — it is a scenario/preset expert readout on the derived HUD (as in real sims where ṁ is measured, not dialed).`,
+ṁ is scenario/preset (HUD), not free.`,
+  },
+  scaleH: {
+    title: 'H/r',
+    summary: 'Disk aspect ratio (scale height over radius).',
+    body: `Free vertical thickness of the volume dens. Larger H/r → puffier disk, stronger polar path length, more “fat torus” look.
+
+In pure thin-disk theory H/r is often derived from ṁ and Γ; here it is an expert free base so you can set geometry independently of the ṁ scenario.`,
+  },
+  gamma: {
+    title: 'Γ (adiabatic index)',
+    summary: 'Equation-of-state index for the gas.',
+    body: `Typical range 4/3 (radiation-dominated soft) … 5/3 (non-relativistic gas). Affects poly-like T scale from ρ₀ and (in theory) disk structure.
+
+Default 5/3. Not a free temperature dial — use ρ₀ / scenario ṁ for brightness.`,
   },
   beta: {
     title: 'β₀ plasma',
     summary: 'Plasma β = p_gas / p_mag seed (turbulence & MAD/SANE class).',
-    body: `High β (gas-dominated) → quieter dens / SANE-like. Low β → stronger MRI-scale turbulence and MAD-class boosts in the model.
+    body: `High β (gas-dominated) → quieter dens / SANE-like. Low β → stronger MRI-scale turbulence and MAD-class boosts.
 
-Derived only (HUD): magnet class, MRI variance, and perturbation amplitude. Not a free H/r or structure master.`,
+HUD shows MAD/SANE class and MRI scale derived from β₀.`,
+  },
+  rin: {
+    title: 'r_in / M',
+    summary: 'Free luminous inner edge (not forced to ISCO).',
+    body: `Inner cutoff of the emitting disk in units of M. Floored above ~1.05 r₊ and below r_out.
+
+ISCO is still computed and shown on the HUD as a reference (Δr_in). For classical thin NT, r_in = ISCO is most physical; free r_in is the expert torus-style lever.
+
+ℓ̃ ≈ √(r_in/M) is derived on the HUD from this value.`,
   },
   outer: {
     title: 'r_out / M',
     summary: 'Outer luminous disk radius in units of M.',
-    body: `Cutoff for the thin-disk emission and volume sampling. Larger r_out → bigger radial extent of the disk.
+    body: `Cutoff for emission and volume sampling. Larger r_out → bigger radial extent.
 
-Inner edge is not free — it is the co-rotating ISCO from (M, a★, Q). Keep r_out well inside the camera distance so the disk does not become a solid “dome” at high inclination.`,
+Keep r_out well inside camera distance at high inclination to avoid a solid “dome.” Shrinking r_out re-clamps r_in if needed.`,
   },
   tilt: {
     title: 'Tilt',
     summary: 'Disk midplane tilt relative to the BH spin axis (+Y).',
-    body: `Rotates the disk plane only (dens / midplane), not the hole’s spin. Spin stays along +Y; geodesics still use that axis.
+    body: `Rotates the disk plane only (dens / midplane), not the hole’s spin. Spin stays along +Y.
 
-0° = equatorial XZ disk. Up to ~40° for a warped/inclined look. Line of nodes is fixed (node = 0) in this build.`,
+0° = equatorial XZ. Up to ~40°. Line of nodes fixed (node = 0).`,
   },
   jet: {
-    title: 'Jet boost',
-    summary: 'User scale on the analytic polar funnel (jets).',
-    body: `0 = off (default). Raises a simple BZ-like funnel glow ∝ a★² · ṁ^{0.4} · boost.
+    title: 'Jet strength',
+    summary: 'Scale on the analytic polar funnel (magnetic/jet proxy).',
+    body: `0 = off (default). Funnel glow ∝ a★² · ṁ^{0.4} · strength.
 
-ṁ itself is scenario/preset (HUD). This slider is the optional multiplier. No emission inside the capture silhouette.`,
+Educational BZ-like jet, not full GRMHD. ṁ is scenario/preset; this is the free multiplier. No emission inside the capture silhouette.`,
   },
   dist: {
     title: 'Distance / M',
