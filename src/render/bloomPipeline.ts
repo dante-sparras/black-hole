@@ -4,8 +4,11 @@
  *
  * AA strategy (no dens/physics changes):
  *  1. Render the full-screen geodesic at resolutionScale > 1 (spatial supersample)
- *  2. Optional SSAA multi-jitter (2–4 samples) for quality tiers
+ *  2. Optional SSAA multi-jitter only on High (full re-trace; med uses spatial + SMAA)
  *  3. SMAA morphological clean-up on the linear composite
+ *
+ * Perf: med was ~1.65² × 2 SSAA ≈ 5× RT; now ~1.65² ≈ 2.7× with same spatial grit stack.
+ * High keeps 2× SSAA (was 4×) for photon-ring edges.
  */
 import * as THREE from 'three/webgpu'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
@@ -32,12 +35,13 @@ const AA_RES: Record<QualityLevel, number> = {
 
 /**
  * SSAA sampleLevel n → 2^n samples. 0 = single pass (no SSAA re-renders).
- * Low stays single-pass + res scale (mobile-friendly).
+ * Med: spatial supersample + SMAA only (SSAA was ~2× extra RT for little grit gain).
+ * High: 2 samples (was 4).
  */
 const AA_SSAA_LEVEL: Record<QualityLevel, number> = {
   low: 0,
-  med: 1, // 2 samples
-  high: 2, // 4 samples
+  med: 0,
+  high: 1, // 2 samples
 }
 
 /**

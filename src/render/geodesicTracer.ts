@@ -15,9 +15,8 @@ import {
   int,
   log,
   max,
-  mix,
-  min,
-  pow,
+    min,
+    pow,
   screenSize,
   sin,
   sqrt,
@@ -260,10 +259,16 @@ export function createGeodesicTracer(): GeodesicTracer {
     const halfPi = float(1.57079632679)
 
     Loop({ start: int(0), end: int(STEPS), type: 'int', condition: '<' }, () => {
-      If(done.greaterThan(0.5).or(stepCount.greaterThanEqual(int(uMaxSteps))), () => {
-        Break()
-      })
-      stepCount.addAssign(1)
+          If(done.greaterThan(0.5).or(stepCount.greaterThanEqual(int(uMaxSteps))), () => {
+            Break()
+          })
+          // Opaque disk already: further steps cannot change col (sky·transm≈0).
+          // Same pixels as marching to escape/capture — big win on thick edge-on rays.
+          If(transm.lessThan(0.02).and(hits.greaterThanEqual(float(1))), () => {
+            done.assign(1)
+            Break()
+          })
+          stepCount.addAssign(1)
 
       // ========== BL Mino path ==========
       If(useBl, () => {
@@ -600,233 +605,171 @@ export function createGeodesicTracer(): GeodesicTracer {
           .and(hits.lessThan(float(40)))
           .and(stepCount.mod(midStride).equal(int(0))),
         () => {
-      // 3D volume dens: Keplerian-advected spirals + plasma/gas/dust zones
-      // dens follows orbital flow (material frame), not a frozen paint job
-      const span = max(rout.sub(rin), M.mul(4))
-      const xRad = min(float(1), max(float(0), rhoV.sub(rin).div(span)))
-      // Zone weights from radial structure (physical annuli)
-      const plasmaW = exp(xRad.mul(-4.5)) // hot inner
-      const dustW = pow(max(xRad.sub(float(0.24)), float(0)).div(0.76), float(1.35))
-      const gasW = max(float(0), float(1).sub(plasmaW.mul(0.85)).sub(dustW.mul(0.55)))
-      const hOverR = uScaleH.mul(
-        float(0.14)
-          .add(pow(xRad.add(0.05), float(1.15)).mul(1.75))
-          .add(dustW.mul(0.95)),
-      )
-      const invRhoV = float(1).div(max(rhoV, float(1e-5)))
-      const cphiV = hxV.mul(invRhoV)
-      const sphiV = hzV.mul(invRhoV)
-      // Keplerian material-frame shear — pattern co-moves with gas
-      // Ω̃ = (M/ρ)^{3/2} (scale-free; visible wind when Animate on)
-      const rhoM = max(rhoV.div(M), float(1e-4))
-      const OmegaDim = pow(rhoM, float(-1.5))
-      const sense = uPrograde.greaterThan(0.5).select(float(1), float(-1))
-      const shear = sense
-        .mul(uShearRate)
-        .mul(uAnim)
-        .mul(float(6))
-        .mul(OmegaDim)
-        .mul(uTime)
-      // Kerr frame-drag + Lense–Thirring dens wind
-      const drag = aStar.mul(float(2.1)).div(max(rhoM, float(1.05)))
-      const ltWind = aStar.mul(float(2.8)).div(max(rhoM.mul(rhoM).mul(rhoM), float(1.2)))
-      const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12)))).add(ltWind)
-      const csh = cos(shearTot)
-      const ssh = sin(shearTot)
-      const cx = cphiV.mul(csh).sub(sphiV.mul(ssh))
-      const sx = cphiV.mul(ssh).add(sphiV.mul(csh))
-      const c2 = cx.mul(cx).sub(sx.mul(sx))
-      const s2 = cx.mul(sx).mul(2)
-      const lnR = log(rhoM)
-      // m=2 soft log spiral (large-scale arms only — face-on safe)
-      const pitch = float(0.48)
-      const armPh = float(-2).mul(pitch).mul(lnR).add(float(0.35)).add(drag)
-      const armWave = float(0.5).add(
-        float(0.5).mul(c2.mul(cos(armPh)).add(s2.mul(sin(armPh)))),
-      )
-      const spiralDens = float(0.55).add(pow(max(armWave, float(1e-4)), float(1.35)).mul(0.75))
-      // Soft m=2 / m=4 filaments only (drop m=8 lace that rings face-on)
-      const c4 = c2.mul(c2).sub(s2.mul(s2))
-      const s4 = c2.mul(s2).mul(2)
-      const filPh = float(-0.55).mul(lnR).add(float(0.9)).add(drag.mul(0.5))
-      const fil = float(0.5).add(float(0.5).mul(c4.mul(cos(filPh)).add(s4.mul(sin(filPh)))))
-      const filDens = float(0.72).add(pow(max(fil, float(1e-4)), float(1.4)).mul(0.4))
-      // LARGE-SCALE swirl dens (advected frame) — low spatial freq only
-      const nA = fract(
-        sin(cx.mul(2.1).add(sx.mul(1.7)).add(lnR.mul(0.55))).mul(43758.5453),
-      )
-      const nB = fract(
-        sin(cx.mul(3.4).add(sx.mul(2.9)).add(lnR.mul(0.8)).add(11.0)).mul(43758.5453),
-      )
-      // Curl-ish swirl: sample offset in perpendicular material direction
-      const nCurl = fract(
-        sin(cx.add(sx.mul(0.7)).mul(1.8).add(sx.sub(cx.mul(0.7)).mul(1.8)).add(lnR.mul(0.4))).mul(
-          43758.5453,
-        ),
-      )
-      const nMix = nA.mul(0.4).add(nB.mul(0.3)).add(nCurl.mul(0.3))
-      const sigmaM = float(0.42).mul(float(0.5).add(uClumps.mul(0.35)).add(uStructure.mul(0.2))).mul(uMriTurb)
-      const xiM = nMix.mul(2).sub(1)
-      const mriDens = exp(xiM.mul(sigmaM).sub(sigmaM.mul(sigmaM).mul(0.5)))
-      // Mild vertical corrugation (low freq)
-      const chan = float(0.9).add(float(0.1).mul(sin(sx.mul(1.8).add(lnR.mul(0.5)).add(drag))))
-      // Irregular outer rim: m=3 soft (not high-freq hash lace)
-      const c3 = cphiV.mul(cphiV.mul(cphiV).sub(sphiV.mul(sphiV).mul(3)))
-      const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
-      const rimN = fract(sin(cphiV.mul(4.1).add(sphiV.mul(3.3)).add(3.1)).mul(43758.5453))
-      const rimWobble = float(0.5).add(
-        float(0.5).mul(c3.mul(0.45).add(s3.mul(0.2)).add(rimN.mul(0.35)).sub(0.1)),
-      )
-      const routEff = rout.mul(float(0.86).add(rimWobble.mul(0.16)))
-      const fadeW = max(span.mul(0.28), M.mul(2.0))
-      const outerLin = min(float(1), max(float(0), routEff.sub(rhoV).div(fadeW)))
-      const outerSoft = pow(outerLin, float(1.4))
-      const fadeIn = max(rin.mul(0.18), M.mul(0.3))
-      const innerLin = min(float(1), max(float(0), rhoV.sub(rin).div(fadeIn)))
-      const innerSoft = pow(innerLin, float(0.9))
-      const radialGate = outerSoft.mul(innerSoft)
-      const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.02))
-      // Mild m=2 midplane warp
-      const warpAmp = Hloc.mul(float(0.08)).mul(uStructure.add(0.35))
-      const midY = s2.mul(warpAmp).add(c2.mul(warpAmp.mul(0.3)))
-      const zWob = sx.mul(0.1).add(cx.mul(0.05)).mul(Hloc)
-      const zNorm = abs(diskY.sub(midY).sub(zWob)).div(Hloc.mul(float(1.05).add(dustW.mul(0.3))))
-      const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
-      const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
-      // Plasma clumps — large scale only
-      const clumpN = fract(
-        sin(cx.mul(2.8).add(sx.mul(2.2)).add(lnR.mul(0.7))).mul(43758.5453),
-      )
-      const densPlasma = float(1).add(
-        plasmaW.mul(uClumps.add(0.4)).mul(clumpN.mul(0.9).sub(0.25)),
-      )
-      // Dust lanes: φ-dependent (not pure radial sin(k·lnR))
-      const dustLane = float(0.5).add(
-        float(0.5).mul(sin(cx.mul(2.2).add(sx.mul(1.6)).add(lnR.mul(0.65)))),
-      )
-      const densDust = float(1).sub(
-        dustW.mul(uDust.add(0.45)).mul(float(0.22).add(dustLane.mul(0.55))).mul(0.7),
-      )
-      // Gas: soft spiral + large-scale swirl
-      const struct = uStructure
-      const densGas = float(1)
-        .sub(struct.mul(0.5))
-        .add(
-          struct.mul(
-            spiralDens.mul(gasW.add(0.35)).mul(0.55).add(filDens.mul(0.4)).add(nMix.mul(0.35)),
-          ),
-        )
-      const densAnalytic = densZ
-        .mul(radialGate)
-        .mul(densPlasma)
-        .mul(densDust)
-        .mul(densGas)
-        .mul(float(0.7).add(mriDens.mul(0.4)))
-        .mul(chan)
-      // Cube dens — soft edges (no high edge boost)
-      const xAdv = cx.mul(rhoV)
-      const zAdv = sx.mul(rhoV)
-      const yAdv = diskY.div(max(M, float(1e-8)))
-      const ux = xAdv.sub(uCubeOx).div(max(uCubeEx, float(1e-6)))
-      const uy = yAdv.sub(uCubeOy).div(max(uCubeEy, float(1e-6)))
-      const uz = zAdv.sub(uCubeOz).div(max(uCubeEz, float(1e-6)))
-      const uvw = vec3(ux, uy, uz)
-      const mx = max(float(1).sub(abs(ux.mul(2).sub(1))), float(0))
-      const my = max(float(1).sub(abs(uy.mul(2).sub(1))), float(0))
-      const mz = max(float(1).sub(abs(uz.mul(2).sub(1))), float(0))
-      const boxMask = mx.mul(my).mul(mz)
-      const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.6))
-      const uvwN = uvw.add(vec3(0.008, 0.004, 0.006))
-      const cubeN = cubeTexNode.sample(uvwN).r.mul(uCubeScale).mul(float(1.6))
-      const densEdge = abs(cubeRaw.sub(cubeN)).mul(float(3.2))
-      const densCube = max(cubeRaw, float(0))
-        .mul(boxMask)
-        .mul(float(0.78).add(min(densEdge, float(1.0)).mul(0.4)))
-      // High-ṁ photosphere (mdotHi from RT scope): kill polar hourglass
-      // Photosphere: densZ^(2+…) → razor midplane at high ṁ
-      const densZPow = float(2).add(mdotHi.mul(2.2))
-      const densZPhot = pow(max(densZ, float(1e-6)), densZPow)
-      // Extra off-midplane kill (polar hourglass)
-      const zKill = exp(zNorm.mul(zNorm).mul(float(-0.35).sub(mdotHi.mul(1.8))))
-      const densEnv = densZ
-        .mul(radialGate)
-        .mul(densZPhot)
-        .mul(zKill)
-        .mul(float(1).sub(mdotHi.mul(0.25))) // overall dens soft-cap at high ṁ
-      // Torus dens peak from ℓ̃ (rPeak) — Gaussian envelope in log-r
-      const rPeak = max(uRPeakM.mul(M), rin.mul(1.05))
-      const lnPeak = log(max(rhoV.div(rPeak), float(1e-4)))
-      const peakEnv = exp(lnPeak.mul(lnPeak).mul(-1.1))
-      const dens = densEnv
-        .mul(float(1.2).add(uGrmhdMix.mul(densCube.mul(0.4))))
-        .mul(uRho0)
-        .mul(float(0.55).add(peakEnv.mul(0.7)))
-        .mul(float(0.7).add(uPerturb.mul(0.6)))
-      const sphR = pos.length()
+              // densEnv gate (sech² + rim + photosphere) → singularity noise dens.
+              // Heavy spiral/MRI analytic dens was unused after singularity path (densAnalytic dead).
+              const span = max(rout.sub(rin), M.mul(4))
+              const xRad = min(float(1), max(float(0), rhoV.sub(rin).div(span)))
+              const dustW = pow(max(xRad.sub(float(0.24)), float(0)).div(0.76), float(1.35))
+              const hOverR = uScaleH.mul(
+                float(0.14)
+                  .add(pow(xRad.add(0.05), float(1.15)).mul(1.75))
+                  .add(dustW.mul(0.95)),
+              )
+              const invRhoV = float(1).div(max(rhoV, float(1e-5)))
+              const cphiV = hxV.mul(invRhoV)
+              const sphiV = hzV.mul(invRhoV)
+              // Material-frame shear — midplane warp + cube advection when GRMHD mix > 0
+              const rhoM = max(rhoV.div(M), float(1e-4))
+              const OmegaDim = pow(rhoM, float(-1.5))
+              const sense = uPrograde.greaterThan(0.5).select(float(1), float(-1))
+              const shear = sense
+                .mul(uShearRate)
+                .mul(uAnim)
+                .mul(float(6))
+                .mul(OmegaDim)
+                .mul(uTime)
+              const drag = aStar.mul(float(2.1)).div(max(rhoM, float(1.05)))
+              const ltWind = aStar.mul(float(2.8)).div(max(rhoM.mul(rhoM).mul(rhoM), float(1.2)))
+              const shearTot = shear.add(drag.mul(float(1).add(uTime.mul(0.12)))).add(ltWind)
+              const csh = cos(shearTot)
+              const ssh = sin(shearTot)
+              const cx = cphiV.mul(csh).sub(sphiV.mul(ssh))
+              const sx = cphiV.mul(ssh).add(sphiV.mul(csh))
+              const c2 = cx.mul(cx).sub(sx.mul(sx))
+              const s2 = cx.mul(sx).mul(2)
+              // Irregular outer rim: m=3 soft
+              const c3 = cphiV.mul(cphiV.mul(cphiV).sub(sphiV.mul(sphiV).mul(3)))
+              const s3 = sphiV.mul(cphiV.mul(cphiV).mul(3).sub(sphiV.mul(sphiV)))
+              const rimN = fract(sin(cphiV.mul(4.1).add(sphiV.mul(3.3)).add(3.1)).mul(43758.5453))
+              const rimWobble = float(0.5).add(
+                float(0.5).mul(c3.mul(0.45).add(s3.mul(0.2)).add(rimN.mul(0.35)).sub(0.1)),
+              )
+              const routEff = rout.mul(float(0.86).add(rimWobble.mul(0.16)))
+              const fadeW = max(span.mul(0.28), M.mul(2.0))
+              const outerLin = min(float(1), max(float(0), routEff.sub(rhoV).div(fadeW)))
+              const outerSoft = pow(outerLin, float(1.4))
+              const fadeIn = max(rin.mul(0.18), M.mul(0.3))
+              const innerLin = min(float(1), max(float(0), rhoV.sub(rin).div(fadeIn)))
+              const innerSoft = pow(innerLin, float(0.9))
+              const radialGate = outerSoft.mul(innerSoft)
+              const Hloc = max(hOverR.mul(max(rhoV, M.mul(2))), M.mul(0.02))
+              // Mild m=2 midplane warp
+              const warpAmp = Hloc.mul(float(0.08)).mul(uStructure.add(0.35))
+              const midY = s2.mul(warpAmp).add(c2.mul(warpAmp.mul(0.3)))
+              const zWob = sx.mul(0.1).add(cx.mul(0.05)).mul(Hloc)
+              const zNorm = abs(diskY.sub(midY).sub(zWob)).div(Hloc.mul(float(1.05).add(dustW.mul(0.3))))
+              const coshZ = exp(zNorm).add(exp(zNorm.mul(-1))).mul(0.5)
+              const densZ = float(1).div(max(coshZ.mul(coshZ), float(1e-5)))
+              // Cube dens — skip 3D texture fetches when mix≈0 (boot analytic default).
+              // Uniform-coherent branch: identical dens when uGrmhdMix=0.
+              const densCube = float(0).toVar()
+              If(uGrmhdMix.greaterThan(0.001), () => {
+                const xAdv = cx.mul(rhoV)
+                const zAdv = sx.mul(rhoV)
+                const yAdv = diskY.div(max(M, float(1e-8)))
+                const ux = xAdv.sub(uCubeOx).div(max(uCubeEx, float(1e-6)))
+                const uy = yAdv.sub(uCubeOy).div(max(uCubeEy, float(1e-6)))
+                const uz = zAdv.sub(uCubeOz).div(max(uCubeEz, float(1e-6)))
+                const uvw = vec3(ux, uy, uz)
+                const mx = max(float(1).sub(abs(ux.mul(2).sub(1))), float(0))
+                const my = max(float(1).sub(abs(uy.mul(2).sub(1))), float(0))
+                const mz = max(float(1).sub(abs(uz.mul(2).sub(1))), float(0))
+                const boxMask = mx.mul(my).mul(mz)
+                const cubeRaw = cubeTexNode.sample(uvw).r.mul(uCubeScale).mul(float(1.6))
+                const uvwN = uvw.add(vec3(0.008, 0.004, 0.006))
+                const cubeN = cubeTexNode.sample(uvwN).r.mul(uCubeScale).mul(float(1.6))
+                const densEdge = abs(cubeRaw.sub(cubeN)).mul(float(3.2))
+                densCube.assign(
+                  max(cubeRaw, float(0))
+                    .mul(boxMask)
+                    .mul(float(0.78).add(min(densEdge, float(1.0)).mul(0.4))),
+                )
+              })
+              // High-ṁ photosphere (mdotHi from RT scope): kill polar hourglass
+              // Photosphere: densZ^(2+…) → razor midplane at high ṁ
+              const densZPow = float(2).add(mdotHi.mul(2.2))
+              const densZPhot = pow(max(densZ, float(1e-6)), densZPow)
+              // Extra off-midplane kill (polar hourglass)
+              const zKill = exp(zNorm.mul(zNorm).mul(float(-0.35).sub(mdotHi.mul(1.8))))
+              const densEnv = densZ
+                .mul(radialGate)
+                .mul(densZPhot)
+                .mul(zKill)
+                .mul(float(1).sub(mdotHi.mul(0.25))) // overall dens soft-cap at high ṁ
+              // Torus dens peak from ℓ̃ (rPeak) — Gaussian envelope in log-r
+              const rPeak = max(uRPeakM.mul(M), rin.mul(1.05))
+              const lnPeak = log(max(rhoV.div(rPeak), float(1e-4)))
+              const peakEnv = exp(lnPeak.mul(lnPeak).mul(-1.1))
+              const dens = densEnv
+                .mul(float(1.2).add(uGrmhdMix.mul(densCube.mul(0.4))))
+                .mul(uRho0)
+                .mul(float(0.55).add(peakEnv.mul(0.7)))
+                .mul(float(0.7).add(uPerturb.mul(0.6)))
+              const sphR = pos.length()
 
-      // Singularity look path (noise dens + dual edge + α) — BB chroma only (not gold)
-      If(
-        dens
-          .greaterThan(0.008)
-          .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01))))
-          .and(transm.greaterThan(0.03)),
-        () => {
-          // Tighter path Δs at high ṁ — less volume stack per step
-          const dsHCap = float(0.5).mul(float(1).sub(mdotHi.mul(0.45)))
-          const dsH = min(ds.div(max(Hloc, M.mul(0.05))), max(dsHCap, float(0.18)))
-          // Harder Beer at high ṁ (photosphere saturates, no white funnel)
-          const beerK = float(0.55).add(mdotHi.mul(0.85))
-          const beer = exp(diskTau.mul(beerK.mul(-1)))
-          // Compressive ṁ weight (not linear dens stack)
-          const mdotW = float(1).div(float(1).add(mdotHi.mul(1.4)))
-          const w = dens
-            .mul(dsH)
-            .mul(beer)
-            .mul(float(1.25))
-            .mul(sqrt(max(uPolyT, float(0.2))))
-            .mul(mdotW)
-          If(w.greaterThan(0.004), () => {
-            // Orbiting g for Doppler beam + Wien T_obs (realism; dens path)
-            const nRayD = vel.normalize()
-            const freqD = orbitingDiskG({
-              hx: hxV,
-              hz: hzV,
-              M,
-              a,
-              Q,
-              rs,
-              nRay: nRayD,
-              uPrograde,
-            })
-            const beamExpD = uIdealBeam
-              .greaterThan(0.5)
-              .select(float(DISK_EMISSION.beamExponentIdeal), float(DISK_EMISSION.beamExponent))
-            const beamFlD = uIdealBeam
-              .greaterThan(0.5)
-              .select(float(DISK_EMISSION.beamFloorIdeal), float(DISK_EMISSION.beamFloor))
-            const beamD = pow(max(freqD, beamFlD), beamExpD)
-            singularityDiskComposite({
-              pos: diskPos,
-              M,
-              rCapture,
-              rout,
-              uTime,
-              noiseDeepMap,
-              col,
-              transm,
-              hits,
-              weight: w,
-              beam: beamD,
-              freq: freqD,
-              mdot,
-              rinOverM: uRIscoM,
-            })
-            diskTau.addAssign(w.mul(float(0.35).add(mdotHi.mul(0.45))))
-          })
-        },
-      )
-        },
-      )
+              // Singularity look path (noise dens + dual edge + α) — BB chroma only (not gold)
+              If(
+                dens
+                  .greaterThan(0.008)
+                  .and(sphR.greaterThan(rCapture.mul(float(RT.captureMargin).add(0.01))))
+                  .and(transm.greaterThan(0.03)),
+                () => {
+                  // Tighter path Δs at high ṁ — less volume stack per step
+                  const dsHCap = float(0.5).mul(float(1).sub(mdotHi.mul(0.45)))
+                  const dsH = min(ds.div(max(Hloc, M.mul(0.05))), max(dsHCap, float(0.18)))
+                  // Harder Beer at high ṁ (photosphere saturates, no white funnel)
+                  const beerK = float(0.55).add(mdotHi.mul(0.85))
+                  const beer = exp(diskTau.mul(beerK.mul(-1)))
+                  // Compressive ṁ weight (not linear dens stack)
+                  const mdotW = float(1).div(float(1).add(mdotHi.mul(1.4)))
+                  const w = dens
+                    .mul(dsH)
+                    .mul(beer)
+                    .mul(float(1.25))
+                    .mul(sqrt(max(uPolyT, float(0.2))))
+                    .mul(mdotW)
+                  If(w.greaterThan(0.004), () => {
+                    // Orbiting g for Doppler beam + Wien T_obs (realism; dens path)
+                    const nRayD = vel.normalize()
+                    const freqD = orbitingDiskG({
+                      hx: hxV,
+                      hz: hzV,
+                      M,
+                      a,
+                      Q,
+                      rs,
+                      nRay: nRayD,
+                      uPrograde,
+                    })
+                    const beamExpD = uIdealBeam
+                      .greaterThan(0.5)
+                      .select(float(DISK_EMISSION.beamExponentIdeal), float(DISK_EMISSION.beamExponent))
+                    const beamFlD = uIdealBeam
+                      .greaterThan(0.5)
+                      .select(float(DISK_EMISSION.beamFloorIdeal), float(DISK_EMISSION.beamFloor))
+                    const beamD = pow(max(freqD, beamFlD), beamExpD)
+                    singularityDiskComposite({
+                      pos: diskPos,
+                      M,
+                      rCapture,
+                      rout,
+                      uTime,
+                      noiseDeepMap,
+                      col,
+                      transm,
+                      hits,
+                      weight: w,
+                      beam: beamD,
+                      freq: freqD,
+                      mdot,
+                      rinOverM: uRIscoM,
+                    })
+                    diskTau.addAssign(w.mul(float(0.35).add(mdotHi.mul(0.45))))
+                  })
+                },
+              )
+                },
+              )
       // Hot dilute corona — KEEP WEAK; was ∝ mdot and drew polar hourglass
       If(
         rhoV

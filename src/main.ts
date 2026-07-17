@@ -101,14 +101,14 @@ async function boot(): Promise<void> {
     await renderer.init()
   } catch (err) {
     showError(
-          [
-            'WebGPU failed to initialize.',
-            '',
-            err instanceof Error ? err.message : String(err),
-            '',
-            'Use Chrome/Edge with WebGPU enabled.',
-          ].join('\n'),
-        )
+      [
+        'WebGPU failed to initialize.',
+        '',
+        err instanceof Error ? err.message : String(err),
+        '',
+        'Use Chrome/Edge with WebGPU enabled.',
+      ].join('\n'),
+    )
     return
   }
 
@@ -130,7 +130,7 @@ async function boot(): Promise<void> {
     // Analytic dens if cube missing
   }
 
-  renderer.setAnimationLoop(() => {
+  function frame(): void {
     const now = performance.now()
     const dt = Math.min((now - last) / 1000, 1 / 20)
     last = now
@@ -160,7 +160,24 @@ async function boot(): Promise<void> {
         )
       }
     }
+  }
+
+  // Pause GPU work when tab hidden — zero visual impact while viewing
+  let loopOn = true
+  const setLoop = (on: boolean): void => {
+    if (on === loopOn) return
+    loopOn = on
+    if (on) {
+      last = performance.now()
+      renderer.setAnimationLoop(frame)
+    } else {
+      renderer.setAnimationLoop(null)
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    setLoop(document.visibilityState === 'visible')
   })
+  renderer.setAnimationLoop(frame)
 }
 
 boot()
