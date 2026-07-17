@@ -18,6 +18,7 @@ import { setIdealBeam } from '../state/idealBeam'
 import { setScaleFree } from '../state/scaleFree'
 import {
   setQuality,
+  getQuality,
   subscribeQuality,
   type QualityLevel,
 } from '../state/quality'
@@ -31,6 +32,7 @@ import {
   setRangeValue,
   setText,
 } from './controlBind'
+import { captureAndDownloadScreenshot } from './screenshot'
 import { mountControlInfo } from './controlInfo'
 import { buildControlsHtml } from './controlsMarkup'
 import { fmt } from './format'
@@ -54,9 +56,17 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 /** Expert free-base panel (ṁ not free). Slider + typed number on each free lever. */
+export type ControlsOptions = {
+  /** Live canvas (WebGPU renderer.domElement). */
+  getCanvas?: () => HTMLCanvasElement
+  /** Run one frame of the post stack before capture. */
+  renderFrame?: () => void
+}
+
 export function mountControls(
   root: HTMLElement,
   derivedRoot: HTMLElement | null,
+  options: ControlsOptions = {},
 ): void {
   root.innerHTML = buildControlsHtml()
   setScaleFree(true)
@@ -393,19 +403,60 @@ export function mountControls(
   })
 
   for (const btn of presetBtns) {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.preset
-      if (!id) return
-      withBatch(() => {
-        applyPreset(id)
-        setScaleFree(true)
-        setIdealBeam(true)
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.preset
+        if (!id) return
+        withBatch(() => {
+          applyPreset(id)
+          setScaleFree(true)
+          setIdealBeam(true)
+        })
+        setActivePresetUi(id, btn.title || id)
       })
-      setActivePresetUi(id, btn.title || id)
-    })
-  }
+    }
 
-  subscribe((p) => {
+    const shotBtn = qs<HTMLButtonElement>(root, '#btn-screenshot')
+    const shotStatus = qs<HTMLElement>(root, '#screenshot-status')
+    shotBtn?.addEventListener('click', () => {
+      void (async () => {
+        if (!options.getCanvas || !options.renderFrame) {
+          if (shotStatus) shotStatus.textContent = 'Screenshot not ready'
+          return
+        }
+        if (shotBtn) shotBtn.disabled = true
+        if (shotStatus) shotStatus.textContent = 'Capturing…'
+        try {
+          const p = getParams()
+          const q = getQuality()
+          const result = await captureAndDownloadScreenshot({
+            getCanvas: options.getCanvas,
+            renderFrame: options.renderFrame,
+            tags: [
+              q.level,
+              `a${fmt(p.spinStar, 2)}`,
+              p.charge > 1e-4 ? `Q${fmt(p.charge, 2)}` : '',
+            ],
+          })
+          if (shotStatus) {
+            shotStatus.textContent = `Saved ${result.width}×${result.height}`
+          }
+        } catch (err) {
+          if (shotStatus) {
+            shotStatus.textContent =
+              err instanceof Error ? err.message : 'Screenshot failed'
+          }
+        } finally {
+          if (shotBtn) shotBtn.disabled = false
+          window.setTimeout(() => {
+            if (shotStatus && shotStatus.textContent?.startsWith('Saved')) {
+              shotStatus.textContent = ''
+            }
+          }, 4_000)
+        }
+      })()
+    })
+
+    subscribe((p) => {
     syncPhysicsInputs(p)
     syncDerived(getDerived())
   })

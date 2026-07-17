@@ -52,6 +52,17 @@ bridge.connect()
 
 let bloomPipeline: ReturnType<typeof createBloomPipeline> | null = null
 let debugHud: ReturnType<typeof mountDebugHud> | null = null
+const t0 = performance.now()
+
+/** One frame of the full post stack (used by the animation loop + screenshot). */
+function renderOneFrame(): void {
+  tracer.setTime((performance.now() - t0) / 1000)
+  if (bloomPipeline) {
+    bloomPipeline.render()
+  } else {
+    renderer.render(scene, camera)
+  }
+}
 
 function onResize(): void {
   const w = Math.floor(window.visualViewport?.width ?? window.innerWidth)
@@ -73,7 +84,10 @@ subscribeQuality((q) => {
 const mobileHud = mountMobileHud()
 
 if (controlsEl) {
-  mountControls(controlsEl, derivedEl)
+  mountControls(controlsEl, derivedEl, {
+    getCanvas: () => renderer.domElement as HTMLCanvasElement,
+    renderFrame: renderOneFrame,
+  })
 }
 if (debugEl) {
   debugHud = mountDebugHud(debugEl)
@@ -94,7 +108,6 @@ renderer.domElement.addEventListener('click', (ev) => {
 let frames = 0
 let fpsAccum = 0
 let last = performance.now()
-const t0 = performance.now()
 
 async function boot(): Promise<void> {
   try {
@@ -135,14 +148,7 @@ async function boot(): Promise<void> {
     const dt = Math.min((now - last) / 1000, 1 / 20)
     last = now
 
-    // Keplerian disk shear / plasma structure animation
-    tracer.setTime((now - t0) / 1000)
-
-    if (bloomPipeline) {
-      bloomPipeline.render()
-    } else {
-      renderer.render(scene, camera)
-    }
+    renderOneFrame()
 
     debugHud?.tickHealth()
 

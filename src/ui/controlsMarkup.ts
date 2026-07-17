@@ -80,8 +80,14 @@ export function buildControlsHtml(): string {
       ).join('')}
     </div>
     <p class="ctrl-hint" id="preset-hint">Hot · Cool · Interstellar · ṁ derived on HUD</p>
+        <div class="export-row">
+          <button type="button" id="btn-screenshot" class="preset-btn export-btn" title="Download a PNG of the current view at full canvas resolution (includes DPR)">
+            Screenshot PNG
+          </button>
+          <span class="ctrl-hint" id="screenshot-status" aria-live="polite"></span>
+        </div>
 
-    <div class="ctrl-section">Black hole (no-hair)</div>
+        <div class="ctrl-section">Black hole (no-hair)</div>
     ${sliderRow(
       'spin',
       'Spin a★',

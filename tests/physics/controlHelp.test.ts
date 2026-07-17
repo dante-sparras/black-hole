@@ -48,6 +48,8 @@ describe('control 🛈 help', () => {
     expect(html).toContain('id="d-rin"')
     expect(html).not.toContain('id="d-mdot"')
     expect(html).not.toContain('id="p-mass"')
+    expect(html).toContain('id="btn-screenshot"')
+    expect(html).toContain('Screenshot PNG')
     expect(html).toContain('class="ctrl-num"')
     expect(html).toContain('type="number"')
     expect(html).toContain('data-val="spin"')
