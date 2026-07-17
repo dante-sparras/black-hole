@@ -53,10 +53,8 @@ function sliderRow(
 }
 
 /**
- * Expert free bases: ρ₀, H/r, Γ, β₀, r_in, r_out, tilt, jet.
- * ṁ is scenario/preset — derived HUD only.
- * Mass locked M=1 (scale-free camera) — not a free look lever.
- * Each slider has a paired number field (drag or type).
+ * Free controls only — no section blurb clutter.
+ * Scale-free note once at top; details on 🛈 cards.
  */
 export function buildControlsHtml(): string {
   const distLim = CAMERA_LIMITS.distanceM
@@ -72,6 +70,8 @@ export function buildControlsHtml(): string {
   const outer = DISK_LIMITS.outerM
 
   return `
+    <p class="ctrl-hint controls-lede">Scale-free · D = d·M · M = 1 locked</p>
+
     <div class="ctrl-section">Presets</div>
     <div class="preset-grid" id="preset-grid">
       ${ALL_PRESETS.map(
@@ -79,15 +79,14 @@ export function buildControlsHtml(): string {
           `<button type="button" class="preset-btn" data-preset="${p.id}" title="${p.hint}">${p.label}</button>`,
       ).join('')}
     </div>
-    <p class="ctrl-hint" id="preset-hint">Hot · Cool · Interstellar · ṁ derived on HUD</p>
-        <div class="export-row">
-          <button type="button" id="btn-screenshot" class="preset-btn export-btn" title="Download a PNG of the current view at full canvas resolution (includes DPR)">
-            Screenshot PNG
-          </button>
-          <span class="ctrl-hint" id="screenshot-status" aria-live="polite"></span>
-        </div>
+    <div class="export-row">
+      <button type="button" id="btn-screenshot" class="preset-btn export-btn" title="Download a PNG of the current view at full canvas resolution (includes DPR)">
+        Screenshot PNG
+      </button>
+      <span class="ctrl-hint" id="screenshot-status" aria-live="polite"></span>
+    </div>
 
-        <div class="ctrl-section">Black hole (no-hair)</div>
+    <div class="ctrl-section">Black hole</div>
     ${sliderRow(
       'spin',
       'Spin a★',
@@ -104,9 +103,8 @@ export function buildControlsHtml(): string {
       'charge',
       { min: 0, max: 0.95, step: 0.01 },
     )}
-    <p class="ctrl-hint">M = 1 locked (scale-free) · a★ ∈ [−0.998, +0.998] · drag or type</p>
 
-    <div class="ctrl-section">Accretion disk (free bases)</div>
+    <div class="ctrl-section">Accretion disk</div>
     ${sliderRow(
       'rho0',
       'ρ₀ dens',
@@ -171,7 +169,6 @@ export function buildControlsHtml(): string {
       'jet',
       { min: 0, max: 1, step: 0.01 },
     )}
-    <p class="ctrl-hint">Free: ρ₀ · H/r · Γ · β₀ · r_in · r_out · tilt · jet · type or drag</p>
 
     <div class="ctrl-section">Observer</div>
     ${sliderRow(
@@ -206,9 +203,8 @@ export function buildControlsHtml(): string {
       'fov',
       { min: fovLim.min, max: fovLim.max, step: 0.01 },
     )}
-    <p class="ctrl-hint">Scale-free D = d·M · drag canvas to orbit</p>
 
-    <div class="ctrl-section">Numerics (not physics)</div>
+    <div class="ctrl-section">Numerics</div>
     ${selectRow(
       'quality',
       'Quality',
@@ -220,23 +216,22 @@ export function buildControlsHtml(): string {
       'quality',
     )}
     ${selectRow(
-          'grmhd',
-          'Density src',
-          `<select id="grmhd-src" class="ctrl-select">
-            <option value="analytic" selected>Analytic</option>
-            <option value="cube">GRMHD cube</option>
-          </select>`,
-          'grmhd',
-        )}
+      'grmhd',
+      'Density src',
+      `<select id="grmhd-src" class="ctrl-select">
+        <option value="analytic" selected>Analytic</option>
+        <option value="cube">GRMHD cube</option>
+      </select>`,
+      'grmhd',
+    )}
 
-        <div class="ctrl-section">Developer</div>
-        <label class="ctrl debug-master-row" for="dbg-master">
-          <span class="ctrl-label">
-            <span class="ctrl-name">Debug mode</span>
-          </span>
-          <input type="checkbox" id="dbg-master" />
-          <span class="ctrl-val" id="dbg-master-val">off</span>
-        </label>
-        <p class="ctrl-hint">Off by default · tools &amp; health appear below when enabled</p>
-      `
-    }
+    <div class="ctrl-section">Developer</div>
+    <label class="ctrl debug-master-row" for="dbg-master">
+      <span class="ctrl-label">
+        <span class="ctrl-name">Debug mode</span>
+      </span>
+      <input type="checkbox" id="dbg-master" />
+      <span class="ctrl-val" id="dbg-master-val">off</span>
+    </label>
+  `
+}

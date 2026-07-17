@@ -106,24 +106,19 @@ export function mountControls(
   const distNum = qs<HTMLInputElement>(root, 'input.ctrl-num[data-val="dist"]')
   const incNum = qs<HTMLInputElement>(root, 'input.ctrl-num[data-val="inc"]')
   const azNum = qs<HTMLInputElement>(root, 'input.ctrl-num[data-val="az"]')
-  const fovNum = qs<HTMLInputElement>(root, 'input.ctrl-num[data-val="fov"]')
+    const fovNum = qs<HTMLInputElement>(root, 'input.ctrl-num[data-val="fov"]')
 
-  const presetHint = qs<HTMLElement>(root, '#preset-hint')
-  const presetBtns = root.querySelectorAll<HTMLButtonElement>('[data-preset]')
-  let activePresetId: string | null = null
+    const presetBtns = root.querySelectorAll<HTMLButtonElement>('[data-preset]')
+    let activePresetId: string | null = null
 
-  function setActivePresetUi(id: string | null, hint?: string): void {
-    activePresetId = id
-    for (const btn of presetBtns) {
-      const on = btn.dataset.preset === id
-      btn.classList.toggle('active', on)
-      btn.setAttribute('aria-pressed', on ? 'true' : 'false')
+    function setActivePresetUi(id: string | null, _hint?: string): void {
+      activePresetId = id
+      for (const btn of presetBtns) {
+        const on = btn.dataset.preset === id
+        btn.classList.toggle('active', on)
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false')
+      }
     }
-    if (presetHint) {
-      presetHint.textContent =
-        hint ?? 'Hot · Cool · Interstellar · ṁ derived on HUD'
-    }
-  }
   function onUserTweaked(): void {
     if (activePresetId !== null) setActivePresetUi(null)
   }

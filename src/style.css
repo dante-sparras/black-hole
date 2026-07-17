@@ -205,6 +205,13 @@ canvas {
   line-height: 1.35;
 }
 
+.controls-lede {
+  margin: 0 0 2px;
+  color: #8aa0c8;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
 .ctrl {
   display: grid;
   grid-template-columns: minmax(72px, 86px) 1fr minmax(56px, 64px);
