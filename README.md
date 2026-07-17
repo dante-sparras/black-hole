@@ -3,6 +3,9 @@
 Best-effort general-relativistic black hole visualization in the browser
 (WebGPU + Three.js / TSL).
 
+**Live demo:** [https://dante-sparras.github.io/black-hole/](https://dante-sparras.github.io/black-hole/)  
+(WebGPU-capable browser required — Chrome/Edge recommended.)
+
 ## No-hair core
 
 1. **Mass \(M\)** — scale  
