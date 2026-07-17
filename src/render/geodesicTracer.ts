@@ -137,13 +137,15 @@ export function createGeodesicTracer(): GeodesicTracer {
 
   // Singularity-style deep noise dens layer (2D, spiral UV)
   // publicUrl() — must work under Vite base (e.g. /black-hole/ on GitHub Pages)
+  // Texture AA: trilinear mips (UV density varies across dens spiral) — no dens formula change
   const noiseDeepMap = new THREE.TextureLoader().load(publicUrl('noise_deep.png'))
   noiseDeepMap.wrapS = THREE.RepeatWrapping
   noiseDeepMap.wrapT = THREE.RepeatWrapping
-  noiseDeepMap.minFilter = THREE.LinearFilter
+  noiseDeepMap.minFilter = THREE.LinearMipmapLinearFilter
   noiseDeepMap.magFilter = THREE.LinearFilter
   noiseDeepMap.colorSpace = THREE.NoColorSpace
-  noiseDeepMap.generateMipmaps = false
+  noiseDeepMap.generateMipmaps = true
+  noiseDeepMap.anisotropy = 4
 
   const STEPS = RT.maxSteps
 
@@ -196,11 +198,12 @@ export function createGeodesicTracer(): GeodesicTracer {
     const vel = dir0.toVar()
     // Singularity-inspired: per-pixel ray origin jitter kills volume banding (onion rings)
     // Static in time so the image is stable; hash from screen coords only.
+    // Mild amplitude (was 0.9×baseStep) — less sample grit; SMAA cleans residual edges.
     const pix = ndc.mul(screenSize.xy)
     const nJ = fract(
       sin(dot(pix, vec2(12.9898, 78.233))).mul(43758.5453),
     )
-    pos.addAssign(vel.mul(nJ.sub(0.5).mul(M.mul(float(RT.baseStepM).mul(0.9)))))
+    pos.addAssign(vel.mul(nJ.sub(0.5).mul(M.mul(float(RT.baseStepM).mul(0.45)))))
 
     const col = vec3(0, 0, 0).toVar()
     const transm = float(1).toVar()

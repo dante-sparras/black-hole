@@ -20,7 +20,8 @@ export type QualityConfig = {
 export const QUALITY_PRESETS: Record<QualityLevel, Omit<QualityConfig, 'level'>> = {
   low: {
     maxSteps: 340,
-    dpr: 0.8,
+    /** Keep full pixel density so post-AA (SMAA) has room to work on mobile */
+    dpr: 1,
     volumeStride: 4,
     baseStepM: 0.15,
   },

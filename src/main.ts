@@ -63,9 +63,11 @@ function onResize(): void {
 window.addEventListener('resize', onResize)
 window.visualViewport?.addEventListener('resize', onResize)
 window.visualViewport?.addEventListener('scroll', onResize)
-subscribeQuality(() => {
+// Quality → DPR/size + post-AA scale (bloomPipeline set after init)
+subscribeQuality((q) => {
   applyDpr()
   onResize()
+  bloomPipeline?.setQualityLevel(q.level)
 })
 
 const mobileHud = mountMobileHud()
@@ -110,10 +112,11 @@ async function boot(): Promise<void> {
     return
   }
 
-  bloomPipeline = createBloomPipeline(renderer, scene, camera, getLook())
+  bloomPipeline = createBloomPipeline(renderer, scene, camera, getLook(), getQuality().level)
   bridge.setBloomPipeline(bloomPipeline)
   // Bloom is created post-WebGPU init; look subscribe already ran before bloom existed.
   bridge.applyLook()
+  bloomPipeline.setQualityLevel(getQuality().level)
 
   // Default dens = analytic (demo cube still has high-m lace → face-on rings)
   // User can enable GRMHD cube via Numerics.
