@@ -33,6 +33,7 @@ import {
   setRangeValue,
   setText,
 } from './controlBind'
+import { mountControlInfo } from './controlInfo'
 import { buildControlsHtml } from './controlsMarkup'
 import { fmt, fmtMdot } from './format'
 import { renderDerivedHud } from './hud'
@@ -64,6 +65,7 @@ export function mountControls(
   root.innerHTML = buildControlsHtml()
   setScaleFree(true)
   setIdealBeam(true)
+  mountControlInfo(root)
 
   const massInput = qs<HTMLInputElement>(root, '#p-mass')
   const spinInput = qs<HTMLInputElement>(root, '#p-spin')

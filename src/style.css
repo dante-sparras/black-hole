@@ -94,15 +94,102 @@ canvas {
 
 .ctrl {
   display: grid;
-  grid-template-columns: 64px 1fr 44px;
+  grid-template-columns: minmax(72px, 86px) 1fr 48px;
   gap: 6px;
   align-items: center;
   color: #c8ccd2;
   font-size: 11px;
 }
 
+.ctrl-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
 .ctrl-name {
   color: #9aa0a8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctrl-info {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #3a4050;
+  border-radius: 50%;
+  background: #16181e;
+  color: #8aa0d0;
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.ctrl-info:hover,
+.ctrl-info:focus-visible,
+.ctrl-info[aria-expanded='true'] {
+  border-color: #7aa2ff;
+  color: #c8dcff;
+  background: #1a2438;
+  outline: none;
+}
+
+.ctrl-info:focus-visible {
+  box-shadow: 0 0 0 1px #7aa2ff;
+}
+
+/* Fixed card — escapes #hud overflow clip */
+.ctrl-info-card {
+  position: fixed;
+  z-index: 40;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 10px 12px;
+  border: 1px solid #3a4560;
+  border-radius: 10px;
+  background: rgba(12, 14, 20, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  color: #c8ccd2;
+  font: 11px/1.4 system-ui, -apple-system, sans-serif;
+  pointer-events: auto;
+  user-select: text;
+}
+
+.ctrl-info-card[hidden] {
+  display: none !important;
+}
+
+.ctrl-info-title {
+  margin-bottom: 4px;
+  color: #e8f0ff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ctrl-info-summary {
+  margin-bottom: 6px;
+  color: #7aa2ff;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.ctrl-info-body {
+  color: #9aa0a8;
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .ctrl-val {
