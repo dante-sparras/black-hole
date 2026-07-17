@@ -44,7 +44,6 @@ import { applyDebugFalseColor } from './tsl/debugFalseColor'
 import { sampleDeepSpaceSky } from './tsl/deepSpaceSky'
 import { accumulateDiskHit } from './tsl/diskHitEmission'
 import { processDiskVolumeSample } from './tsl/diskLayerHit'
-import { singularityDiskComposite } from './tsl/singularityDisk'
 import { knNullAccelTsl } from './tsl/knNullAccelTsl'
 
 export type {
@@ -758,7 +757,7 @@ export function createGeodesicTracer(): GeodesicTracer {
         .mul(float(0.7).add(uPerturb.mul(0.6)))
       const sphR = pos.length()
 
-      // Singularity look path (noise dens + dual edge + gold ramp + α)
+      // Physical volume emission: NT + Planck BB chroma (not gold ColorRamp)
       If(
         dens
           .greaterThan(0.008)
@@ -780,18 +779,38 @@ export function createGeodesicTracer(): GeodesicTracer {
             .mul(sqrt(max(uPolyT, float(0.2))))
             .mul(mdotW)
           If(w.greaterThan(0.004), () => {
-            singularityDiskComposite({
-              pos: diskPos,
+            processDiskVolumeSample({
+              hx: hxV,
+              hz: hzV,
+              weight: w,
+              densVert: densZ.mul(zKill),
               M,
-              rCapture,
+              a,
+              aStar,
+              Q,
+              rs,
+              mdot,
+              rin,
               rout,
-              uTime,
-              noiseDeepMap,
+              uRIscoM,
+              hits,
               col,
               transm,
-              hits,
-              weight: w,
-              beam: float(1),
+              dbgG,
+              dbgT,
+              dbgFlux,
+              uDebugMode,
+              uIdealBeam,
+              uTime,
+              uPrograde,
+              uStructure,
+              uArms,
+              uClumps,
+              uDust,
+              uScaleH,
+              uShearRate,
+              uAnim,
+              nRay: vel.normalize(),
             })
             diskTau.addAssign(w.mul(float(0.35).add(mdotHi.mul(0.45))))
           })
