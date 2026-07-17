@@ -34,7 +34,7 @@ import { DISK_EMISSION, R_ISCO_SCHW_OVER_M } from '../physics/disk'
 import { DEFAULT_DISK } from '../physics/diskParams'
 import { DISK_TEXTURE } from '../physics/diskTexture'
 import { createEmptyCube } from '../physics/grmhdCube'
-import { RT } from '../physics/geodesic/rtConstants'
+import { RT, rtMaxStepsForCamera } from '../physics/geodesic/rtConstants'
 import { OBSERVER_DEFAULTS } from '../physics/observer'
 import { DEBUG_DEFAULTS } from '../debug/state'
 import { SKY_DEFAULTS } from '../state/sky'
@@ -913,9 +913,23 @@ export function createGeodesicTracer(): GeodesicTracer {
     If(done.lessThan(0.5).and(minR.lessThan(M.mul(RT.stalledCaptureM))), () => {
       captured.assign(1)
     })
-    If(done.lessThan(0.5).and(minR.greaterThanEqual(M.mul(RT.stalledCaptureM))), () => {
-      escaped.assign(1)
-    })
+    // Incomplete far-camera rays: do NOT paint sky if still plunging or
+    // impact is inside critical scale — that made the hole vanish on zoom-out.
+    If(
+      done
+        .lessThan(0.5)
+        .and(minR.greaterThanEqual(M.mul(RT.stalledCaptureM))),
+      () => {
+        const inbound = dot(pos, vel).lessThan(0)
+        const shadowImpact = impactB.lessThan(M.mul(float(RT.stalledShadowImpactM)))
+        If(inbound.or(shadowImpact), () => {
+          captured.assign(1)
+        })
+        If(inbound.not().and(shadowImpact.not()), () => {
+          escaped.assign(1)
+        })
+      },
+    )
 
     // BL → Cartesian exit direction for lensed sky (RT already updates vel)
     If(useBl, () => {
@@ -1006,6 +1020,18 @@ export function createGeodesicTracer(): GeodesicTracer {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
   mesh.frustumCulled = false
 
+  let lastQualityMaxSteps = RT.defaultMaxSteps
+  let lastBaseStepM = RT.baseStepM
+
+  function refreshIntegrationBudget(): void {
+    const M = Math.max(uMass.value as number, 1e-8)
+    const dSlider = uCamDistM.value as number
+    const scaleFreeOn = (uScaleFree.value as number) > 0.5
+    const camD = scaleFreeOn ? dSlider * M : dSlider
+    uMaxSteps.value = rtMaxStepsForCamera(camD, M, lastQualityMaxSteps)
+    uBaseStepM.value = lastBaseStepM
+  }
+
   return {
     material,
     mesh,
@@ -1031,14 +1057,16 @@ export function createGeodesicTracer(): GeodesicTracer {
       uRho0.value = p.rho0
       uPolyT.value = p.polyTScale
       uRPeakM.value = p.rPeakOverM
-            uMadBoost.value = p.madBoost
+      uMadBoost.value = p.madBoost
       uPerturb.value = p.perturbAmp
+      refreshIntegrationBudget()
     },
     setCamera: (c) => {
       uCamDistM.value = c.distanceM
       uInclination.value = c.inclination
       uAzimuth.value = c.azimuth
       uFov.value = c.fov
+      refreshIntegrationBudget()
     },
     setSky: (s) => {
       uStarDensity.value = s.starDensity
@@ -1054,6 +1082,7 @@ export function createGeodesicTracer(): GeodesicTracer {
     },
     setScaleFree: (on) => {
       uScaleFree.value = on ? 1 : 0
+      refreshIntegrationBudget()
     },
     setIdealBeam: (on) => {
       uIdealBeam.value = on ? 1 : 0
@@ -1062,9 +1091,10 @@ export function createGeodesicTracer(): GeodesicTracer {
       uTime.value = seconds
     },
     setQuality: (q) => {
-      uMaxSteps.value = q.maxSteps
+      lastQualityMaxSteps = q.maxSteps
+      lastBaseStepM = q.baseStepM
       uVolumeStride.value = q.volumeStride
-      uBaseStepM.value = q.baseStepM
+      refreshIntegrationBudget()
     },
     setGrmhdCube: (gpu, mix) => {
       if (gpu) {
