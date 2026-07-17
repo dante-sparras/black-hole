@@ -23,3 +23,5 @@ tmp/
 tmp-ref.ppm
 yarn-debug.log*
 yarn-error.log*
+# Hermes agent local plans / session artifacts (not project source)
+.hermes/
