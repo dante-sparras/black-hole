@@ -12,6 +12,7 @@ import { getLook } from './state/look'
 import { getQuality, subscribeQuality } from './state/quality'
 import { mountControls } from './ui/controls'
 import { mountDebugHud } from './ui/debugHud'
+import { mountDebugMasterToggle, mountReadoutsCollapse } from './ui/hud'
 import { mountMobileHud } from './ui/mobileHud'
 import { mountOrbitControls } from './ui/orbit'
 
@@ -81,18 +82,19 @@ subscribeQuality((q) => {
 })
 
 const mobileHud = mountMobileHud()
+mountReadoutsCollapse()
 
 let debugHud: ReturnType<typeof mountDebugHud> | null = null
 
 if (debugEl) {
   debugHud = mountDebugHud(debugEl)
 }
+mountDebugMasterToggle((on) => debugHud?.setOpen(on))
 
 if (controlsEl) {
   mountControls(controlsEl, derivedEl, {
     getCanvas: () => renderer.domElement as HTMLCanvasElement,
     renderFrame: renderOneFrame,
-    setDebugOpen: (on) => debugHud?.setOpen(on),
   })
 }
 

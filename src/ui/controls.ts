@@ -61,8 +61,6 @@ export type ControlsOptions = {
   getCanvas?: () => HTMLCanvasElement
   /** Run one frame of the post stack before capture. */
   renderFrame?: () => void
-  /** Show/hide the debug tools panel (from Debug mode checkbox). */
-  setDebugOpen?: (on: boolean) => void
 }
 
 export function mountControls(
@@ -451,20 +449,12 @@ export function mountControls(
               }, 4_000)
             }
           })()
-        })
+              })
 
-      const dbgMaster = qs<HTMLInputElement>(root, '#dbg-master')
-      const dbgMasterVal = qs<HTMLElement>(root, '#dbg-master-val')
-      dbgMaster?.addEventListener('change', () => {
-        const on = Boolean(dbgMaster.checked)
-        if (dbgMasterVal) dbgMasterVal.textContent = on ? 'on' : 'off'
-        options.setDebugOpen?.(on)
-      })
-
-        subscribe((p) => {
-    syncPhysicsInputs(p)
-    syncDerived(getDerived())
-  })
+              subscribe((p) => {
+                syncPhysicsInputs(p)
+                syncDerived(getDerived())
+              })
   subscribeDisk((d) => {
     syncDiskInputs(d)
     syncDerived(getDerived())

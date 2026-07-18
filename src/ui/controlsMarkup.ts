@@ -216,22 +216,13 @@ export function buildControlsHtml(): string {
       'quality',
     )}
     ${selectRow(
-      'grmhd',
-      'Density src',
-      `<select id="grmhd-src" class="ctrl-select">
-        <option value="analytic" selected>Analytic</option>
-        <option value="cube">GRMHD cube</option>
-      </select>`,
-      'grmhd',
-    )}
-
-    <div class="ctrl-section">Developer</div>
-    <label class="ctrl debug-master-row" for="dbg-master">
-      <span class="ctrl-label">
-        <span class="ctrl-name">Debug mode</span>
-      </span>
-      <input type="checkbox" id="dbg-master" />
-      <span class="ctrl-val" id="dbg-master-val">off</span>
-    </label>
-  `
-}
+          'grmhd',
+          'Density src',
+          `<select id="grmhd-src" class="ctrl-select">
+            <option value="analytic" selected>Analytic</option>
+            <option value="cube">GRMHD cube</option>
+          </select>`,
+          'grmhd',
+        )}
+      `
+    }

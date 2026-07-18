@@ -27,6 +27,41 @@ import { getGrmhd } from '../state/grmhd'
 import { getIdealBeam } from '../state/idealBeam'
 import { fmt, fmtMdot, fmtTempK } from './format'
 
+/** Collapsible Readouts section (stats hidden until opened). Default closed. */
+export function mountReadoutsCollapse(): void {
+  const btn = document.getElementById('readouts-toggle') as HTMLButtonElement | null
+  const body = document.getElementById('readouts-body')
+  if (!btn || !body) return
+
+  const setOpen = (open: boolean): void => {
+    body.hidden = !open
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false')
+    btn.classList.toggle('open', open)
+    const chev = btn.querySelector('.section-toggle-chevron')
+    if (chev) chev.textContent = open ? '▾' : '▸'
+  }
+
+  // Default collapsed
+  setOpen(false)
+  btn.addEventListener('click', () => {
+      setOpen(Boolean(body.hidden))
+    })
+}
+
+/**
+ * Wire the bottom Debug mode checkbox to show/hide the debug tools panel.
+ */
+export function mountDebugMasterToggle(setOpen: (on: boolean) => void): void {
+  const master = document.getElementById('dbg-master') as HTMLInputElement | null
+  const val = document.getElementById('dbg-master-val')
+  if (!master) return
+  master.addEventListener('change', () => {
+    const on = Boolean(master.checked)
+    if (val) val.textContent = on ? 'on' : 'off'
+    setOpen(on)
+  })
+}
+
 export function renderDerivedHud(
   root: HTMLElement,
   params: BlackHoleParams,

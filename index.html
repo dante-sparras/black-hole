@@ -35,11 +35,32 @@
     </header>
     <div id="hud-body" class="hud-body">
       <div id="controls" class="controls"></div>
-      <div id="debug-panel" class="controls debug-panel" hidden></div>
+
       <section class="hud-readouts" aria-label="Derived science readouts">
-        <div class="ctrl-section">Readouts</div>
-        <p class="ctrl-hint">Derived only · drag canvas to orbit · scroll to zoom</p>
-        <dl id="derived" class="derived"></dl>
+        <button
+          type="button"
+          id="readouts-toggle"
+          class="section-toggle"
+          aria-expanded="false"
+          aria-controls="readouts-body"
+        >
+          <span class="section-toggle-label">Readouts</span>
+          <span class="section-toggle-chevron" aria-hidden="true">▸</span>
+        </button>
+        <div id="readouts-body" class="readouts-body" hidden>
+          <dl id="derived" class="derived"></dl>
+        </div>
+      </section>
+
+      <section class="debug-section" aria-label="Debug tools">
+        <label class="ctrl debug-master-row" for="dbg-master">
+          <span class="ctrl-label">
+            <span class="ctrl-name">Debug mode</span>
+          </span>
+          <input type="checkbox" id="dbg-master" />
+          <span class="ctrl-val" id="dbg-master-val">off</span>
+        </label>
+        <div id="debug-panel" class="controls debug-panel" hidden></div>
       </section>
     </div>
   </div>
